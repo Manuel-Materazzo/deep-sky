@@ -1,6 +1,7 @@
 # SP-01 · Push con FCM e configurazione a runtime (`TC-04`, `S-02`, `AD-04`)
 
 Specifiche tecniche per il prototipo `proto/sp-01` (Milestone M1, `docs/m0-m1-operative-plan.md`).
+Per la procedura passo-passo di creazione progetto su Firebase Console e configurazione del server, vedi [Firebase Setup Guide](firebase-setup.md).
 
 ## 1. Principi di sicurezza e privacy (`S-02`, `TC-04`)
 
