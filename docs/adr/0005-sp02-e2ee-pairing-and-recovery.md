@@ -29,4 +29,6 @@ The prototype on branch `proto/sp-02` implements and validates the protocol spec
   1. Entropy, domain separation strings, and AAD canonical encoding in `DeepSkyCrypto` & `RecoveryKeyCodec`.
   2. Recovery challenge rate-limiting / brute-force resistance when promoted alongside M2 production controllers.
   3. Key-rotation (`keyGeneration > 1`) automation strategy upon `S-06` revocation of a stolen device.
+  4. Pure-Dart cryptography (`package:cryptography` without `cryptography_flutter`): evaluate constant-time guarantees and timing side-channel risk on Android devices for `X25519`, `Ed25519`, and `XChaCha20-Poly1305`, deciding whether to add `cryptography_flutter` before `G-5` (`G5-09`).
+  5. Android Auto Backup & offline cache exclusion (`AD-06`): verify `AndroidManifest.xml` (`allowBackup="false"`, `dataExtractionRules`, `fullBackupContent`) prevents Google Auto Backup, `adb backup`, or device-to-device transfer from extracting key material, `SharedPreferences`, or local cache (`G5-06`).
 - **Remaining physical verification transitioned from `G-1` into M2 (`PD-05` gate):** Complete two real Android device pairing/recovery/enrollment/revocation checks and observed completion by two non-technical testers without verbal coaching (tracked in `docs/m2-operative-plan.md`) before storing real couple data (`PD-05`).

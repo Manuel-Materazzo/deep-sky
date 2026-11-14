@@ -252,7 +252,7 @@ Checklist di verifica:
 - [x] Il server non contiene **nulla** di leggibile: tipo degli eventi, testi, date delle capsule *(verificato con ispezione DB e schema ciphertext-only in `V2__sp02_pairing_and_sync.sql`)*
 - [x] Una busta manomessa o spostata tra coppie viene rifiutata *(verificato in `deep_sky_crypto_test.dart` tramite AAD canonico XChaCha20-Poly1305)*
 - [ ] Due persone non tecniche completano abbinamento e conferma di salvataggio della chiave **senza istruzioni**
-- [ ] ADR con esito e i punti da sottoporre a revisione indipendente *(bozza tecnica scritta in [ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md); manca chiusura post-test su telefoni reali)*
+- [ ] ADR con esito e i punti da sottoporre a revisione indipendente *(bozza tecnica scritta in [ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md); inclusi in M2/`G-5` la verifica esplicita di esclusione dal backup automatico Android e la valutazione di `cryptography` senza `cryptography_flutter`)*
 
 ### 3.2 SP-01 · Push con FCM e configurazione a runtime
 
@@ -339,8 +339,8 @@ Checklist di verifica:
 - [x] Documento architetturale aggiornato alla v0.2 con le correzioni emerse *(esportato in [Documento architetturale v0.2](architecture.md), chiude `REP-05`)*
 - [x] Decisioni AR-xx confermate, corrette o riaperte esplicitamente *(tabella `AR-01`–`AR-11` e risposte `AD-01`–`AD-10` in [architecture.md](architecture.md))*
 - [x] Elenco dei rischi aggiornato *(tabella post-M1 in [Considerazioni tecniche cap. 11](technical-considerations.md#11-rischi-tecnici))*
-- [x] Elenco dei punti da sottoporre a revisione indipendente (G-5) *(sezione `G5-01`–`G5-08` in [architecture.md](architecture.md))*
-- [x] Dettaglio di M2 preparato a partire dagli esiti *(in [Piano operativo M2](m2-operative-plan.md))*
+- [x] Elenco dei punti da sottoporre a revisione indipendente (G-5) *(sezione `G5-01`–`G5-09` in [architecture.md](architecture.md), incluse esclusione backup automatico Android e valutazione `cryptography` vs `cryptography_flutter`)*
+- [x] Dettaglio di M2 preparato a partire dagli esiti *(in [Piano operativo M2](m2-operative-plan.md), inclusa verifica esplicita Android Auto Backup)*
 - [x] Elenco del codice dei prototipi da promuovere in M2, con le pull request previste *(`PR-M2-01`–`PR-M2-07` dai rami `proto/sp-01`–`proto/sp-05` in [Piano operativo M2](m2-operative-plan.md))*
 
 ## 4. Tracciabilità
