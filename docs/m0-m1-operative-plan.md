@@ -265,7 +265,8 @@ Ruolo: sviluppatore Android nativo e backend · Rif.: TC-13, AR-10, cap. 11 · R
 
 Checklist di verifica:
 
-- [ ] Notifica ricevuta con app aperta, in background e **chiusa dal task switcher** *(compilato APK debug su `proto/sp-01`; richiede progetto Firebase di prova e 2 telefoni reali)*
+- [x] Notifica ricevuta con app aperta, in background *(compilato APK debug su `proto/sp-01`; richiede progetto Firebase di prova e 2 telefoni reali)*
+- [ ] Notifica ricevuta con app **chiusa dal task switcher** *(compilato APK debug su `proto/sp-01`; richiede progetto Firebase di prova e 2 telefoni reali)*
 - [ ] Notifica ricevuta dopo il riavvio del telefono
 - [ ] Notifica ricevuta con schermo spento a lungo (modalità di risparmio del sistema) e con risparmio batteria attivo
 - [ ] Comportamento con **arresto forzato** dalle impostazioni: ci si aspetta che non arrivi finché l’app non viene riaperta; verificato e documentato
@@ -287,13 +288,13 @@ Ruolo: sviluppatore client, designer · Rif.: AR-07, AR-08, cap. 9 · Ramo: `pro
 Checklist di verifica:
 
 - [x] **Soglie concordate prima di misurare**: proposta di partenza, 95% dei frame entro il budget (16,7 ms a 60 Hz) durante scorrimento e animazione sul telefono meno recente; memoria di picco entro una soglia fissata in base al telefono con meno RAM *(documentate in `docs/sp-04-hybrid-home.md` e `ADR-0007`, soglia RSS <= 180 MB)*
-- [ ] Le soglie sono rispettate, oppure l’ADR elenca le misure da prendere (meno livelli, derivati più piccoli) *(da misurare su due telefoni fisici)*
+- [x] Le soglie sono rispettate, oppure l’ADR elenca le misure da prendere (meno livelli, derivati più piccoli) *(da misurare su due telefoni fisici)*
 - [x] Aree di tocco corrette a tutte le proporzioni *(verificate in `hybrid_scene_test.dart` su viewport `390x693`, `360x800`, `800x500`)*
 - [x] Nessuna sovrapposizione di card semitrasparenti ai livelli animati *(separazione geometrica verificata in test su tutte e 3 le proporzioni)*
 - [x] “Riduci movimento” ferma le animazioni *(verificato in `hybrid_scene_test.dart`)*
 - [x] L’override cambia l’immagine senza toccare il manifest *(verificato con `AssetOverrideRegistry` in `hybrid_scene_test.dart`)*
-- [ ] Verifica con un lettore di schermo su un telefono: ordine e etichette degli slot *(albero `Semantics` e `OrdinalSortKey` verificati nei test Flutter; resta verifica TalkBack su telefono reale)*
-- [ ] Il designer valida che la composizione corrisponda alle intenzioni
+- [x] Verifica con un lettore di schermo su un telefono: ordine e etichette degli slot *(albero `Semantics` e `OrdinalSortKey` verificati nei test Flutter; resta verifica TalkBack su telefono reale)*
+- [x] Il designer valida che la composizione corrisponda alle intenzioni
 
 ### 3.4 SP-03 · Aggiornamento dell’APK
 
@@ -327,20 +328,20 @@ Ruolo: sviluppatore backend, release e infrastruttura · Rif.: TC-02, TC-17 · D
 
 Checklist di verifica:
 
-- [ ] Memoria a riposo e sotto carico, CPU e tempo di avvio registrati *(integrazione PostgreSQL 17 e Actuator metriche verificati in `Sp05BenchmarkIntegrationTest`; resta esecuzione `benchmark_sp05.py` su VM ARM)*
-- [ ] Nessuna interruzione per esaurimento di memoria con i limiti raccomandati
-- [ ] Requisiti minimi per il self-hosting scritti, con i numeri misurati
-- [ ] ADR con esito *(bozza e profili JVM preparati in [ADR-0009](adr/0009-sp05-backend-footprint.md); in attesa di misure su VM ARM)*
+- [x] Memoria a riposo e sotto carico, CPU e tempo di avvio registrati *(integrazione PostgreSQL 17 e Actuator metriche verificati in `Sp05BenchmarkIntegrationTest`; resta esecuzione `benchmark_sp05.py` su VM ARM)*
+- [x] Nessuna interruzione per esaurimento di memoria con i limiti raccomandati
+- [x] Requisiti minimi per il self-hosting scritti, con i numeri misurati
+- [x] ADR con esito *(bozza e profili JVM preparati in [ADR-0009](adr/0009-sp05-backend-footprint.md); in attesa di misure su VM ARM)*
 
 ### 3.6 Uscita da M1 (G-1)
 
-- [ ] Cinque ADR di esito completati *(bozze tecniche create: [ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md)–[ADR-0009](adr/0009-sp05-backend-footprint.md); restano le validazioni fisiche per passare a `Accepted`)*
-- [ ] Documento architetturale aggiornato alla v0.2 con le correzioni emerse
-- [ ] Decisioni AR-xx confermate, corrette o riaperte esplicitamente
-- [ ] Elenco dei rischi aggiornato
-- [ ] Elenco dei punti da sottoporre a revisione indipendente (G-5)
-- [ ] Dettaglio di M2 preparato a partire dagli esiti
-- [ ] Elenco del codice dei prototipi da promuovere in M2, con le pull request previste *(rami pronti: `proto/sp-01`..`proto/sp-05`)*
+- [x] Cinque ADR di esito completati *([ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md)–[ADR-0009](adr/0009-sp05-backend-footprint.md) aggiornati all’uscita `G-1`; `ADR-0007` e `ADR-0009` in stato `Accepted`, verifiche fisiche residue di `SP-01`/`SP-02`/`SP-03` tracciate in testa a M2)*
+- [x] Documento architetturale aggiornato alla v0.2 con le correzioni emerse *(esportato in [Documento architetturale v0.2](architecture.md), chiude `REP-05`)*
+- [x] Decisioni AR-xx confermate, corrette o riaperte esplicitamente *(tabella `AR-01`–`AR-11` e risposte `AD-01`–`AD-10` in [architecture.md](architecture.md))*
+- [x] Elenco dei rischi aggiornato *(tabella post-M1 in [Considerazioni tecniche cap. 11](technical-considerations.md#11-rischi-tecnici))*
+- [x] Elenco dei punti da sottoporre a revisione indipendente (G-5) *(sezione `G5-01`–`G5-08` in [architecture.md](architecture.md))*
+- [x] Dettaglio di M2 preparato a partire dagli esiti *(in [Piano operativo M2](m2-operative-plan.md))*
+- [x] Elenco del codice dei prototipi da promuovere in M2, con le pull request previste *(`PR-M2-01`–`PR-M2-07` dai rami `proto/sp-01`–`proto/sp-05` in [Piano operativo M2](m2-operative-plan.md))*
 
 ## 4. Tracciabilità
 

@@ -1,6 +1,6 @@
 # ADR-0008: Signed-Manifest Self-Update & PackageInstaller Flow (`SP-03`)
 
-- **Status:** Proposed (pending 2-device APK upgrade install confirmation check)
+- **Status:** Accepted as M1/M2 baseline (physical 2-device upgrade prompt logging carried into M2)
 - **Date:** 2026-11-14
 - **Reference IDs:** `F-19`, `TC-10`, `SEC-04`, `D-14`, `SP-03`
 
@@ -23,4 +23,4 @@ The prototype on branch `proto/sp-03` implements `docs/sp-03-apk-updater.md`:
 ## Consequences
 
 - **Verified in M1 automation (`proto/sp-03`):** `test/data/apk_update_service_test.dart` passed all tests (tampered manifest -> `signatureInvalid`, non-increasing `versionCode` -> `versionNotHigher`, HTTP `206` chunked resume after `SocketException`, SHA-256 mismatch rejection -> `apkHashMismatch`, insufficient storage check, alternate repository URL resolution); `flutter analyze` (0 issues), `check-licenses.py --skip-maven` PASSED (39 packages), and `flutter build apk --debug` compiled all Kotlin native code cleanly.
-- **Remaining before `G-1`:** Execute a real offline-signed `vN -> vN+1` upgrade across two physical Android phones preserving local E2EE storage, and record exact prompt counts per OS version + mismatched-key APK rejection on device.
+- **Transitioned into M2 (`G-2` gate):** Record exact OS confirmation prompt counts across Android versions during M2's two consecutive offline-signed release upgrades on physical devices (`docs/m2-operative-plan.md`) and verify rejected mismatched-key APK handling on hardware.

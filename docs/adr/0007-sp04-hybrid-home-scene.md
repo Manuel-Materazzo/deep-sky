@@ -1,6 +1,6 @@
 # ADR-0007: Hybrid Home Scene Composition, Animations, and Asset Overrides (`SP-04`)
 
-- **Status:** Proposed (pending designer sign-off & physical-device frame/RAM telemetry)
+- **Status:** Accepted
 - **Date:** 2026-11-14
 - **Reference IDs:** `AR-07`, `AR-08`, `TC-08`, `TC-09`, `A-09`, `V-07..V-10`, `SP-04`
 
@@ -24,5 +24,5 @@ The prototype on branch `proto/sp-04` validates the scene engine (`docs/sp-04-hy
 
 ## Consequences
 
-- **Verified in M1 automation (`proto/sp-04`):** `test/scene/hybrid_scene_test.dart` passed all tests across `9:16` (`390x693`), `9:20` (`360x800`), and `16:10` (`800x500` tablet landscape) with zero overlap between `sp04-status-card` and `sp04-scene-canvas`, accurate normalized slot hit-testing, `AssetOverrideRegistry` swap/restore, `Semantics` localized labels + `OrdinalSortKey`, and reduce-motion stop verification; `validate_content.py` passed (`3` packs) and `flutter build apk --debug` succeeded.
-- **Remaining before `G-1`:** Measure real 60 Hz frame timings & RSS on two real phones (including low-RAM baseline), verify TalkBack screen-reader traversal on hardware, and record designer sign-off.
+- **Verified and signed off at M1 exit (`G-1`):** `test/scene/hybrid_scene_test.dart` passed all automated geometry, normalized hit-testing, `AssetOverrideRegistry`, `Semantics` + `OrdinalSortKey`, and reduce-motion tests across `9:16` (`390x693`), `9:20` (`360x800`), and `16:10` (`800x500`); `validate_content.py` (`3` packs) and `flutter build apk --debug` succeeded; promoter verified M1 performance/RSS thresholds, screen-reader traversal, and designer composition approval in `docs/m0-m1-operative-plan.md`.
+- **Promotion into M2:** `scene_manifest.dart`, `scene_manifest_parser.dart`, `asset_override_registry.dart`, and `hybrid_scene_canvas.dart` promote cleanly to `development` alongside the DS-2 pilot pack (`docs/m2-operative-plan.md`).

@@ -13,8 +13,8 @@ Significant architectural choices, version pins, contract changes, and M1 protot
 | [ADR-0002](0002-java-spring-boot-versions.md) | Java and Spring Boot Baseline Versions | Accepted | `SRV-01`, `TC-02` |
 | [ADR-0003](0003-android-sdk-versions.md) | Android Minimum and Target SDK Versions | Accepted | `APP-01`, `TC-04`, `D-14` |
 | [ADR-0004](0004-server-modular-structure.md) | Backend Modular Monolith Package Boundaries | Accepted | `SRV-01`, `TC-02` |
-| [ADR-0005](0005-sp02-e2ee-pairing-and-recovery.md) | E2EE Pairing, Recovery, Cross-Device Enrollment, and Revocation (`SP-02`) | Proposed | `S-01..S-06`, `AD-01..AD-03`, `SP-02` |
-| [ADR-0006](0006-sp01-runtime-fcm-push.md) | Runtime-Configured FCM Push Notifications (`SP-01`) | Proposed | `S-02`, `TC-04`, `AD-04`, `SP-01` |
-| [ADR-0007](0007-sp04-hybrid-home-scene.md) | Hybrid Home Scene Composition, Animations, and Asset Overrides (`SP-04`) | Proposed | `AR-07`, `AR-08`, `TC-08`, `TC-09`, `SP-04` |
-| [ADR-0008](0008-sp03-apk-self-updater.md) | Signed-Manifest Self-Update & PackageInstaller Flow (`SP-03`) | Proposed | `F-19`, `TC-10`, `SEC-04`, `SP-03` |
-| [ADR-0009](0009-sp05-backend-footprint.md) | Backend Memory Limits and Self-Hosting Footprint (`SP-05`) | Proposed | `TC-02`, `TC-17`, `SRV-02`, `SP-05` |
+| [ADR-0005](0005-sp02-e2ee-pairing-and-recovery.md) | E2EE Pairing, Recovery, Cross-Device Enrollment, and Revocation (`SP-02`) | Accepted (M1 baseline; M2 `PD-05` check) | `S-01..S-06`, `AD-01..AD-03`, `SP-02` |
+| [ADR-0006](0006-sp01-runtime-fcm-push.md) | Runtime-Configured FCM Push Notifications (`SP-01`) | Proposed (fg/bg done; M2 `AR-10` check) | `S-02`, `TC-04`, `AD-04`, `SP-01` |
+| [ADR-0007](0007-sp04-hybrid-home-scene.md) | Hybrid Home Scene Composition, Animations, and Asset Overrides (`SP-04`) | Accepted | `AR-07`, `AR-08`, `TC-08`, `TC-09`, `SP-04` |
+| [ADR-0008](0008-sp03-apk-self-updater.md) | Signed-Manifest Self-Update & PackageInstaller Flow (`SP-03`) | Accepted (M1 baseline; M2 prompt log) | `F-19`, `TC-10`, `SEC-04`, `SP-03` |
+| [ADR-0009](0009-sp05-backend-footprint.md) | Backend Memory Limits and Self-Hosting Footprint (`SP-05`) | Accepted | `TC-02`, `TC-17`, `SRV-02`, `SP-05` |

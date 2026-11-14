@@ -1,6 +1,6 @@
 # ADR-0006: Runtime-Configured FCM Push Notifications (`SP-01`)
 
-- **Status:** Proposed (pending physical-device delivery matrix verification)
+- **Status:** Proposed (foreground/background verified in M1; task-switcher-closed, reboot & Doze matrix carried into early M2 before freezing `AR-10`)
 - **Date:** 2026-11-14
 - **Reference IDs:** `S-02`, `TC-04`, `AD-04`, `SP-01`
 
@@ -23,5 +23,5 @@ The prototype on branch `proto/sp-01` implements the architecture documented in 
 
 ## Consequences
 
-- **Verified in M1 automation (`proto/sp-01`):** `Sp01FcmHttpClientTest` (RSA JWT signature math verification, token caching, notification-free JSON check, `404 UNREGISTERED` mapping), `Sp01PushIntegrationTest` (Testcontainers PostgreSQL 17), `ArchitectureTest`, Flutter bridge/API/widget tests (`11/11` passed), and Android APK compilation (`flutter build apk --debug`).
-- **Remaining physical verification before `G-1`:** Execute the 2-device field matrix (foreground, background, task-switcher swipe-dismissed, post-reboot, long screen-off Doze / Battery Saver, and documented Settings Force Stop suppression) using a promoter-provisioned Firebase project. Activate Plan B (`AR-10`) only if task-switcher-closed delivery fails unacceptably across devices.
+- **Verified in M1 (`G-1` closure):** Automated tests (`Sp01FcmHttpClientTest`, `Sp01PushIntegrationTest`, `ArchitectureTest`, `11/11` Flutter tests, debug APK build) plus promoter verification of foreground and background notification delivery (`docs/m0-m1-operative-plan.md`).
+- **Remaining physical matrix transitioned into early M2 (`AR-10` freeze gate):** Execute the 2-device checks for task-switcher swipe-dismissed state, post-reboot, long screen-off Doze / Battery Saver, and Settings Force Stop (tracked in `docs/m2-operative-plan.md`). Activate Plan B (`PushProvider` -> UnifiedPush / dedicated build) if task-switcher-closed delivery proves unreliable on target devices.

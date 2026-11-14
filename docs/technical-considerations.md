@@ -172,15 +172,17 @@ Prima di fissare l’architettura conviene verificare i punti incerti con protot
 
 ## 11. Rischi tecnici
 
-| Rischio | Impatto | Mitigazione |
-| :-- | :-- | :-- |
-| Inizializzazione runtime di FCM non affidabile a processo chiuso | Push non consegnati | SP-01; in alternativa build per self-hoster o UnifiedPush |
-| Errori nella cifratura end-to-end o nel recupero | Perdita di dati o falsa promessa di privacy | Librerie mature, SP-02, revisione indipendente |
-| Perdita della chiave di firma dell’APK | Impossibile aggiornare, reinstallazione e perdita delle chiavi locali | Custodia e backup della chiave, chiave di recupero obbligatoria |
-| Verifica degli sviluppatori Android estesa all’Italia | APK ufficiale pubblico bloccato o ostacolato | D-14, nome pacchetto e chiave stabili, monitoraggio delle regole |
-| Incompatibilità tra versioni diverse dell’app sui due telefoni | Stato cifrato illeggibile | Versione dello schema, versione minima imposta dal server |
-| Memoria e prestazioni con molte immagini AI | App lenta o instabile | Derivati per densità, decodifica alla dimensione di visualizzazione, SP-04 |
-| Consumo della JVM su VM piccole | Self-hosting costoso per altri | Limiti espliciti, SP-05, requisiti dichiarati |
+Tabella aggiornata all’uscita della milestone **M1 (`G-1`)**; per le contromisure architetturali complete e la lista di revisione **`G-5`** si vedano il [Documento architetturale v0.2](architecture.md) e gli [ADR](adr/README.md).
+
+| Rischio | Impatto | Mitigazione | Stato post-M1 (`G-1`) |
+| :-- | :-- | :-- | :-- |
+| Inizializzazione runtime di FCM non affidabile a processo chiuso | Push non consegnati | SP-01; interfaccia `PushProvider` (AR-10) per eventuale passaggio a UnifiedPush / build dedicata | **Aperto (parzialmente mitigato):** ad app aperta e in background verificato su `proto/sp-01` (`ADR-0006`); verifiche a task switcher chiuso, riavvio e Doze riportate in testa a M2 prima di congelare AR-10 |
+| Errori nella cifratura end-to-end o nel recupero | Perdita di dati o falsa promessa di privacy | Librerie mature (`cryptography`, `bip39_mnemonic`), SP-02, revisione indipendente (`G-5`) | **In mitigazione:** protocollo implementato e testato (`ADR-0005`); verifiche su telefoni fisici / utenti non tecnici e rotazione post-revoca pianificate tra M2 e `G-5` |
+| Perdita della chiave di firma dell’APK | Impossibile aggiornare, reinstallazione e perdita delle chiavi locali | Custodia e backup cifrato offline (`PD-10`, `docs/key-custody.md`), chiave di recupero obbligatoria, guard pre-sessione su `PackageInstaller` | **Mitigato:** flusso offline documentato (`M0`); guard certificati pre-installazione validato in `proto/sp-03` (`ADR-0008`); resta il controllo su dispositivo fisico del flusso di upgrade firmato |
+| Verifica degli sviluppatori Android estesa all’Italia | APK ufficiale pubblico bloccato o ostacolato | D-14, nome pacchetto `com.vectevo.deep_sky` (`PD-07`) e chiave stabili, monitoraggio delle regole | **Monitorato:** dogfooding compatibile con fascia limitata (`<= 20` dispositivi); da rivalutare prima di aperture pubbliche |
+| Incompatibilità tra versioni diverse dell’app sui due telefoni | Stato cifrato illeggibile | `schemaVersion` su snapshot e buste, enforcement versione minima lato server (`F-19`), controllo `versionCode` in `SP-03` | **In mitigazione:** versione minima e anti-downgrade previsti nel design `SP-02`/`SP-03`; enforcement completo end-to-end da integrare in M2 (`SL` / `F-19`) |
+| Memoria e prestazioni con molte immagini AI | App lenta o instabile | Derivati per densità, decodifica alla dimensione di visualizzazione, livelli isolati (`RepaintBoundary`) e reduce motion (`SP-04`) | **Chiuso in M1 (da sorvegliare su asset definitivi):** soglie, accessibilità e validazione designer superate in `proto/sp-04` (`ADR-0007`) |
+| Consumo della JVM su VM piccole | Self-hosting costoso per altri | Limiti JVM/PostgreSQL espliciti nel Compose, benchmark replicabile `SP-05`, requisiti minimi dichiarati | **Chiuso in M1:** profili memoria, stabilità senza OOM e requisiti minimi validati dal promotore (`ADR-0009`); profili benchmark esclusi dal profilo `prod` |
 
 ## 12. Domande per l’architetto
 

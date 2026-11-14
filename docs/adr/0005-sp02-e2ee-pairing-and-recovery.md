@@ -1,6 +1,6 @@
 # ADR-0005: E2EE Pairing, Recovery, Cross-Device Enrollment, and Revocation (`SP-02`)
 
-- **Status:** Proposed (pending physical-device & non-technical usability sign-off)
+- **Status:** Accepted as M1/M2 baseline (`PD-05` physical 2-phone & non-technical walkthrough tracked at M2 start before real couple data)
 - **Date:** 2026-11-14
 - **Reference IDs:** `S-01`, `S-03`, `S-04`, `S-05`, `S-06`, `F-01`, `F-02`, `AD-01`, `AD-02`, `AD-03`, `SP-02`
 
@@ -29,4 +29,4 @@ The prototype on branch `proto/sp-02` implements and validates the protocol spec
   1. Entropy, domain separation strings, and AAD canonical encoding in `DeepSkyCrypto` & `RecoveryKeyCodec`.
   2. Recovery challenge rate-limiting / brute-force resistance when promoted alongside M2 production controllers.
   3. Key-rotation (`keyGeneration > 1`) automation strategy upon `S-06` revocation of a stolen device.
-- **Remaining physical verification before `G-1`:** Two real Android devices completing pairing, recovery, enrollment, revocation, and observed completion by two non-technical testers without verbal coaching.
+- **Remaining physical verification transitioned from `G-1` into M2 (`PD-05` gate):** Complete two real Android device pairing/recovery/enrollment/revocation checks and observed completion by two non-technical testers without verbal coaching (tracked in `docs/m2-operative-plan.md`) before storing real couple data (`PD-05`).
