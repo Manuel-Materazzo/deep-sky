@@ -1,0 +1,45 @@
+name: Bug Report
+description: Report a defect in the client app, backend server, scripts, or deployment setup
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Flutter App (Android)
+        - Backend Server
+        - Content / Manifest
+        - Deployment / Docker Compose
+        - CI / Scripts
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Clear description of the bug. Do not include real personal data, keys, or secrets.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Device model / Android version / OS / commit hash
+      placeholder: "e.g. Pixel 7, Android 15, commit abc1234"

@@ -1,0 +1,35 @@
+name: Decision / ADR Proposal
+description: Raise an open question, conflict with a [Deciso] requirement, or propose an ADR
+title: "[DECISION] "
+labels: ["decision"]
+body:
+  - type: input
+    id: refs
+    attributes:
+      label: Related IDs
+      description: Cite open decisions or requirements (e.g. D-11, AD-04, DD-05, PD-13).
+      placeholder: "AD-01, S-01"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context & Question
+      description: What decision is needed or which existing decision is in conflict?
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options with Pros and Cons
+      description: Propose concrete alternatives with trade-offs for the promoter to decide.
+      value: |
+        ### Option A
+        - Pros:
+        - Cons:
+
+        ### Option B
+        - Pros:
+        - Cons:
+    validations:
+      required: true

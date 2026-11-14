@@ -1,0 +1,45 @@
+name: Task
+description: Propose or track a development, infrastructure, design, or documentation task
+title: "[TASK] "
+labels: ["task"]
+body:
+  - type: input
+    id: refs
+    attributes:
+      label: Reference IDs
+      description: Cite IDs from the operative/development plan or briefs (e.g. SRV-01, APP-02, F-03, P-01).
+      placeholder: "REP-03, TC-02"
+    validations:
+      required: true
+  - type: dropdown
+    id: track
+    attributes:
+      label: Track
+      options:
+        - REP (Repository & Process)
+        - SEC (Secrets & Keys)
+        - INF (Infrastructure)
+        - SRV (Server)
+        - APP (Flutter App)
+        - CNT (Content & Assets)
+        - CI (Pipeline)
+        - DOC (Documentation / ADR)
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Goal & Scope
+      description: What this task owns and what "done" looks like.
+    validations:
+      required: true
+  - type: textarea
+    id: checklist
+    attributes:
+      label: Verification Checklist
+      description: Concrete checks or tests required to close the task.
+      value: |
+        - [ ] Unit / integration tests pass
+        - [ ] Documentation / ADR updated if applicable
+    validations:
+      required: true

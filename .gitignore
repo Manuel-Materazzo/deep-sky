@@ -2,6 +2,7 @@
 *.class
 *.log
 *.pyc
+__pycache__/
 *.swp
 .DS_Store
 .atom/
@@ -12,16 +13,26 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# Secrets, keys, and local environment files (SEC-01)
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+*.sig.tmp
+secrets/
+firebase-service-account*.json
+google-services.json
+
+# IntelliJ / IDE related
 *.iml
 *.ipr
 *.iws
 .idea/
-
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+.vscode/
 
 # Flutter/Dart/Pub related
 **/doc/api/
@@ -33,16 +44,29 @@ migrate_working_dir/
 /build/
 /coverage/
 
-# Symbolication related
+# Symbolication & Obfuscation related
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android Studio / Gradle build artifacts
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/.gradle/
+/android/captures/
+/android/local.properties
+
+# Java / Maven / Spring Boot (server/)
+server/target/
+server/.mvn/wrapper/maven-wrapper.jar
+*.jar
+*.war
+*.ear
+!server/gradle/wrapper/gradle-wrapper.jar
+
+# Docker / local volumes
+deploy/data/
+deploy/backups/
 
 # Widget Preview related
 .widget_preview/
