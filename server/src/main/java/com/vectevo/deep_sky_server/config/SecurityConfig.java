@@ -22,6 +22,9 @@ public class SecurityConfig {
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
 						.requestMatchers("/actuator/info").permitAll()
+						// Standalone SP-01 endpoints for runtime push config and two-device field verification.
+						// When promoted with SP-02, token registration/wakeup bind to Ed25519 DeviceAuthFilter.
+						.requestMatchers("/api/v1/push/**").permitAll()
 						.anyRequest().authenticated())
 				.build();
 	}

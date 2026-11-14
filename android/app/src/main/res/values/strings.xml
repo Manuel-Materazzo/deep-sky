@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_channel_updates_name">Sky updates</string>
+    <string name="notification_channel_updates_desc">Generic wakeup notifications resolved locally on your device</string>
+    <string name="push_title_generic">Deep Sky</string>
+    <string name="push_body_generic">There is a quiet update waiting for you.</string>
+    <string name="push_body_new_moment">Something new appeared under your sky.</string>
+    <string name="push_body_capsule_ready">A time capsule may be ready to open.</string>
+    <string name="push_body_daily_prompt">Today\'s quiet prompt is ready.</string>
+</resources>

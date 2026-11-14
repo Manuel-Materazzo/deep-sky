@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_channel_updates_name">Aggiornamenti del cielo</string>
+    <string name="notification_channel_updates_desc">Notifiche generiche risolte localmente sul dispositivo</string>
+    <string name="push_title_generic">Deep Sky</string>
+    <string name="push_body_generic">C\'è un aggiornamento tranquillo che ti aspetta.</string>
+    <string name="push_body_new_moment">Qualcosa di nuovo è apparso sotto il vostro cielo.</string>
+    <string name="push_body_capsule_ready">Una capsula del tempo potrebbe essere pronta.</string>
+    <string name="push_body_daily_prompt">La domanda di oggi è pronta.</string>
+</resources>

@@ -1,8 +1,10 @@
 package com.vectevo.deep_sky.platform
 
+import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.core.app.ActivityCompat
 import com.vectevo.deep_sky.platform.installer.ApkInstallerCoordinator
 import com.vectevo.deep_sky.platform.push.RuntimeFirebaseCoordinator
 import com.vectevo.deep_sky.platform.widget.HomeWidgetCoordinator
@@ -12,11 +14,12 @@ import io.flutter.plugin.common.MethodChannel
 
 /**
  * Unified native Android bridge exposed to Flutter over [CHANNEL_NAME] (APP-02).
- * Hosts coordinators for APK installation (SP-03/F-19), runtime FCM (SP-01/TC-13),
+ * Hosts coordinators for APK installation (SP-03/F-19), runtime FCM (SP-01/TC-04),
  * and home screen widgets (F-13).
  */
 class PlatformBridgePlugin(
     private val context: Context,
+    private val activity: Activity? = null,
     private val installerCoordinator: ApkInstallerCoordinator = ApkInstallerCoordinator(context),
     private val widgetCoordinator: HomeWidgetCoordinator = HomeWidgetCoordinator(context),
     private val pushCoordinator: RuntimeFirebaseCoordinator = RuntimeFirebaseCoordinator(context),
@@ -24,19 +27,79 @@ class PlatformBridgePlugin(
 
     companion object {
         const val CHANNEL_NAME = "com.vectevo.deep_sky/platform"
+        private const val REQ_POST_NOTIFICATIONS = 4102
     }
+
+    private var pendingPermissionResult: MethodChannel.Result? = null
 
     fun register(flutterEngine: FlutterEngine) {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             .setMethodCallHandler(this)
     }
 
+    fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray): Boolean {
+        if (requestCode != REQ_POST_NOTIFICATIONS) {
+            return false
+        }
+        val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+        pendingPermissionResult?.success(granted)
+        pendingPermissionResult = null
+        return true
+    }
+
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "ping" -> result.success("pong")
             "getPlatformCapabilities" -> result.success(buildCapabilitiesMap())
+            "configureRuntimePush" -> handleConfigurePush(call, result)
+            "getPushStatus" -> result.success(pushCoordinator.statusMap())
+            "consumePendingPushToken" -> result.success(pushCoordinator.consumePendingToken() ?: "")
+            "clearRuntimePushConfig" -> {
+                pushCoordinator.clearStoredConfig()
+                result.success(null)
+            }
+            "requestNotificationPermission" -> handleRequestNotificationPermission(result)
             else -> result.notImplemented()
         }
+    }
+
+    private fun handleConfigurePush(call: MethodCall, result: MethodChannel.Result) {
+        val projectId = call.argument<String>("projectId")?.trim().orEmpty()
+        val apiKey = call.argument<String>("apiKey")?.trim().orEmpty()
+        val appId = call.argument<String>("appId")?.trim().orEmpty()
+        val senderId = call.argument<String>("senderId")?.trim().orEmpty()
+
+        val config = RuntimeFirebaseCoordinator.RuntimeConfig(
+            projectId = projectId,
+            apiKey = apiKey,
+            appId = appId,
+            senderId = senderId,
+        )
+
+        pushCoordinator.configureAndFetchToken(
+            config = config,
+            onSuccess = { token -> result.success(token) },
+            onError = { code, message -> result.error(code, message, null) },
+        )
+    }
+
+    private fun handleRequestNotificationPermission(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || pushCoordinator.hasNotificationPermission()) {
+            result.success(true)
+            return
+        }
+        val hostActivity = activity
+        if (hostActivity == null) {
+            result.success(false)
+            return
+        }
+        pendingPermissionResult?.error("cancelled", "Superseded by a new permission request.", null)
+        pendingPermissionResult = result
+        ActivityCompat.requestPermissions(
+            hostActivity,
+            arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+            REQ_POST_NOTIFICATIONS,
+        )
     }
 
     @Suppress("DEPRECATION")
