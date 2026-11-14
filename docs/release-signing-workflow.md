@@ -6,9 +6,10 @@
 
 CI never holds signing keys (`PD-10`). Every release APK and manifest follows a strict three-step flow:
 
-1. **Build unsigned artifacts in CI (`CI-02`):**
-   - Run the **Unsigned Release Artifacts** workflow (`.github/workflows/release.yml`) on GitHub Actions with `version_name` and `version_code`.
-   - Download the `deep-sky-unsigned-<version_name>-<version_code>` bundle containing `app-release-unsigned.apk`, its SHA-256 checksum, and `release-info.json`.
+1. **Build release artifacts & draft release in CI (`CI-02`, `SRV-02`):**
+   - Run the **Release Artifacts** workflow (`.github/workflows/release.yml`) on GitHub Actions with `version_name` and `version_code`.
+   - The workflow builds and pushes the multi-arch backend image (`ghcr.io/manuel-materazzo/deep-sky-server:<version_name>` and `:latest`), builds the unsigned Android APK (`deep-sky-unsigned-<version_name>-<version_code>` workflow artifact), and creates (or updates) a **draft** GitHub Release `v<version_name>` with `release-info.json`, `app-release-unsigned.apk.sha256`, and the server image digest.
+   - Download the `deep-sky-unsigned-<version_name>-<version_code>` artifact containing `app-release-unsigned.apk`, its SHA-256 checksum, and `release-info.json`.
 2. **Sign locally offline (`SEC-04`):**
    - Verify the downloaded APK checksum (`sha256sum -c app-release-unsigned.apk.sha256`).
    - Run the local signing script against your offline keys (never inside the git repository):
@@ -42,5 +43,5 @@ CI never holds signing keys (`PD-10`). Every release APK and manifest follows a 
      ```
    - The script rejects non-increasing `versionCode`, signs the APK, verifies it via `apksigner verify --verbose`, generates `manifest.json` with the signed APK's SHA-256, and signs `manifest.json` -> `manifest.json.sig`.
 3. **Publish GitHub Release:**
-   - Create tag `v<version_name>` (e.g. `v1.0.0`) on the exact commit tested by CI.
-   - Upload `deep-sky-<version_name>-<version_code>.apk`, `manifest.json`, and `manifest.json.sig` to the GitHub Release.
+   - Open the auto-created draft release `v<version_name>` on GitHub Releases (targeted at the exact CI-tested commit).
+   - Upload `deep-sky-<version_name>-<version_code>.apk`, `manifest.json`, and `manifest.json.sig` to the draft release, then click **Publish release**.
