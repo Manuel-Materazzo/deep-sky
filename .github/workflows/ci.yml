@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  server:
+    name: Server (Build, ArchUnit & PostgreSQL Integration)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Verify server build and tests
+        working-directory: server
+        run: ./mvnw -B verify
+
+  app:
+    name: App (Format, Analyze, Test & Debug APK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java for Android Gradle
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.50.0"
+          channel: stable
+          cache: true
+
+      - name: Install pub dependencies
+        run: flutter pub get
+
+      - name: Check Dart formatting
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Analyze Dart code
+        run: flutter analyze
+
+      - name: Run Flutter tests (unit, widget, golden)
+        run: flutter test
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+  content:
+    name: Content (Manifest Schema Validation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Validate content pack manifests
+        run: python3 scripts/validate_content.py
+
+  deploy:
+    name: Deploy (Compose Validation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate development compose file
+        run: docker compose -f server/docker-compose.yaml config --quiet
+
+      - name: Validate production compose file
+        run: |
+          mkdir -p deploy/secrets
+          echo "dummy-db-pass-for-validation" > deploy/secrets/db_password.txt
+          echo "dummy-admin-secret-for-validation" > deploy/secrets/admin_secret.txt
+          cp deploy/.env.example deploy/.env
+          docker compose --env-file deploy/.env -f deploy/docker-compose.yml config --quiet
+
+  security:
+    name: Security (Secrets & Licenses)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+      - name: Repository forbidden-file check
+        run: sh scripts/check-secrets.sh
+
+      - name: Set up JDK 25 and Flutter for license audit
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.50.0"
+          channel: stable
+          cache: true
+
+      - name: Audit dependency licenses (SEC-02)
+        run: |
+          flutter pub get
+          python3 scripts/check-licenses.py
+
+  image:
+    name: Image (Multi-Arch Server Build ARM64 + AMD64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build server image for linux/amd64 and linux/arm64
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

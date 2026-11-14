@@ -33,65 +33,65 @@ Le licenze: il codice è **MIT** (PD-13, confermata).
 **REP-01 · Monorepo pubblico** — Ruolo: release e infrastruttura · Rif.: PD-09, PD-13
 
 - [x] Repository **pubblico**
-- [ ] `LICENSE` MIT con anno e titolare corretti
-- [ ] README: cos’è Deep Sky, stato del progetto, come contribuire, link ai documenti
-- [ ] `CONTRIBUTING.md` (flusso di lavoro, regole delle pull request) e `SECURITY.md` (come segnalare vulnerabilità)
-- [ ] Nota sull’uso del **nome e del logo** (la licenza MIT non li concede)
-- [ ] `.gitignore` per Flutter, Java, Docker, IDE; nessun file generato o segreto
-- [ ] Verificato che la cronologia contenga solo file voluti
+- [x] `LICENSE` MIT con anno e titolare corretti
+- [x] README: cos’è Deep Sky, stato del progetto, come contribuire, link ai documenti
+- [x] `CONTRIBUTING.md` (flusso di lavoro, regole delle pull request) e `SECURITY.md` (come segnalare vulnerabilità)
+- [x] Nota sull’uso del **nome e del logo** (la licenza MIT non li concede)
+- [x] `.gitignore` per Flutter, Java, Docker, IDE; nessun file generato o segreto
+- [x] Verificato che la cronologia contenga solo file voluti
 
 **REP-02 · Protezione del ramo principale** — Ruolo: release e infrastruttura · Rif.: PD-11 · Dipende da: REP-01
 
-- [ ] Merge solo tramite pull request, con CI verde e approvazione del promotore
-- [ ] Nessun *force push*, cronologia lineare
+- [ ] Merge solo tramite pull request, con CI verde e approvazione del promotore *(da configurare su GitHub)*
+- [ ] Nessun *force push*, cronologia lineare *(da configurare su GitHub)*
 - [ ] Prova con una pull request di test che viene **rifiutata** se la CI è rossa
 
 **REP-03 · Modelli e convenzioni** — Ruolo: redattore · Rif.: 2.2, 2.4 del Piano · Dipende da: REP-01
 
-- [ ] Modello di pull request: ID di riferimento, riepilogo, **evidenza dei test**, punti da guardare con più attenzione, impatti su contratti o sicurezza
-- [ ] Modelli di issue: task, difetto, decisione
-- [ ] Modello di ADR in `docs/adr/` e primo ADR “usiamo gli ADR”
-- [ ] Convenzione dei messaggi di commit e dei nomi dei rami descritta in `CONTRIBUTING.md`
+- [x] Modello di pull request: ID di riferimento, riepilogo, **evidenza dei test**, punti da guardare con più attenzione, impatti su contratti o sicurezza
+- [x] Modelli di issue: task, difetto, decisione
+- [x] Modello di ADR in `docs/adr/` e primo ADR “usiamo gli ADR”
+- [x] Convenzione dei messaggi di commit e dei nomi dei rami descritta in `CONTRIBUTING.md`
 
 **REP-04 · Board di lavoro** — Ruolo: redattore · Dipende da: REP-01
 non necessario
 
 **REP-05 · Documenti nel repository** — Ruolo: redattore · Dipende da: REP-01
 
-- [ ] Project Brief, Design Brief, Considerazioni tecniche, Documento architetturale, Piano di sviluppo e questo documento esportati in `docs/` come Markdown
-- [ ] Indice in `docs/README.md`; gli ID dei documenti sono invariati
+- [ ] Project Brief, Design Brief, Considerazioni tecniche, Documento architetturale, Piano di sviluppo e questo documento esportati in `docs/` come Markdown *(manca ancora `Documento architetturale` in `docs/`)*
+- [x] Indice in `docs/README.md`; gli ID dei documenti sono invariati
 - [x] Aggiornato il nome (“Deep Sky”) dove compare ancora “Casa”
 
 ### 2.2 Segreti e chiavi (SEC)
 
 **SEC-01 · Scansione dei segreti** — Ruolo: release e infrastruttura · Rif.: 3.1 del Piano · Dipende da: REP-01
 
-- [ ] Controllo prima di ogni commit e in CI
-- [ ] Un commit di prova con un segreto **finto** viene bloccato
-- [ ] Scansione dell’intera cronologia: nessun segreto
-- [ ] Elenco di ciò che **non** deve mai entrare nel repository (chiavi di firma, chiave di servizio Firebase, segreto di amministrazione, file `.env`)
+- [x] Controllo prima di ogni commit e in CI
+- [x] Un commit di prova con un segreto **finto** viene bloccato
+- [x] Scansione dell’intera cronologia: nessun segreto
+- [x] Elenco di ciò che **non** deve mai entrare nel repository (chiavi di firma, chiave di servizio Firebase, segreto di amministrazione, file `.env`)
 
 **SEC-02 · Dipendenze e licenze** — Ruolo: release e infrastruttura · Dipende da: REP-01
 
-- [ ] Aggiornamenti automatici delle dipendenze configurati
-- [ ] Controllo delle licenze in CI: fallisce se compare una licenza copyleft incompatibile con MIT
-- [ ] Elenco delle licenze delle dipendenze attuali archiviato
+- [x] Aggiornamenti automatici delle dipendenze configurati
+- [x] Controllo delle licenze in CI: fallisce se compare una licenza copyleft incompatibile con MIT
+- [x] Elenco delle licenze delle dipendenze attuali archiviato *(in `docs/dependencies-licenses.md`)*
 
 **SEC-03 · Chiavi di firma** — Ruolo: promotore con supporto del release · Rif.: PD-10, AD-08
 
 - [ ] Generate **offline** la chiave dell’APK e la chiave Ed25519 per manifest e pacchetti
 - [ ] **Backup cifrato in due luoghi distinti**
 - [ ] **Prova di ripristino** da backup su una macchina pulita
-- [ ] Impronta pubblica (SHA-256 del certificato, chiave pubblica) registrata in `docs/`
+- [ ] Impronta pubblica (SHA-256 del certificato, chiave pubblica) registrata in `docs/` *(tabella pronta in `docs/key-custody.md`)*
 - [ ] Le chiavi non sono mai passate per il repository, la CI o una chat
-- [ ] Procedura di custodia scritta, senza i segreti
+- [x] Procedura di custodia scritta, senza i segreti *(in `docs/key-custody.md`)*
 
 **SEC-04 · Script di firma locale** — Ruolo: sviluppatore Android nativo · Rif.: PD-10, 10.3 dell’Architettura · Dipende da: SEC-03
 
-- [ ] `scripts/` contiene uno script che prende l’APK non firmato e il manifest e produce APK e manifest firmati
-- [ ] L’APK firmato viene verificato con gli strumenti di Android
-- [ ] Rifiuta se la versione non è superiore a quella precedente
-- [ ] Provato con una chiave **di prova**, mai con quella vera nei test automatici
+- [x] `scripts/` contiene uno script che prende l’APK non firmato e il manifest e produce APK e manifest firmati
+- [x] L’APK firmato viene verificato con gli strumenti di Android
+- [x] Rifiuta se la versione non è superiore a quella precedente
+- [x] Provato con una chiave **di prova**, mai con quella vera nei test automatici *(verificato con `scripts/test-sign-release.ps1`)*
 
 ### 2.3 Infrastruttura (INF)
 
@@ -116,100 +116,100 @@ non necessario
 
 **INF-04 · Compose di sviluppo e produzione** — Ruolo: release e infrastruttura · Rif.: 12.1 dell’Architettura · Dipende da: INF-03, SRV-02
 
-- [ ] il progetto backend contiene un compose con **proxy** (Caddy), **api** e **db** (PostgreSQL con versione fissata), rete interna e volumi
-- [ ] Segreti letti da file o Docker secrets, mai scritti nel compose
-- [ ] `docker compose up` da un clone pulito avvia tutto
+- [x] il progetto backend contiene un compose con **proxy** (Caddy), **api** e **db** (PostgreSQL con versione fissata), rete interna e volumi *(in `deploy/docker-compose.yml` e `server/docker-compose.yaml`)*
+- [x] Segreti letti da file o Docker secrets, mai scritti nel compose
+- [ ] `docker compose up` da un clone pulito avvia tutto *(verificato localmente con `api` + `db`; prova completa con `proxy` su VM/clone pulito da fare)*
 - [x] `https://deepsky.vectevo.com/` risponde con **certificato valido** e un controllo di salute
-- [ ] Il database **non** è raggiungibile dall’esterno
+- [x] Il database **non** è raggiungibile dall’esterno
 - [ ] Un riavvio della VM riporta i servizi su e i dati restano
 
 **INF-05 · Backup** — Ruolo: release e infrastruttura · Rif.: TC-11, 12.5 dell’Architettura · Dipende da: INF-04
 
-- [ ] Gli script esistenti coprono dump del database, volume dei blob e volume dei pacchetti nella stessa finestra
+- [ ] Gli script esistenti coprono dump del database, volume dei blob e volume dei pacchetti nella stessa finestra *(bozza e checklist in `docs/backup-restore.md`)*
 - [ ] I backup sono cifrati e hanno una retention definita
 - [ ] **Ripristino provato** su una macchina di prova e procedura documentata
 
 **INF-06 · Log** — Ruolo: release e infrastruttura · Rif.: S-07, 15 dell’Architettura · Dipende da: INF-04
 
-- [ ] Rotazione dei log configurata
-- [ ] Nessun contenuto dei messaggi nei log; indirizzi IP del proxy conservati per poco tempo
+- [x] Rotazione dei log configurata
+- [x] Nessun contenuto dei messaggi nei log; indirizzi IP del proxy conservati per poco tempo *(header rimossi e IP mascherati in `deploy/Caddyfile`)*
 
 ### 2.4 Server (SRV)
 
 **SRV-01 · Scheletro Spring Boot** — Ruolo: sviluppatore backend · Rif.: AR-01, TC-02
 
-- [ ] Progetto con i moduli dell’Architettura 5.1 (anche vuoti)
-- [ ] Salute e metriche tramite Actuator, profili sviluppo e produzione
-- [ ] Migrazione iniziale del database con Flyway
-- [ ] **Test di architettura** che verificano i confini tra moduli
-- [ ] **Test di integrazione con PostgreSQL reale** (Testcontainers) verde
-- [ ] Versioni di Java e Spring Boot registrate in un ADR
+- [x] Progetto con i moduli dell’Architettura 5.1 (anche vuoti) *(`config`, `shared`, `pairing`, `sync`, `blob`, `push`, `content` — ADR-0004)*
+- [x] Salute e metriche tramite Actuator, profili sviluppo e produzione
+- [x] Migrazione iniziale del database con Flyway
+- [x] **Test di architettura** che verificano i confini tra moduli
+- [x] **Test di integrazione con PostgreSQL reale** (Testcontainers) verde
+- [x] Versioni di Java e Spring Boot registrate in un ADR *(ADR-0002)*
 
 **SRV-02 · Immagine multi-architettura** — Ruolo: sviluppatore backend · Rif.: TC-03 · Dipende da: SRV-01
 
-- [ ] Dockerfile con utente non privilegiato e limiti di memoria della JVM parametrici
-- [ ] Immagine per **ARM64 e AMD64** costruita in CI
-- [ ] Provata sulla VM ARM e su una macchina AMD
-- [ ] Dimensione dell’immagine, tempo di avvio e memoria a riposo registrati (base per SP-05)
+- [x] Dockerfile con utente non privilegiato e limiti di memoria della JVM parametrici
+- [ ] Immagine per **ARM64 e AMD64** costruita in CI *(workflow configurato in `.github/workflows/ci.yml`, in attesa esecuzione CI)*
+- [ ] Provata sulla VM ARM e su una macchina AMD *(provata su AMD64; verifica ARM64 su VM OCI da fare)*
+- [x] Dimensione dell’immagine, tempo di avvio e memoria a riposo registrati (base per SP-05) *(baseline AMD64 in ADR-0002)*
 
 **SRV-03 · Configurazione** — Ruolo: sviluppatore backend · Dipende da: SRV-01
 
-- [ ] Parametri via variabili d’ambiente o segreti (dominio, database, segreto di amministrazione, parametri Firebase, quote)
-- [ ] Validazione all’avvio con messaggi chiari sugli errori di configurazione
-- [ ] Documento con l’elenco dei parametri e dei valori predefiniti
+- [x] Parametri via variabili d’ambiente o segreti (dominio, database, segreto di amministrazione, parametri Firebase, quote)
+- [x] Validazione all’avvio con messaggi chiari sugli errori di configurazione
+- [x] Documento con l’elenco dei parametri e dei valori predefiniti *(in `docs/server-configuration.md`)*
 
 ### 2.5 App (APP)
 
 **APP-01 · Progetto Flutter** — Ruolo: sviluppatore client · Rif.: TC-01, AR-06, PD-07
 
 - [x] Identificativo dell’app `com.vectevo.deep_sky`; nome visibile “Deep Sky”
-- [ ] Struttura a livelli (presentation, scene, domain, data, platform)
-- [ ] Regole di analisi statica e formattazione attive
-- [ ] APK di debug costruito e installato su un telefono reale
-- [ ] Versione minima di Android supportata e livello di API di destinazione decisi e annotati in un ADR
+- [x] Struttura a livelli (presentation, scene, domain, data, platform)
+- [x] Regole di analisi statica e formattazione attive
+- [ ] APK di debug costruito e installato su un telefono reale *(APK di debug costruito; installazione su telefono fisico da eseguire)*
+- [x] Versione minima di Android supportata e livello di API di destinazione decisi e annotati in un ADR *(minSdk 26, targetSdk 36 — ADR-0003)*
 
 **APP-02 · Canale nativo Android** — Ruolo: sviluppatore Android nativo · Rif.: 8.4 dell’Architettura · Dipende da: APP-01
 
-- [ ] Canale tra Flutter e Kotlin con un metodo di prova
-- [ ] Test del canale
-- [ ] Struttura pronta per installatore, widget e Firebase
+- [x] Canale tra Flutter e Kotlin con un metodo di prova
+- [x] Test del canale
+- [x] Struttura pronta per installatore, widget e Firebase
 
 **APP-03 · Test dell’app** — Ruolo: QA · Rif.: 14 dell’Architettura · Dipende da: APP-01
 
-- [ ] Un test unitario, uno di widget e un test *golden* di esempio in CI
-- [ ] Procedura per i test su dispositivo reale documentata
+- [x] Un test unitario, uno di widget e un test *golden* di esempio in CI
+- [x] Procedura per i test su dispositivo reale documentata *(in `docs/device-testing.md`)*
 
 ### 2.6 Contenuti (CNT)
 
 **CNT-01 · Struttura dei contenuti** — Ruolo: designer con architetto · Rif.: AR-09, 9.7 dell’Architettura · Dipende da: REP-01
 
-- [ ] `content/` con pacchetto base vuoto, manifest di esempio e **schema** del manifest
-- [ ] Un validatore controlla il manifest di esempio
-- [ ] Script che calcola hash e firma (con chiave di prova)
-- [ ] Schema approvato dal designer: copre slot, aree di tocco, stati, animazioni livello 1
+- [x] `content/` con pacchetto base vuoto, manifest di esempio e **schema** del manifest
+- [x] Un validatore controlla il manifest di esempio
+- [x] Script che calcola hash e firma (con chiave di prova)
+- [ ] Schema approvato dal designer: copre slot, aree di tocco, stati, animazioni livello 1 *(in attesa approvazione del designer)*
 
 **CNT-02 · Termini degli strumenti di generazione** — Ruolo: redattore, con decisione del promotore · Rif.: D-11, A-08
 
-- [ ] Elenco degli strumenti candidati e **termini d’uso** rilevanti (uso commerciale, redistribuzione, progetti open source)
-- [ ] Data di verifica e fonte per ogni strumento
-- [ ] Raccomandazione sulla licenza degli asset, da decidere dal promotore
-- [ ] Nessun asset inserito nel repository prima di questa decisione
+- [x] Elenco degli strumenti candidati e **termini d’uso** rilevanti (uso commerciale, redistribuzione, progetti open source) *(in `docs/ai-asset-tools-terms.md`)*
+- [x] Data di verifica e fonte per ogni strumento
+- [x] Raccomandazione sulla licenza degli asset, da decidere dal promotore
+- [x] Nessun asset inserito nel repository prima di questa decisione
 
 ### 2.7 Pipeline (CI)
 
 **CI-01 · Workflow** — Ruolo: release e infrastruttura · Dipende da: REP-01, SRV-01, APP-01
 
-- [ ] Job server: build e test, con PostgreSQL reale
-- [ ] Job app: analisi, test, APK di debug
-- [ ] Job deploy: validazione dei file compose
-- [ ] Job sicurezza: segreti e licenze (SEC-01, SEC-02)
-- [ ] Job immagine: build multi-architettura
-- [ ] Tutti verdi su una pull request di prova; tempi registrati; cache attive
+- [x] Job server: build e test, con PostgreSQL reale
+- [x] Job app: analisi, test, APK di debug
+- [x] Job deploy: validazione dei file compose
+- [x] Job sicurezza: segreti e licenze (SEC-01, SEC-02)
+- [x] Job immagine: build multi-architettura
+- [ ] Tutti verdi su una pull request di prova; tempi registrati; cache attive *(in attesa esecuzione su GitHub Actions)*
 
 **CI-02 · Artefatti di release** — Ruolo: release e infrastruttura · Rif.: 10.3, 12.3 dell’Architettura · Dipende da: CI-01, SEC-04
 
-- [ ] La CI produce APK e manifest **non firmati**
-- [ ] Il flusso “scarico, firma in locale, carico sulla release” è descritto e provato una volta
+- [x] La CI produce APK e manifest **non firmati** *(`.github/workflows/release.yml`, build `-Punsigned=true` verificata)*
+- [ ] Il flusso “scarico, firma in locale, carico sulla release” è descritto e provato una volta *(descritto in `docs/release-signing-workflow.md`; firma locale provata, ciclo completo con release GitHub da provare)*
 
 ### 2.8 Nome (NAME)
 

@@ -1,0 +1,71 @@
+name: Unsigned Release Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: "Release versionName (e.g. 1.0.0)"
+        required: true
+        default: "1.0.0"
+      version_code:
+        description: "Monotonically increasing Android versionCode"
+        required: true
+        default: "1"
+
+permissions:
+  contents: read
+
+jobs:
+  build-unsigned-release:
+    name: Build Unsigned Android APK & Manifest Template
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java for Android Gradle
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.50.0"
+          channel: stable
+          cache: true
+
+      - name: Verify tests before building release artifact
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+
+      - name: Build unsigned release APK (CI-02, PD-10)
+        run: |
+          flutter build apk --release --config-only \
+            --build-name="${{ inputs.version_name }}" \
+            --build-number="${{ inputs.version_code }}"
+          cd android
+          ./gradlew assembleRelease -Punsigned=true
+
+      - name: Prepare unsigned release bundle
+        run: |
+          mkdir -p release-unsigned
+          cp build/app/outputs/apk/release/app-release-unsigned.apk release-unsigned/
+          sha256sum release-unsigned/app-release-unsigned.apk > release-unsigned/app-release-unsigned.apk.sha256
+          cat > release-unsigned/release-info.json <<EOF
+          {
+            "packageId": "com.vectevo.deep_sky",
+            "versionName": "${{ inputs.version_name }}",
+            "versionCode": ${{ inputs.version_code }},
+            "commit": "${{ github.sha }}"
+          }
+          EOF
+
+      - name: Upload unsigned release artifacts for local offline signing
+        uses: actions/upload-artifact@v4
+        with:
+          name: deep-sky-unsigned-${{ inputs.version_name }}-${{ inputs.version_code }}
+          path: release-unsigned/
+          retention-days: 14
