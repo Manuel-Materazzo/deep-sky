@@ -18,3 +18,4 @@ Significant architectural choices, version pins, contract changes, and M1 protot
 | [ADR-0007](0007-sp04-hybrid-home-scene.md) | Hybrid Home Scene Composition, Animations, and Asset Overrides (`SP-04`) | Accepted | `AR-07`, `AR-08`, `TC-08`, `TC-09`, `SP-04` |
 | [ADR-0008](0008-sp03-apk-self-updater.md) | Signed-Manifest Self-Update & PackageInstaller Flow (`SP-03`) | Accepted (M1 baseline; M2 prompt log) | `F-19`, `TC-10`, `SEC-04`, `SP-03` |
 | [ADR-0009](0009-sp05-backend-footprint.md) | Backend Memory Limits and Self-Hosting Footprint (`SP-05`) | Accepted | `TC-02`, `TC-17`, `SRV-02`, `SP-05` |
+| [ADR-0010](0010-g5-09-cryptography-timing-evaluation.md) | Valutazione crittografica `cryptography` vs `cryptography_flutter` (`G5-09`) | Proposed (`G-5` review) | `G5-09`, `S-01`, `S-06`, `N-06` |

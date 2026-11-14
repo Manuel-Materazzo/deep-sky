@@ -36,3 +36,5 @@ docker run --rm -v deep-sky_pack_data:/data:ro -v "$BACKUP_DIR:/out" alpine tar 
 - [ ] Start `db` first and restore `db.dump` with `pg_restore`
 - [ ] Restore `blob_data` and `pack_data` volumes
 - [ ] Start `api` and verify `/actuator/health` returns `UP` and row counts match pre-backup state
+
+On the OCI VM (with Docker running the `deep-sky` Compose project), the isolated restore verification above can be run non-destructively via [scripts/verify-backup-restore.sh](../scripts/verify-backup-restore.sh).
