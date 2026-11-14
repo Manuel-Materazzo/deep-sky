@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AD-06 / G5-06: Exclude keys, SharedPreferences, and offline encrypted cache from legacy Android Auto Backup. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="." />
+    <exclude domain="database" path="." />
+    <exclude domain="file" path="." />
+    <exclude domain="root" path="." />
+</full-backup-content>
