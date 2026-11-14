@@ -1,0 +1,9 @@
+# Optional override to build the server image from local source instead of
+# pulling from GHCR:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+services:
+  api:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    image: deep-sky-server:local

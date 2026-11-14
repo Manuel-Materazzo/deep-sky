@@ -26,10 +26,7 @@ services:
         max-file: "3"
 
   api:
-    build:
-      context: ../server
-      dockerfile: Dockerfile
-    image: ${DEEPSKY_SERVER_IMAGE:-deep-sky-server:local}
+    image: ${DEEPSKY_SERVER_IMAGE:-ghcr.io/manuel-materazzo/deep-sky-server:latest}
     restart: unless-stopped
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}

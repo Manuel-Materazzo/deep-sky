@@ -16,9 +16,14 @@ Reference IDs: `INF-04`, `INF-05`, `INF-06`, `TC-03`, `SRV-02`, `SRV-03`.
    openssl rand -base64 32 > secrets/admin_secret.txt
    chmod 600 secrets/*.txt
    ```
-3. Build and start the stack:
+3. Pull the prebuilt multi-arch server image (or pin a version via `DEEPSKY_SERVER_IMAGE` in `.env`) and start the stack:
    ```bash
-   docker compose up -d --build
+   docker compose pull
+   docker compose up -d
+   ```
+   To build the server image locally from source instead:
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
    ```
 4. Verify health:
    ```bash
