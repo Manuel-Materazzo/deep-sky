@@ -23,6 +23,9 @@ class SceneManifestParser {
       throw const FormatException('Missing or invalid "scene" object.');
     }
     final String aspectRatio = _requireString(sceneRaw, 'aspectRatio');
+    final SceneBackground? background = _parseBackground(
+      sceneRaw['background'],
+    );
 
     final Object? slotsRaw = decoded['slots'];
     if (slotsRaw is! List<Object?>) {
@@ -41,7 +44,23 @@ class SceneManifestParser {
       name: name,
       aspectRatio: aspectRatio,
       slots: slots,
+      background: background,
     );
+  }
+
+  SceneBackground? _parseBackground(Object? raw) {
+    if (raw == null) {
+      return null;
+    }
+    if (raw is! Map<String, Object?>) {
+      throw const FormatException('Invalid "scene.background" object.');
+    }
+    final String dayAsset = (raw['dayAsset'] as String?)?.trim() ?? '';
+    final String nightAsset = (raw['nightAsset'] as String?)?.trim() ?? '';
+    if (dayAsset.isEmpty || nightAsset.isEmpty) {
+      return null;
+    }
+    return SceneBackground(dayAsset: dayAsset, nightAsset: nightAsset);
   }
 
   SceneSlot _parseSlot(Object? raw) {

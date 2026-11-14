@@ -86,6 +86,14 @@ class SceneSlot {
   final List<SceneAnimation> animations;
 }
 
+/// Day and night room background assets declared in `scene.background` (SP-04).
+class SceneBackground {
+  const SceneBackground({required this.dayAsset, required this.nightAsset});
+
+  final String dayAsset;
+  final String nightAsset;
+}
+
 /// Root manifest for a Deep Sky scene content pack.
 class SceneManifest {
   const SceneManifest({
@@ -96,6 +104,7 @@ class SceneManifest {
     required this.name,
     required this.aspectRatio,
     required this.slots,
+    this.background,
   });
 
   final int schemaVersion;
@@ -105,4 +114,18 @@ class SceneManifest {
   final LocalizedText name;
   final String aspectRatio;
   final List<SceneSlot> slots;
+  final SceneBackground? background;
+
+  double get numericAspectRatio {
+    final List<String> parts = aspectRatio.split(':');
+    if (parts.length != 2) {
+      return 9 / 16;
+    }
+    final double? w = double.tryParse(parts[0]);
+    final double? h = double.tryParse(parts[1]);
+    if (w == null || h == null || w <= 0 || h <= 0) {
+      return 9 / 16;
+    }
+    return w / h;
+  }
 }
