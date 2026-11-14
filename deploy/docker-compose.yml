@@ -1,0 +1,125 @@
+name: deep-sky
+
+services:
+  proxy:
+    image: caddy:2.9-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DEEPSKY_DOMAIN: ${DEEPSKY_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - edge
+      - internal
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  api:
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    image: ${DEEPSKY_SERVER_IMAGE:-deep-sky-server:local}
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_CONFIG_IMPORT: optional:configtree:/run/secrets/
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-deepsky}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-deepsky}
+      DEEPSKY_DOMAIN: ${DEEPSKY_DOMAIN:-deepsky.vectevo.com}
+      DEEPSKY_MIN_CLIENT_VERSION_CODE: ${DEEPSKY_MIN_CLIENT_VERSION_CODE:-1}
+      DEEPSKY_MIN_PROTOCOL_VERSION: ${DEEPSKY_MIN_PROTOCOL_VERSION:-1}
+      DEEPSKY_MAX_BLOB_BYTES: ${DEEPSKY_MAX_BLOB_BYTES:-10485760}
+      DEEPSKY_MAX_COUPLE_STORAGE_BYTES: ${DEEPSKY_MAX_COUPLE_STORAGE_BYTES:-1073741824}
+      DEEPSKY_FIREBASE_ENABLED: ${DEEPSKY_FIREBASE_ENABLED:-false}
+      DEEPSKY_FIREBASE_PROJECT_ID: ${DEEPSKY_FIREBASE_PROJECT_ID:-}
+      DEEPSKY_FIREBASE_API_KEY: ${DEEPSKY_FIREBASE_API_KEY:-}
+      DEEPSKY_FIREBASE_APP_ID: ${DEEPSKY_FIREBASE_APP_ID:-}
+      DEEPSKY_FIREBASE_SENDER_ID: ${DEEPSKY_FIREBASE_SENDER_ID:-}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError}
+    secrets:
+      - source: db_password
+        target: spring.datasource.password
+      - source: admin_secret
+        target: deepsky.admin-secret
+    volumes:
+      - blob_data:/var/lib/deepsky/blobs
+      - pack_data:/var/lib/deepsky/packs
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+    deploy:
+      resources:
+        limits:
+          memory: ${API_MEM_LIMIT:-512M}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/actuator/health/liveness | grep -q '\"status\":\"UP\"'"]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-deepsky}
+      POSTGRES_USER: ${POSTGRES_USER:-deepsky}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    deploy:
+      resources:
+        limits:
+          memory: ${DB_MEM_LIMIT:-256M}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-deepsky} -d ${POSTGRES_DB:-deepsky}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  admin_secret:
+    file: ./secrets/admin_secret.txt
+
+networks:
+  edge:
+    driver: bridge
+  internal:
+    driver: bridge
+    internal: true
+
+volumes:
+  pg_data:
+  blob_data:
+  pack_data:
+  caddy_data:
+  caddy_config:
