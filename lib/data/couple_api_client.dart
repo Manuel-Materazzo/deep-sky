@@ -142,11 +142,17 @@ class CoupleApiClient {
   final int _clientVersionCode;
   final int _protocolVersion;
 
-  Future<CompatibilityPolicy> fetchCompatibilityPolicy() async {
-    final Uri uri = Uri.parse('$_baseUrl/api/v1/system/compatibility');
+  /// Performs an unauthenticated GET request carrying client version headers.
+  Future<Object?> unsignedGetJson(String pathWithQuery) async {
+    final Uri uri = Uri.parse('$_baseUrl$pathWithQuery');
     final http.Response res = await _http.get(uri, headers: _versionHeaders());
+    return _decodeResponse(res);
+  }
+
+  Future<CompatibilityPolicy> fetchCompatibilityPolicy() async {
     final Map<String, Object?> json =
-        _decodeResponse(res)! as Map<String, Object?>;
+        (await unsignedGetJson('/api/v1/system/compatibility'))!
+            as Map<String, Object?>;
     return CompatibilityPolicy.fromJson(json);
   }
 
