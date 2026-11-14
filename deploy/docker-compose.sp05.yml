@@ -1,0 +1,21 @@
+services:
+  api:
+    # Override to build locally on the ARM64 VM and expose localhost-only ports for SP-05 synthetic load.
+    build:
+      context: ../server
+      dockerfile: Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod,benchmark}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--Xms64m -Xmx256m -XX:MaxMetaspaceSize=128m -XX:+ExitOnOutOfMemoryError}
+    ports:
+      - "127.0.0.1:8080:8080"
+    deploy:
+      resources:
+        limits:
+          memory: ${API_MEM_LIMIT:-512M}
+
+  db:
+    deploy:
+      resources:
+        limits:
+          memory: ${DB_MEM_LIMIT:-384M}
