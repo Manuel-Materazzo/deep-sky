@@ -1,0 +1,23 @@
+title = "Deep Sky Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "firebase-service-account"
+description = "Firebase / Google Cloud service account private key JSON"
+regex = '''"type"\s*:\s*"service_account"'''
+tags = ["firebase", "gcp", "key"]
+
+[[rules]]
+id = "deepsky-admin-secret-env"
+description = "Hardcoded non-placeholder Deep Sky admin secret"
+regex = '''(?i)DEEPSKY_ADMIN_SECRET\s*[:=]\s*["']?(?!change-me|placeholder|example|\$\{)[A-Za-z0-9_\-+/=]{12,}'''
+tags = ["deepsky", "secret"]
+
+[allowlist]
+description = "Allow documentation examples and test placeholders"
+paths = [
+  '''^deploy/\.env\.example$''',
+  '''^docs/''',
+]

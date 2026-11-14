@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+set -eu
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks protect --staged --config "$REPO_ROOT/.gitleaks.toml" --redact --verbose
+else
+  "$REPO_ROOT/scripts/check-secrets.sh" --staged
+fi
