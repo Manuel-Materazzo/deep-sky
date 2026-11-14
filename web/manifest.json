@@ -1,6 +1,6 @@
 {
-    "name": "deep_sky",
-    "short_name": "deep_sky",
+    "name": "Deep Sky",
+    "short_name": "Deep Sky",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

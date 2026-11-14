@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.vectevo" "\0"
-            VALUE "FileDescription", "deep_sky" "\0"
+            VALUE "FileDescription", "Deep Sky" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "deep_sky" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.vectevo. All rights reserved." "\0"
             VALUE "OriginalFilename", "deep_sky.exe" "\0"
-            VALUE "ProductName", "deep_sky" "\0"
+            VALUE "ProductName", "Deep Sky" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

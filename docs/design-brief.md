@@ -34,7 +34,7 @@ Principi che il design deve incarnare: **P-01** piccoli gesti, **P-02** affetto 
 
 ### 4.1 Nome
 
-**\[Aperto\] DD-01.** La direzione scelta è “la luce lasciata accesa”: il gesto di far sapere che ci sei senza scrivere. Il nome definitivo non è confermato. Il designer può usare **“Lucciola”** solo come segnaposto di lavoro e **non lo incide in asset finali** finché il promotore non lo conferma. Alternativa tenuta in riserva: “Lanterna”.
+**\[Deciso\] DD-01.** Il nome definitivo del prodotto è **Deep Sky** (D-01). La direzione emotiva resta “la luce lasciata accesa”: il gesto di far sapere che ci sei senza scrivere. Resta aperto il naming dei concetti interni dell’interfaccia.
 
 ### 4.2 Concetto: la luce
 
@@ -178,7 +178,7 @@ Ogni fase termina con un’approvazione del promotore prima di procedere.
 
 | Fase | Deliverable | Gate |
 | :-- | :-- | :-- |
-| **DS-1 Discovery visiva** | Analisi degli anti-riferimenti, **3 direzioni** di moodboard, proposte di logo e nome | Il promotore sceglie una direzione |
+| **DS-1 Discovery visiva** | Analisi degli anti-riferimenti, **3 direzioni** di moodboard, proposte di logo e identità visiva | Il promotore sceglie una direzione |
 | **DS-2 Pilota** | Style Bible, **kit pilota** (alcune pose del pet, due oggetti, un avatar) e prova completa di **sostituzione con un assistente AI esterno** | Il pilota dimostra coerenza stilistica e fattibilità del flusso di personalizzazione |
 | **DS-3 Design system** | Token (colori chiaro/scuro, tipografia, spaziature, raggi, ombre, movimento), iconografia, componenti, linee guida di microcopy | Approvazione del sistema |
 | **DS-4 Schermate** | Schermate e stati chiave: prima il nucleo (F-01 – F-07), poi il resto | Approvazione per gruppi di funzioni |
@@ -202,7 +202,7 @@ Il designer non le risolve: le segnala, proponendo alternative con pro e contro.
 
 | ID | Questione |
 | :-- | :-- |
-| **DD-01** | Nome definitivo e naming dei concetti interni |
+| **DD-01** | Naming dei concetti interni (nome definitivo deciso: **Deep Sky**) |
 | **DD-02** | Stile illustrativo e moodboard di riferimento |
 | **DD-03** | Specie di default del pet e set definitivo di pose |
 | **DD-04** | Casa come scena unica o più stanze; navigazione accessibile oltre la scena |

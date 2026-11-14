@@ -1,17 +1,21 @@
-# deep_sky
+# Deep Sky
 
-Sky is the only thing that unites and divides us
+Sky is the only thing that unites and divides us.
+
+**Deep Sky** is a private digital home for two people — a mobile-first, end-to-end encrypted, self-hosted app for couples to leave small traces of presence in each other's day without ads, streaks, coins, or pressure.
+
+## Documentation
+
+- [Project Brief](docs/project-brief.md)
+- [Design Brief](docs/design-brief.md)
+- [Considerazioni tecniche](docs/technical-considerations.md)
 
 ## Getting Started
 
-This project is a starting point for a Flutter application.
+This repository contains the Flutter client application (Android-first).
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter pub get
+flutter run
+flutter test
+```

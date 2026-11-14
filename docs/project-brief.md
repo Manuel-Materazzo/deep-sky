@@ -223,7 +223,7 @@ Gli agenti non le risolvono: le segnalano e propongono alternative con pro e con
 
 | ID | Questione | Note |
 | :-- | :-- | :-- |
-| **D-01** | Nome definitivo del prodotto | “Casa” è un titolo provvisorio. |
+| **D-01** | Nome definitivo del prodotto | **\[Deciso\]** **Deep Sky**. |
 | **D-02** | Cifratura end-to-end: ambito e compromessi | Deciso: E2EE dalla v1 (S-01), stato calcolato da un dispositivo, recupero con scambio di chiavi tra telefoni e chiave di recupero (S-06). Dettagli nelle Considerazioni tecniche. |
 | **D-03** | Perimetro dell’MVP | La discovery ha prodotto sia un MVP di nove elementi (inclusi pet e corkboard) sia una sequenza che li rimanda dopo il dogfooding. Va scelto il confine. |
 | **D-04** | Direzione visiva | Serve un moodboard approvato (stile, palette, stile del pet). |
