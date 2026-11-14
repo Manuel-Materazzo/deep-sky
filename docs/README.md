@@ -20,6 +20,7 @@ This directory contains the project documentation, operational plans, technical 
 | [Architecture Decision Records](adr/README.md) | `REP-03`, `SRV-01`, `APP-01` | Index and template for ADRs (`docs/adr/`) |
 | [Key Custody & Offline Signing Procedure](key-custody.md) | `SEC-03`, `SEC-04`, `PD-10`, `AD-08` | Offline generation, encrypted backup, restore verification, and public fingerprint registry |
 | [Server Configuration Reference](server-configuration.md) | `SRV-03`, `INF-04` | Environment variables, defaults, validation rules, and self-hosting notes |
+| [Firebase Setup Guide](firebase-setup.md) | `TC-04`, `S-02`, `AD-04`, `SP-01` | Step-by-step guide to creating a Firebase project, extracting runtime options, and mounting the service account key |
 | [Real-Device Testing Procedure](device-testing.md) | `APP-01`, `APP-03` | How to build, install, and verify debug/signed APKs on physical Android devices |
 | [Release Signing & Publishing Workflow](release-signing-workflow.md) | `CI-02`, `SEC-04`, `PD-10` | End-to-end flow: CI unsigned build, offline signing, GitHub Release publishing |
 | [Backup and Restore Procedure](backup-restore.md) | `INF-05`, `TC-11` | OCI VM backup scope and restore verification checklist |

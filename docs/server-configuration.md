@@ -34,5 +34,5 @@ All configuration is supplied via environment variables (or Docker secrets mappe
 ## Startup Validation Behavior (`SRV-03`)
 
 - In `prod` profile, `DEEPSKY_DOMAIN` cannot be `localhost` or blank, and `DEEPSKY_ADMIN_SECRET` must be at least 24 characters and must not equal the dev placeholder.
-- Whenever `DEEPSKY_FIREBASE_ENABLED=true`, all five Firebase fields (`project-id`, `api-key`, `app-id`, `sender-id`, `service-account-file`) must be non-blank, and `service-account-file` must point to a readable file.
+- Whenever `DEEPSKY_FIREBASE_ENABLED=true`, all five Firebase fields (`project-id`, `api-key`, `app-id`, `sender-id`, `service-account-file`) must be non-blank, and `service-account-file` must point to a readable file. See [Firebase Setup Guide](firebase-setup.md) for step-by-step setup without `google-services.json`.
 - Quotas (`max-blob-bytes`, `max-couple-storage-bytes`) and protocol versions must be strictly positive, and `max-couple-storage-bytes >= max-blob-bytes`.
