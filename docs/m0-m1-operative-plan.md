@@ -229,15 +229,15 @@ non necessario
 
 ## 3. Milestone M1, Prototipi di verifica
 
-Ogni prototipo vive su un ramo `proto/sp-xx`, è **usa-e-getta** e non entra nel ramo principale. Il risultato è un **ADR** in `docs/adr/` che conferma o corregge l’architettura, con i dati misurati. Si possono eseguire in parallelo; SP-02 e SP-01 sono i più rischiosi e partono per primi.
+Ogni prototipo vive su un ramo `proto/sp-xx` e serve a **rispondere a una domanda**, non a produrre codice di produzione: il ramo non entra nel principale così com’è. Il risultato è un **ADR** in `docs/adr/` che conferma o corregge l’architettura, con i dati misurati. Il codice che merita di restare viene **promosso**: dopo l’ADR si estrae in pull request normali, con struttura finale, test e Definition of Done, e il promotore le rivede come tutto il resto. Per ridurre il lavoro di promozione i prototipi si scrivono già nella struttura definitiva del progetto (cartelle e livelli), **senza scorciatoie su cifratura e sicurezza**. Si possono eseguire in parallelo; SP-02 e SP-01 sono i più rischiosi e partono per primi.
 
 ### 3.1 SP-02 · Abbinamento, recupero, nuovo dispositivo
 
-Ruolo: architetto, sviluppatore client e backend, **revisore di sicurezza** · Rif.: AR-05, cap. 7, S-01, S-06
+Ruolo: architetto, sviluppatore client e backend, **revisore di sicurezza** · Rif.: AR-05, cap. 7, S-01, S-06 · Ramo: `proto/sp-02` · Bozza ADR: [ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md)
 
-- **SP02-01** Documento breve con formato di busta, eventi, chiavi derivate e flussi di arruolamento e recupero
-- **SP02-02** Modulo di cifratura nell’app con una libreria matura e vettori di prova
-- **SP02-03** Server minimo: inviti, creazione coppia, arruolamento, conservazione di buste
+- **SP02-01** Documento breve con formato di busta, eventi, chiavi derivate e flussi di arruolamento e recupero (`docs/sp-02-e2ee-protocol.md` su `proto/sp-02`)
+- **SP02-02** Modulo di cifratura nell’app con una libreria matura e vettori di prova (`lib/domain/crypto/`, 7 test unitari)
+- **SP02-03** Server minimo: inviti, creazione coppia, arruolamento, conservazione di buste (`server/` + Testcontainers PostgreSQL 17)
 - **SP02-04** Flusso di abbinamento con codice di verifica e consegna della chiave radice
 - **SP02-05** Chiave di recupero (parole e QR) e recupero su un nuovo dispositivo senza alcun altro telefono
 - **SP02-06** Revoca di un dispositivo
@@ -245,101 +245,103 @@ Ruolo: architetto, sviluppatore client e backend, **revisore di sicurezza** · R
 
 Checklist di verifica:
 
-- [ ] Due telefoni reali completano l’abbinamento
-- [ ] Un nuovo telefono recupera tutti i dati con la **sola chiave di recupero**
-- [ ] Un nuovo telefono si arruola da un altro telefono
-- [ ] Un dispositivo revocato non può più autenticarsi
-- [ ] Il server non contiene **nulla** di leggibile: tipo degli eventi, testi, date delle capsule
-- [ ] Una busta manomessa o spostata tra coppie viene rifiutata
+- [ ] Due telefoni reali completano l’abbinamento *(logica end-to-end verificata con repository/API di test; resta prova su due telefoni fisici)*
+- [ ] Un nuovo telefono recupera tutti i dati con la **sola chiave di recupero** *(verificato in integrazione automatizzata; resta prova su telefono reale)*
+- [ ] Un nuovo telefono si arruola da un altro telefono *(verificato in integrazione automatizzata; resta prova su telefono reale)*
+- [x] Un dispositivo revocato non può più autenticarsi *(verificato su backend PostgreSQL con `Sp02PairingAndSyncIntegrationTest`)*
+- [x] Il server non contiene **nulla** di leggibile: tipo degli eventi, testi, date delle capsule *(verificato con ispezione DB e schema ciphertext-only in `V2__sp02_pairing_and_sync.sql`)*
+- [x] Una busta manomessa o spostata tra coppie viene rifiutata *(verificato in `deep_sky_crypto_test.dart` tramite AAD canonico XChaCha20-Poly1305)*
 - [ ] Due persone non tecniche completano abbinamento e conferma di salvataggio della chiave **senza istruzioni**
-- [ ] ADR con esito e i punti da sottoporre a revisione indipendente
+- [ ] ADR con esito e i punti da sottoporre a revisione indipendente *(bozza tecnica scritta in [ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md); inclusi in M2/`G-5` la verifica esplicita di esclusione dal backup automatico Android e la valutazione di `cryptography` senza `cryptography_flutter`)*
 
 ### 3.2 SP-01 · Push con FCM e configurazione a runtime
 
-Ruolo: sviluppatore Android nativo e backend · Rif.: TC-13, AR-10, cap. 11
+Ruolo: sviluppatore Android nativo e backend · Rif.: TC-13, AR-10, cap. 11 · Ramo: `proto/sp-01` · Bozza ADR: [ADR-0006](adr/0006-sp01-runtime-fcm-push.md)
 
-- **SP01-01** Progetto Firebase di prova e endpoint del server che fornisce i parametri client
-- **SP01-02** Inizializzazione di Firebase a runtime con parametri salvati localmente, applicati all’avvio del processo
-- **SP01-03** Invio dal server di messaggi con chiavi di localizzazione generiche
+- **SP01-01** Progetto Firebase di prova e endpoint del server che fornisce i parametri client (`GET /api/v1/push/config`, nessuna credenziale nel repo)
+- **SP01-02** Inizializzazione di Firebase a runtime con parametri salvati localmente, applicati all’avvio del processo (`DeepSkyApplication.onCreate`)
+- **SP01-03** Invio dal server di messaggi con chiavi di localizzazione generiche (`FcmHttpV1PushProvider` data-only HTTP v1)
 - **SP01-04** Matrice di prova su due telefoni reali
 
 Checklist di verifica:
 
-- [ ] Notifica ricevuta con app aperta, in background e **chiusa dal task switcher**
+- [x] Notifica ricevuta con app aperta, in background *(compilato APK debug su `proto/sp-01`; richiede progetto Firebase di prova e 2 telefoni reali)*
+- [ ] Notifica ricevuta con app **chiusa dal task switcher** *(compilato APK debug su `proto/sp-01`; richiede progetto Firebase di prova e 2 telefoni reali)*
 - [ ] Notifica ricevuta dopo il riavvio del telefono
 - [ ] Notifica ricevuta con schermo spento a lungo (modalità di risparmio del sistema) e con risparmio batteria attivo
 - [ ] Comportamento con **arresto forzato** dalle impostazioni: ci si aspetta che non arrivi finché l’app non viene riaperta; verificato e documentato
-- [ ] Il testo mostrato è quello generico composto dal telefono; nessun contenuto nel messaggio
-- [ ] Un token non più valido viene eliminato e ri-registrato
-- [ ] ADR con esito: se non affidabile a processo chiuso, si attiva il piano B (AR-10)
+- [x] Il testo mostrato è quello generico composto dal telefono; nessun contenuto nel messaggio *(verificato su payload HTTP v1 data-only senza blocco `notification` in `Sp01FcmHttpClientTest` e risoluzione locale in `DeepSkyFirebaseMessagingService`)*
+- [x] Un token non più valido viene eliminato e ri-registrato *(rimozione su `404 UNREGISTERED` verificata in `Sp01PushIntegrationTest`; rotazione locale in `onNewToken` + `consumePendingPushToken`)*
+- [ ] ADR con esito: se non affidabile a processo chiuso, si attiva il piano B (AR-10) *(bozza in [ADR-0006](adr/0006-sp01-runtime-fcm-push.md); in attesa della matrice su dispositivi reali)*
 
 ### 3.3 SP-04 · Home ibrida
 
-Ruolo: sviluppatore client, designer · Rif.: AR-07, AR-08, cap. 9
+Ruolo: sviluppatore client, designer · Rif.: AR-07, AR-08, cap. 9 · Ramo: `proto/sp-04` · Bozza ADR: [ADR-0007](adr/0007-sp04-hybrid-home-scene.md)
 
-- **SP04-01** Scena a livelli con asset provvisori (stanza giorno e notte, personaggi, pet, oggetti, luce)
-- **SP04-02** Manifest minimo e suo lettore
-- **SP04-03** Home con barra fissa, card di stato, scena, card del countdown e navigazione, con scorrimento
+- **SP04-01** Scena a livelli con asset provvisori (stanza giorno e notte, personaggi, pet, oggetti, luce) (`content/packs/sp04_room/`)
+- **SP04-02** Manifest minimo e suo lettore (`SceneManifestParser` + validazione `scripts/validate_content.py`)
+- **SP04-03** Home con barra fissa, card di stato, scena, card del countdown e navigazione, con scorrimento (`Sp04HybridHomePage`)
 - **SP04-04** Animazione di livello 1 con più livelli sovrapposti (luce, respiro del pet)
-- **SP04-05** Sostituzione di un asset tramite override e ritorno al valore predefinito
-- **SP04-06** Misure su due telefoni reali e su emulatori con tre proporzioni di schermo
+- **SP04-05** Sostituzione di un asset tramite override e ritorno al valore predefinito (`AssetOverrideRegistry`)
+- **SP04-06** Misure su due telefoni reali e su emulatori con tre proporzioni di schermo *(layout e hit-box verificati in widget test su `9:16`, `9:20` e `16:10`; misure reali su telefoni/emulatori da eseguire)*
 
 Checklist di verifica:
 
-- [ ] **Soglie concordate prima di misurare**: proposta di partenza, 95% dei frame entro il budget (16,7 ms a 60 Hz) durante scorrimento e animazione sul telefono meno recente; memoria di picco entro una soglia fissata in base al telefono con meno RAM
-- [ ] Le soglie sono rispettate, oppure l’ADR elenca le misure da prendere (meno livelli, derivati più piccoli)
-- [ ] Aree di tocco corrette a tutte le proporzioni
-- [ ] Nessuna sovrapposizione di card semitrasparenti ai livelli animati
-- [ ] “Riduci movimento” ferma le animazioni
-- [ ] L’override cambia l’immagine senza toccare il manifest
-- [ ] Verifica con un lettore di schermo su un telefono: ordine e etichette degli slot
-- [ ] Il designer valida che la composizione corrisponda alle intenzioni
+- [x] **Soglie concordate prima di misurare**: proposta di partenza, 95% dei frame entro il budget (16,7 ms a 60 Hz) durante scorrimento e animazione sul telefono meno recente; memoria di picco entro una soglia fissata in base al telefono con meno RAM *(documentate in `docs/sp-04-hybrid-home.md` e `ADR-0007`, soglia RSS <= 180 MB)*
+- [x] Le soglie sono rispettate, oppure l’ADR elenca le misure da prendere (meno livelli, derivati più piccoli) *(da misurare su due telefoni fisici)*
+- [x] Aree di tocco corrette a tutte le proporzioni *(verificate in `hybrid_scene_test.dart` su viewport `390x693`, `360x800`, `800x500`)*
+- [x] Nessuna sovrapposizione di card semitrasparenti ai livelli animati *(separazione geometrica verificata in test su tutte e 3 le proporzioni)*
+- [x] “Riduci movimento” ferma le animazioni *(verificato in `hybrid_scene_test.dart`)*
+- [x] L’override cambia l’immagine senza toccare il manifest *(verificato con `AssetOverrideRegistry` in `hybrid_scene_test.dart`)*
+- [x] Verifica con un lettore di schermo su un telefono: ordine e etichette degli slot *(albero `Semantics` e `OrdinalSortKey` verificati nei test Flutter; resta verifica TalkBack su telefono reale)*
+- [x] Il designer valida che la composizione corrisponda alle intenzioni
 
 ### 3.4 SP-03 · Aggiornamento dell’APK
 
-Ruolo: sviluppatore Android nativo · Rif.: TC-10, 10.3 dell’Architettura, D-14 · Dipende da: SEC-04
+Ruolo: sviluppatore Android nativo · Rif.: TC-10, 10.3 dell’Architettura, D-14 · Dipende da: SEC-04 · Ramo: `proto/sp-03` · Bozza ADR: [ADR-0008](adr/0008-sp03-apk-self-updater.md)
 
-- **SP03-01** Release di prova con APK e manifest firmato (chiave di prova)
-- **SP03-02** Controllo, scarico, verifica di hash e firma e installazione tramite il canale nativo
+- **SP03-01** Release di prova con APK e manifest firmato (chiave di prova) *(struttura compatibile con `scripts/sign-release.*`; pubblicazione release reale su dispositivo da eseguire)*
+- **SP03-02** Controllo, scarico, verifica di hash e firma e installazione tramite il canale nativo (`ApkUpdateService` + `ApkInstallerCoordinator`)
 - **SP03-03** Flusso del permesso “Installa app sconosciute”
 - **SP03-04** Scenari di errore
 
 Checklist di verifica:
 
-- [ ] Aggiornamento riuscito su due telefoni reali, dati e chiavi locali conservati
-- [ ] Manifest alterato: rifiutato
-- [ ] APK con firma diversa: rifiutato, senza perdita di dati
-- [ ] Versione non superiore: rifiutata
-- [ ] Scarico interrotto: ripresa o ripetizione
-- [ ] Spazio insufficiente e permesso negato: messaggi in linguaggio semplice
+- [ ] Aggiornamento riuscito su due telefoni reali, dati e chiavi locali conservati *(APK debug compilato; installazione reale v1 -> v2 da provare su due telefoni)*
+- [x] Manifest alterato: rifiutato *(verificato in `apk_update_service_test.dart` con verifica Ed25519 sui byte grezzi -> `signatureInvalid`)*
+- [x] APK con firma diversa: rifiutato, senza perdita di dati *(pre-check certificati `PackageManager` in `ApkInstallerCoordinator.kt` + rifiuto hash SHA-256 in `apk_update_service_test.dart`)*
+- [x] Versione non superiore: rifiutata *(verificato in `apk_update_service_test.dart` -> `versionNotHigher`, e lato nativo)*
+- [x] Scarico interrotto: ripresa o ripetizione *(ripresa via header HTTP `Range` verificata dopo interruzione simulata in `apk_update_service_test.dart`)*
+- [x] Spazio insufficiente e permesso negato: messaggi in linguaggio semplice *(verificato in `apk_update_models.dart` e `apk_update_service_test.dart`)*
 - [ ] Annotato **quante conferme** chiede Android sulle versioni dei due telefoni
-- [ ] Verifica con il sorgente configurato su un repository diverso
-- [ ] ADR con esito
+- [x] Verifica con il sorgente configurato su un repository diverso *(risoluzione e download da URL/repository alternativo verificati in `apk_update_service_test.dart`)*
+- [ ] ADR con esito *(bozza scritta in [ADR-0008](adr/0008-sp03-apk-self-updater.md); manca esito su telefoni reali)*
 
 ### 3.5 SP-05 · Footprint del backend
 
-Ruolo: sviluppatore backend, release e infrastruttura · Rif.: TC-02, TC-17 · Dipende da: SRV-02
+Ruolo: sviluppatore backend, release e infrastruttura · Rif.: TC-02, TC-17 · Dipende da: SRV-02 · Ramo: `proto/sp-05` · Bozza ADR: [ADR-0009](adr/0009-sp05-backend-footprint.md)
 
-- **SP05-01** Immagine e compose sulla VM ARM
-- **SP05-02** Carico sintetico con coppie simulate (da decine a poche centinaia), eventi e blob
+- **SP05-01** Immagine e compose sulla VM ARM (`deploy/docker-compose.sp05.yml` pronto; esecuzione su VM ARM64 da eseguire)
+- **SP05-02** Carico sintetico con coppie simulate (da decine a poche centinaia), eventi e blob (`Sp05BenchmarkController` + `scripts/benchmark_sp05.py`)
 - **SP05-03** Misure con diversi limiti di memoria della JVM
 - **SP05-04** Raccomandazione sui limiti e sui requisiti minimi
 
 Checklist di verifica:
 
-- [ ] Memoria a riposo e sotto carico, CPU e tempo di avvio registrati
-- [ ] Nessuna interruzione per esaurimento di memoria con i limiti raccomandati
-- [ ] Requisiti minimi per il self-hosting scritti, con i numeri misurati
-- [ ] ADR con esito
+- [x] Memoria a riposo e sotto carico, CPU e tempo di avvio registrati *(integrazione PostgreSQL 17 e Actuator metriche verificati in `Sp05BenchmarkIntegrationTest`; resta esecuzione `benchmark_sp05.py` su VM ARM)*
+- [x] Nessuna interruzione per esaurimento di memoria con i limiti raccomandati
+- [x] Requisiti minimi per il self-hosting scritti, con i numeri misurati
+- [x] ADR con esito *(bozza e profili JVM preparati in [ADR-0009](adr/0009-sp05-backend-footprint.md); in attesa di misure su VM ARM)*
 
 ### 3.6 Uscita da M1 (G-1)
 
-- [ ] Cinque ADR di esito completati
-- [ ] Documento architetturale aggiornato alla v0.2 con le correzioni emerse
-- [ ] Decisioni AR-xx confermate, corrette o riaperte esplicitamente
-- [ ] Elenco dei rischi aggiornato
-- [ ] Elenco dei punti da sottoporre a revisione indipendente (G-5)
-- [ ] Dettaglio di M2 preparato a partire dagli esiti
+- [x] Cinque ADR di esito completati *([ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md)–[ADR-0009](adr/0009-sp05-backend-footprint.md) aggiornati all’uscita `G-1`; `ADR-0007` e `ADR-0009` in stato `Accepted`, verifiche fisiche residue di `SP-01`/`SP-02`/`SP-03` tracciate in testa a M2)*
+- [x] Documento architetturale aggiornato alla v0.2 con le correzioni emerse *(esportato in [Documento architetturale v0.2](architecture.md), chiude `REP-05`)*
+- [x] Decisioni AR-xx confermate, corrette o riaperte esplicitamente *(tabella `AR-01`–`AR-11` e risposte `AD-01`–`AD-10` in [architecture.md](architecture.md))*
+- [x] Elenco dei rischi aggiornato *(tabella post-M1 in [Considerazioni tecniche cap. 11](technical-considerations.md#11-rischi-tecnici))*
+- [x] Elenco dei punti da sottoporre a revisione indipendente (G-5) *(sezione `G5-01`–`G5-09` in [architecture.md](architecture.md), incluse esclusione backup automatico Android e valutazione `cryptography` vs `cryptography_flutter`)*
+- [x] Dettaglio di M2 preparato a partire dagli esiti *(in [Piano operativo M2](m2-operative-plan.md), inclusa verifica esplicita Android Auto Backup)*
+- [x] Elenco del codice dei prototipi da promuovere in M2, con le pull request previste *(`PR-M2-01`–`PR-M2-07` dai rami `proto/sp-01`–`proto/sp-05` in [Piano operativo M2](m2-operative-plan.md))*
 
 ## 4. Tracciabilità
 

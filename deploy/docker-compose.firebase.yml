@@ -1,0 +1,13 @@
+# Mounts the Firebase service account JSON cleanly as a read-only Docker secret
+# for containers running as non-root user `deepsky` (see docs/firebase-setup.md).
+services:
+  api:
+    environment:
+      DEEPSKY_FIREBASE_SERVICE_ACCOUNT_FILE: /run/secrets/firebase_service_account.json
+    secrets:
+      - source: firebase_service_account
+        target: firebase_service_account.json
+
+secrets:
+  firebase_service_account:
+    file: ./secrets/firebase-service-account.json

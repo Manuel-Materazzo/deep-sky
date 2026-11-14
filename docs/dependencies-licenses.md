@@ -4,33 +4,70 @@ Reference IDs: `SEC-02`, `PD-13`, [Piano di sviluppo](development-plan.md) secti
 
 Generated via `python scripts/check-licenses.py --write-doc docs/dependencies-licenses.md`.
 
-## Flutter / Dart Packages (32)
+## Flutter / Dart Packages (75)
 
 | Package | Detected License | Status |
 | :-- | :-- | :-- |
+| `args` | BSD | compatible |
 | `async` | BSD | compatible |
+| `bip39_mnemonic` | MIT | compatible |
 | `boolean_selector` | BSD | compatible |
 | `characters` | BSD | compatible |
 | `clock` | Apache-2.0 | compatible |
+| `code_assets` | BSD | compatible |
 | `collection` | BSD | compatible |
+| `convert` | BSD | compatible |
+| `crypto` | BSD | compatible |
+| `cryptography` | Apache-2.0 | compatible |
 | `cupertino_icons` | MIT | compatible |
 | `cupertino_ui` | BSD | compatible |
 | `fake_async` | Apache-2.0 | compatible |
+| `ffi` | BSD | compatible |
+| `ffi_leak_tracker` | BSD | compatible |
 | `flutter` | BSD | compatible |
 | `flutter_lints` | BSD | compatible |
 | `flutter_localizations` | Unknown | compatible |
+| `flutter_secure_storage` | BSD | compatible |
+| `flutter_secure_storage_darwin` | BSD | compatible |
+| `flutter_secure_storage_linux` | BSD | compatible |
+| `flutter_secure_storage_platform_interface` | BSD | compatible |
+| `flutter_secure_storage_web` | BSD | compatible |
+| `flutter_secure_storage_windows` | BSD | compatible |
 | `flutter_test` | Unknown | compatible |
+| `flutter_web_plugins` | Unknown | compatible |
+| `hooks` | BSD | compatible |
+| `http` | BSD | compatible |
+| `http_parser` | BSD | compatible |
 | `intl` | BSD | compatible |
+| `jni` | BSD | compatible |
+| `jni_flutter` | BSD | compatible |
+| `jni_util` | BSD | compatible |
 | `leak_tracker` | BSD | compatible |
 | `leak_tracker_flutter_testing` | BSD | compatible |
 | `leak_tracker_testing` | BSD | compatible |
 | `lints` | BSD | compatible |
 | `listen` | BSD | compatible |
+| `logging` | BSD | compatible |
 | `matcher` | BSD | compatible |
 | `material_color_utilities` | Apache-2.0 | compatible |
 | `material_ui` | BSD | compatible |
 | `meta` | BSD | compatible |
+| `objective_c` | BSD | compatible |
+| `package_config` | BSD | compatible |
 | `path` | BSD | compatible |
+| `path_provider` | BSD | compatible |
+| `path_provider_android` | BSD | compatible |
+| `path_provider_foundation` | BSD | compatible |
+| `path_provider_linux` | BSD | compatible |
+| `path_provider_platform_interface` | BSD | compatible |
+| `path_provider_windows` | BSD | compatible |
+| `platform` | BSD | compatible |
+| `plugin_platform_interface` | BSD | compatible |
+| `pointycastle` | MIT | compatible |
+| `pub_semver` | BSD | compatible |
+| `qr` | BSD | compatible |
+| `qr_flutter` | BSD | compatible |
+| `record_use` | BSD | compatible |
 | `sky_engine` | MIT | compatible |
 | `source_span` | BSD | compatible |
 | `stack_trace` | BSD | compatible |
@@ -38,8 +75,14 @@ Generated via `python scripts/check-licenses.py --write-doc docs/dependencies-li
 | `string_scanner` | BSD | compatible |
 | `term_glyph` | BSD | compatible |
 | `test_api` | BSD | compatible |
+| `typed_data` | BSD | compatible |
+| `unorm_dart` | MIT | compatible |
 | `vector_math` | BSD | compatible |
 | `vm_service` | BSD | compatible |
+| `web` | BSD | compatible |
+| `win32` | BSD | compatible |
+| `xdg_directories` | BSD | compatible |
+| `yaml` | MIT | compatible |
 
 ## Backend Maven Artifacts (172)
 
