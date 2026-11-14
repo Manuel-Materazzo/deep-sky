@@ -1,5 +1,6 @@
 package com.vectevo.deep_sky_server.pairing;
 
+import com.vectevo.deep_sky_server.push.PushService;
 import com.vectevo.deep_sky_server.shared.DevicePrincipal;
 import com.vectevo.deep_sky_server.shared.Ed25519SignatureVerifier;
 import java.nio.charset.StandardCharsets;
@@ -27,6 +28,7 @@ public class PairingService {
 	private final PairingInviteRepository inviteRepository;
 	private final KeyDeliveryRepository keyDeliveryRepository;
 	private final RecoveryChallengeRepository challengeRepository;
+	private final PushService pushService;
 	private final SecureRandom secureRandom = new SecureRandom();
 
 	public PairingService(
@@ -34,12 +36,14 @@ public class PairingService {
 			DeviceRepository deviceRepository,
 			PairingInviteRepository inviteRepository,
 			KeyDeliveryRepository keyDeliveryRepository,
-			RecoveryChallengeRepository challengeRepository) {
+			RecoveryChallengeRepository challengeRepository,
+			PushService pushService) {
 		this.coupleRepository = coupleRepository;
 		this.deviceRepository = deviceRepository;
 		this.inviteRepository = inviteRepository;
 		this.keyDeliveryRepository = keyDeliveryRepository;
 		this.challengeRepository = challengeRepository;
+		this.pushService = pushService;
 	}
 
 	public record CreateInviteResult(UUID coupleId, UUID deviceId, String inviteToken, Instant expiresAt) {}
@@ -316,6 +320,7 @@ public class PairingService {
 			target.setRevokedAt(Instant.now());
 			deviceRepository.save(target);
 		}
+		pushService.unregisterDevice(target.getId());
 	}
 
 	@Transactional
@@ -332,6 +337,7 @@ public class PairingService {
 			}
 		}
 		deviceRepository.saveAll(devices);
+		pushService.unregisterCouple(couple.getId());
 	}
 
 	@Transactional

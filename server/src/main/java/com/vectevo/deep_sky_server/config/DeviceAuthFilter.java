@@ -46,7 +46,8 @@ public class DeviceAuthFilter extends OncePerRequestFilter {
 		if (!path.startsWith("/api/v1/")) {
 			return true;
 		}
-		if (HttpMethod.GET.matches(method) && "/api/v1/system/compatibility".equals(path)) {
+		if (HttpMethod.GET.matches(method)
+				&& ("/api/v1/system/compatibility".equals(path) || "/api/v1/push/config".equals(path))) {
 			return true;
 		}
 		if (HttpMethod.POST.matches(method)) {

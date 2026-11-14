@@ -1,5 +1,6 @@
 package com.vectevo.deep_sky_server.sync;
 
+import com.vectevo.deep_sky_server.push.PushService;
 import com.vectevo.deep_sky_server.shared.DevicePrincipal;
 import com.vectevo.deep_sky_server.shared.Ed25519SignatureVerifier;
 import java.time.Instant;
@@ -10,15 +11,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Opaque encrypted envelope storage and retrieval (`SP-02`, `S-01`).
+ * Opaque encrypted envelope storage, retrieval, and partner push wakeup dispatch (`SP-02`, `PR-M2-03`, `S-01`).
  */
 @Service
 public class SyncService {
 
 	private final EncryptedEnvelopeRepository envelopeRepository;
+	private final PushService pushService;
 
-	public SyncService(EncryptedEnvelopeRepository envelopeRepository) {
+	public SyncService(EncryptedEnvelopeRepository envelopeRepository, PushService pushService) {
 		this.envelopeRepository = envelopeRepository;
+		this.pushService = pushService;
 	}
 
 	public record EnvelopeView(
@@ -84,6 +87,12 @@ public class SyncService {
 
 		// Reload to retrieve database-generated IDENTITY seq
 		EncryptedEnvelopeEntity persisted = envelopeRepository.findById(envelopeId).orElseThrow();
+		if ("EVENT".equals(channel)) {
+			pushService.dispatchPartnerWakeup(
+					principal.coupleId(),
+					principal.deviceId(),
+					"wakeup.thinking_of_you");
+		}
 		return toView(persisted);
 	}
 
