@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "packId": "example-living-room",
+  "packVersion": "0.1.0",
+  "minAppProtocol": 1,
+  "name": {
+    "it": "Soggiorno di esempio",
+    "en": "Example Living Room"
+  },
+  "scene": {
+    "aspectRatio": "9:16",
+    "bleed": {
+      "top": 0.08,
+      "bottom": 0.08,
+      "left": 0.08,
+      "right": 0.08
+    },
+    "background": {
+      "dayAsset": "assets/bg_day.jpg",
+      "nightAsset": "assets/bg_night.jpg"
+    }
+  },
+  "slots": [
+    {
+      "id": "window",
+      "description": "Main room window showing time of day and warm light when a gesture arrives",
+      "zIndex": 10,
+      "replaceable": false,
+      "anchor": { "x": 0.5, "y": 0.28 },
+      "bounds": { "x": 0.30, "y": 0.14, "width": 0.40, "height": 0.28 },
+      "touchArea": { "x": 0.28, "y": 0.12, "width": 0.44, "height": 0.32 },
+      "accessibilityLabel": {
+        "it": "Finestra della casa, apri i gesti ricevuti",
+        "en": "House window, open received gestures"
+      },
+      "defaultState": "calm",
+      "states": {
+        "calm": {
+          "layers": [
+            { "id": "frame", "asset": "assets/window_frame.png", "zOffset": 0, "opacity": 1.0 }
+          ]
+        },
+        "lit": {
+          "layers": [
+            { "id": "frame", "asset": "assets/window_frame.png", "zOffset": 0, "opacity": 1.0 },
+            { "id": "glow", "asset": "assets/window_glow.png", "zOffset": 1, "opacity": 0.85 }
+          ]
+        }
+      },
+      "animations": [
+        {
+          "layerId": "glow",
+          "type": "fade",
+          "durationMs": 2800,
+          "curve": "easeInOut",
+          "repeat": "reverse",
+          "from": 0.65,
+          "to": 1.0
+        }
+      ]
+    },
+    {
+      "id": "countdown_calendar",
+      "description": "Wall calendar slot for shared countdowns",
+      "zIndex": 20,
+      "replaceable": true,
+      "anchor": { "x": 0.20, "y": 0.42 },
+      "bounds": { "x": 0.10, "y": 0.34, "width": 0.20, "height": 0.16 },
+      "touchArea": { "x": 0.08, "y": 0.32, "width": 0.24, "height": 0.20 },
+      "accessibilityLabel": {
+        "it": "Calendario sulla parete, apri i countdown",
+        "en": "Wall calendar, open countdowns"
+      },
+      "defaultState": "default",
+      "states": {
+        "default": {
+          "layers": [
+            { "id": "calendar_body", "asset": "assets/calendar.png", "zOffset": 0, "opacity": 1.0 }
+          ]
+        }
+      },
+      "animations": []
+    }
+  ]
+}

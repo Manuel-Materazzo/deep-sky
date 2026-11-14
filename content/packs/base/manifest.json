@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "packId": "base",
+  "packVersion": "0.1.0",
+  "minAppProtocol": 1,
+  "name": {
+    "it": "Casa base",
+    "en": "Base Home"
+  },
+  "scene": {
+    "aspectRatio": "9:16",
+    "bleed": {
+      "top": 0.08,
+      "bottom": 0.08,
+      "left": 0.08,
+      "right": 0.08
+    },
+    "background": {
+      "dayAsset": null,
+      "nightAsset": null
+    }
+  },
+  "slots": []
+}

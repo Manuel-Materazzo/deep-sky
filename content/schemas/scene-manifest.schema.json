@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://deepsky.vectevo.com/schemas/scene-manifest.schema.json",
+  "title": "Deep Sky Scene Pack Manifest",
+  "description": "Schema for data-driven layered scene packs (CNT-01, TC-08, TC-09, A-09).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "packId",
+    "packVersion",
+    "minAppProtocol",
+    "name",
+    "scene",
+    "slots"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "packId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{1,63}$"
+    },
+    "packVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$"
+    },
+    "minAppProtocol": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "name": {
+      "$ref": "#/$defs/localizedText"
+    },
+    "scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["aspectRatio", "bleed", "background"],
+      "properties": {
+        "aspectRatio": {
+          "type": "string",
+          "pattern": "^[1-9]\\d*:[1-9]\\d*$"
+        },
+        "bleed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["top", "bottom", "left", "right"],
+          "properties": {
+            "top": { "type": "number", "minimum": 0.0, "maximum": 0.5 },
+            "bottom": { "type": "number", "minimum": 0.0, "maximum": 0.5 },
+            "left": { "type": "number", "minimum": 0.0, "maximum": 0.5 },
+            "right": { "type": "number", "minimum": 0.0, "maximum": 0.5 }
+          }
+        },
+        "background": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["dayAsset", "nightAsset"],
+          "properties": {
+            "dayAsset": { "type": ["string", "null"] },
+            "nightAsset": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    "slots": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/slot"
+      }
+    }
+  },
+  "$defs": {
+    "localizedText": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["it", "en"],
+      "properties": {
+        "it": { "type": "string", "minLength": 1 },
+        "en": { "type": "string", "minLength": 1 }
+      }
+    },
+    "normalizedRect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "y": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "width": { "type": "number", "exclusiveMinimum": 0.0, "maximum": 1.0 },
+        "height": { "type": "number", "exclusiveMinimum": 0.0, "maximum": 1.0 }
+      }
+    },
+    "layer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "asset", "zOffset"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$" },
+        "asset": { "type": "string", "minLength": 1 },
+        "zOffset": { "type": "integer", "minimum": 0 },
+        "opacity": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      }
+    },
+    "animation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["layerId", "type", "durationMs", "curve", "repeat", "from", "to"],
+      "properties": {
+        "layerId": { "type": "string", "minLength": 1 },
+        "type": {
+          "type": "string",
+          "enum": ["fade", "translateY", "translateX", "scale", "rotate"]
+        },
+        "durationMs": { "type": "integer", "minimum": 100, "maximum": 60000 },
+        "curve": {
+          "type": "string",
+          "enum": ["linear", "easeInOut", "easeIn", "easeOut"]
+        },
+        "repeat": {
+          "type": "string",
+          "enum": ["none", "loop", "reverse"]
+        },
+        "from": { "type": "number" },
+        "to": { "type": "number" }
+      }
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "description",
+        "zIndex",
+        "replaceable",
+        "anchor",
+        "bounds",
+        "touchArea",
+        "accessibilityLabel",
+        "defaultState",
+        "states",
+        "animations"
+      ],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{1,63}$" },
+        "description": { "type": "string", "minLength": 1 },
+        "zIndex": { "type": "integer", "minimum": 0 },
+        "replaceable": { "type": "boolean" },
+        "anchor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+            "y": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+          }
+        },
+        "bounds": { "$ref": "#/$defs/normalizedRect" },
+        "touchArea": { "$ref": "#/$defs/normalizedRect" },
+        "accessibilityLabel": { "$ref": "#/$defs/localizedText" },
+        "defaultState": { "type": "string", "minLength": 1 },
+        "states": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["layers"],
+            "properties": {
+              "layers": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/layer" }
+              }
+            }
+          }
+        },
+        "animations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/animation" }
+        }
+      }
+    }
+  }
+}
