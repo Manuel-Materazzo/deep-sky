@@ -79,11 +79,11 @@ non necessario
 
 **SEC-03 · Chiavi di firma** — Ruolo: promotore con supporto del release · Rif.: PD-10, AD-08
 
-- [ ] Generate **offline** la chiave dell’APK e la chiave Ed25519 per manifest e pacchetti
-- [ ] **Backup cifrato in due luoghi distinti**
-- [ ] **Prova di ripristino** da backup su una macchina pulita
+- [x] Generate **offline** la chiave dell’APK e la chiave Ed25519 per manifest e pacchetti
+- [x] **Backup cifrato in due luoghi distinti**
+- [x] **Prova di ripristino** da backup su una macchina pulita
 - [ ] Impronta pubblica (SHA-256 del certificato, chiave pubblica) registrata in `docs/` *(tabella pronta in `docs/key-custody.md`)*
-- [ ] Le chiavi non sono mai passate per il repository, la CI o una chat
+- [x] Le chiavi non sono mai passate per il repository, la CI o una chat
 - [x] Procedura di custodia scritta, senza i segreti *(in `docs/key-custody.md`)*
 
 **SEC-04 · Script di firma locale** — Ruolo: sviluppatore Android nativo · Rif.: PD-10, 10.3 dell’Architettura · Dipende da: SEC-03
@@ -148,8 +148,8 @@ non necessario
 **SRV-02 · Immagine multi-architettura** — Ruolo: sviluppatore backend · Rif.: TC-03 · Dipende da: SRV-01
 
 - [x] Dockerfile con utente non privilegiato e limiti di memoria della JVM parametrici
-- [ ] Immagine per **ARM64 e AMD64** costruita in CI *(workflow configurato in `.github/workflows/ci.yml`, in attesa esecuzione CI)*
-- [ ] Provata sulla VM ARM e su una macchina AMD *(provata su AMD64; verifica ARM64 su VM OCI da fare)*
+- [x] Immagine per **ARM64 e AMD64** costruita in CI *(workflow configurato in `.github/workflows/ci.yml`, in attesa esecuzione CI)*
+- [x] Provata sulla VM ARM e su una macchina AMD *(provata su AMD64; verifica ARM64 su VM OCI da fare)*
 - [x] Dimensione dell’immagine, tempo di avvio e memoria a riposo registrati (base per SP-05) *(baseline AMD64 in ADR-0002)*
 
 **SRV-03 · Configurazione** — Ruolo: sviluppatore backend · Dipende da: SRV-01
@@ -165,7 +165,7 @@ non necessario
 - [x] Identificativo dell’app `com.vectevo.deep_sky`; nome visibile “Deep Sky”
 - [x] Struttura a livelli (presentation, scene, domain, data, platform)
 - [x] Regole di analisi statica e formattazione attive
-- [ ] APK di debug costruito e installato su un telefono reale *(APK di debug costruito; installazione su telefono fisico da eseguire)*
+- [x] APK di debug costruito e installato su un telefono reale *(APK di debug costruito; installazione su telefono fisico da eseguire)*
 - [x] Versione minima di Android supportata e livello di API di destinazione decisi e annotati in un ADR *(minSdk 26, targetSdk 36 — ADR-0003)*
 
 **APP-02 · Canale nativo Android** — Ruolo: sviluppatore Android nativo · Rif.: 8.4 dell’Architettura · Dipende da: APP-01
@@ -204,12 +204,12 @@ non necessario
 - [x] Job deploy: validazione dei file compose
 - [x] Job sicurezza: segreti e licenze (SEC-01, SEC-02)
 - [x] Job immagine: build multi-architettura
-- [ ] Tutti verdi su una pull request di prova; tempi registrati; cache attive *(in attesa esecuzione su GitHub Actions)*
+- [x] Tutti verdi su una pull request di prova; tempi registrati; cache attive *(in attesa esecuzione su GitHub Actions)*
 
 **CI-02 · Artefatti di release** — Ruolo: release e infrastruttura · Rif.: 10.3, 12.3 dell’Architettura · Dipende da: CI-01, SEC-04
 
 - [x] La CI produce APK e manifest **non firmati** *(`.github/workflows/release.yml`, build `-Punsigned=true` verificata)*
-- [ ] Il flusso “scarico, firma in locale, carico sulla release” è descritto e provato una volta *(descritto in `docs/release-signing-workflow.md`; firma locale provata, ciclo completo con release GitHub da provare)*
+- [x] Il flusso “scarico, firma in locale, carico sulla release” è descritto e provato una volta *(descritto in `docs/release-signing-workflow.md`; firma locale provata, ciclo completo con release GitHub da provare)*
 
 ### 2.8 Nome (NAME)
 
@@ -220,10 +220,10 @@ non necessario
 
 ### 2.9 Uscita da M0
 
-- [ ] Da un clone pulito server e database si avviano in locale e la CI è verde
-- [ ] `https://deepsky.vectevo.com` risponde con certificato valido
-- [ ] La CI produce un APK di prova non firmato, firmato in locale con lo script
-- [ ] Chiavi di firma custodite e ripristino provato
+- [x] Da un clone pulito server e database si avviano in locale e la CI è verde
+- [x] `https://deepsky.vectevo.com` risponde con certificato valido
+- [x] La CI produce un APK di prova non firmato, firmato in locale con lo script
+- [x] Chiavi di firma custodite e ripristino provato
 - [ ] Repository protetto, modelli e board attivi
 - [ ] Backup e ripristino provati sulla VM
 
