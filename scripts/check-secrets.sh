@@ -46,7 +46,7 @@ if [ "$MODE" = "staged" ]; then
       FAILED=1
       continue
     fi
-    if git show ":$f" | grep -Eq "$PATTERN"; then
+    if git show ":$f" | grep -Eq -e "$PATTERN"; then
       echo "Secret pattern detected in staged file: $f" >&2
       FAILED=1
     fi
@@ -59,7 +59,7 @@ elif [ "$MODE" = "history" ]; then
         FAILED=1
       fi
     done
-    if git show "$c" --pretty=format: | grep -E '^\+' | grep -Ev '^\+\+\+' | grep -Eq "$PATTERN"; then
+    if git show "$c" --pretty=format: | grep -E '^\+' | grep -Ev '^\+\+\+' | grep -Eq -e "$PATTERN"; then
       echo "Secret pattern detected in commit history: $c" >&2
       FAILED=1
     fi
@@ -70,7 +70,7 @@ else
       FAILED=1
       continue
     fi
-    if [ -f "$f" ] && grep -Eq "$PATTERN" "$f"; then
+    if [ -f "$f" ] && grep -Eq -e "$PATTERN" "$f"; then
       echo "Secret pattern detected in tracked file: $f" >&2
       FAILED=1
     fi
