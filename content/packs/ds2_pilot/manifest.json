@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 1,
+  "packId": "ds2-pilot-room",
+  "packVersion": "0.2.0",
+  "minAppProtocol": 1,
+  "name": {
+    "it": "La nostra stanza · Pilota DS-2",
+    "en": "Our Room · DS-2 Pilot"
+  },
+  "scene": {
+    "aspectRatio": "9:16",
+    "bleed": {
+      "top": 0.06,
+      "bottom": 0.06,
+      "left": 0.06,
+      "right": 0.06
+    },
+    "background": {
+      "dayAsset": "assets/bg_day.png",
+      "nightAsset": "assets/bg_night.png"
+    }
+  },
+  "slots": [
+    {
+      "id": "window",
+      "description": "Window showing day/night ambiance and warm light glow",
+      "zIndex": 10,
+      "replaceable": false,
+      "anchor": { "x": 0.50, "y": 0.25 },
+      "bounds": { "x": 0.31, "y": 0.11, "width": 0.38, "height": 0.27 },
+      "touchArea": { "x": 0.29, "y": 0.09, "width": 0.42, "height": 0.31 },
+      "accessibilityLabel": {
+        "it": "Finestra della stanza, indica un pensiero in arrivo o la luce del cielo",
+        "en": "Room window, reflects sky ambiance and arriving thoughts"
+      },
+      "defaultState": "calm",
+      "states": {
+        "calm": {
+          "layers": [
+            { "id": "frame", "asset": "assets/window_frame.png", "zOffset": 0, "opacity": 1.0 }
+          ]
+        },
+        "lit": {
+          "layers": [
+            { "id": "frame", "asset": "assets/window_frame.png", "zOffset": 0, "opacity": 1.0 },
+            { "id": "glow", "asset": "assets/window_glow.png", "zOffset": 1, "opacity": 0.85 }
+          ]
+        }
+      },
+      "animations": [
+        {
+          "layerId": "glow",
+          "type": "fade",
+          "durationMs": 2800,
+          "curve": "easeInOut",
+          "repeat": "reverse",
+          "from": 0.55,
+          "to": 1.0
+        }
+      ]
+    },
+    {
+      "id": "couch",
+      "description": "Cozy center sofa base",
+      "zIndex": 20,
+      "replaceable": false,
+      "anchor": { "x": 0.50, "y": 0.65 },
+      "bounds": { "x": 0.20, "y": 0.54, "width": 0.60, "height": 0.22 },
+      "touchArea": { "x": 0.20, "y": 0.54, "width": 0.60, "height": 0.22 },
+      "accessibilityLabel": {
+        "it": "Divano centrale della stanza",
+        "en": "Center living room sofa"
+      },
+      "defaultState": "default",
+      "states": {
+        "default": {
+          "layers": [
+            { "id": "sofa_base", "asset": "assets/sofa.png", "zOffset": 0, "opacity": 1.0 }
+          ]
+        }
+      },
+      "animations": []
+    },
+    {
+      "id": "partner_a",
+      "description": "Partner A character on left side of sofa",
+      "zIndex": 30,
+      "replaceable": true,
+      "anchor": { "x": 0.38, "y": 0.55 },
+      "bounds": { "x": 0.28, "y": 0.43, "width": 0.19, "height": 0.22 },
+      "touchArea": { "x": 0.27, "y": 0.42, "width": 0.21, "height": 0.24 },
+      "accessibilityLabel": {
+        "it": "Primo personaggio sul divano",
+        "en": "First partner on the sofa"
+      },
+      "defaultState": "resting",
+      "states": {
+        "resting": {
+          "layers": [
+            { "id": "avatar", "asset": "assets/partner_a.png", "zOffset": 0, "opacity": 1.0 }
+          ]
+        }
+      },
+      "animations": []
+    },
+    {
+      "id": "partner_b",
+      "description": "Partner B character on right side of sofa",
+      "zIndex": 32,
+      "replaceable": true,
+      "anchor": { "x": 0.62, "y": 0.55 },
+      "bounds": { "x": 0.53, "y": 0.43, "width": 0.19, "height": 0.22 },
+      "touchArea": { "x": 0.52, "y": 0.42, "width": 0.21, "height": 0.24 },
+      "accessibilityLabel": {
+        "it": "Secondo personaggio sul divano",
+        "en": "Second partner on the sofa"
+      },
+      "defaultState": "resting",
+      "states": {
+        "resting": {
+          "layers": [
+            { "id": "avatar", "asset": "assets/partner_b.png", "zOffset": 0, "opacity": 1.0 }
+          ]
+        }
+      },
+      "animations": []
+    },
+    {
+      "id": "pet",
+      "description": "Replaceable pet companion with breathing scale animation",
+      "zIndex": 40,
+      "replaceable": true,
+      "anchor": { "x": 0.24, "y": 0.80 },
+      "bounds": { "x": 0.12, "y": 0.72, "width": 0.24, "height": 0.16 },
+      "touchArea": { "x": 0.10, "y": 0.70, "width": 0.28, "height": 0.20 },
+      "accessibilityLabel": {
+        "it": "Animale domestico, tocca per cambiare aspetto",
+        "en": "Pet companion, tap to toggle asset override"
+      },
+      "defaultState": "napping",
+      "states": {
+        "napping": {
+          "layers": [
+            { "id": "pet_body", "asset": "assets/pet_cat.png", "zOffset": 0, "opacity": 1.0 }
+          ]
+        }
+      },
+      "animations": [
+        {
+          "layerId": "pet_body",
+          "type": "scale",
+          "durationMs": 2400,
+          "curve": "easeInOut",
+          "repeat": "reverse",
+          "from": 0.96,
+          "to": 1.04
+        }
+      ]
+    },
+    {
+      "id": "warm_mug",
+      "description": "Warm tea mug on floor cushion with subtle rising steam",
+      "zIndex": 45,
+      "replaceable": true,
+      "anchor": { "x": 0.76, "y": 0.80 },
+      "bounds": { "x": 0.68, "y": 0.73, "width": 0.15, "height": 0.14 },
+      "touchArea": { "x": 0.66, "y": 0.71, "width": 0.19, "height": 0.18 },
+      "accessibilityLabel": {
+        "it": "Tazza calda sul tappeto",
+        "en": "Warm tea mug on the rug"
+      },
+      "defaultState": "steaming",
+      "states": {
+        "steaming": {
+          "layers": [
+            { "id": "mug_cup", "asset": "assets/mug_cup.png", "zOffset": 0, "opacity": 1.0 },
+            { "id": "mug_steam", "asset": "assets/mug_steam.png", "zOffset": 1, "opacity": 0.85 }
+          ]
+        }
+      },
+      "animations": [
+        {
+          "layerId": "mug_steam",
+          "type": "translateY",
+          "durationMs": 2200,
+          "curve": "easeInOut",
+          "repeat": "reverse",
+          "from": 2.0,
+          "to": -6.0
+        }
+      ]
+    },
+    {
+      "id": "countdown_calendar",
+      "description": "Wall calendar slot linked to shared countdowns",
+      "zIndex": 50,
+      "replaceable": true,
+      "anchor": { "x": 0.18, "y": 0.30 },
+      "bounds": { "x": 0.08, "y": 0.22, "width": 0.20, "height": 0.16 },
+      "touchArea": { "x": 0.06, "y": 0.20, "width": 0.24, "height": 0.20 },
+      "accessibilityLabel": {
+        "it": "Calendario sulla parete, apri i countdown condivisi",
+        "en": "Wall calendar, open shared countdowns"
+      },
+      "defaultState": "default",
+      "states": {
+        "default": {
+          "layers": [
+            { "id": "calendar_body", "asset": "assets/calendar.png", "zOffset": 0, "opacity": 1.0 }
+          ]
+        }
+      },
+      "animations": []
+    }
+  ]
+}
