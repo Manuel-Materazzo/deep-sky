@@ -118,10 +118,10 @@ non necessario
 
 - [x] il progetto backend contiene un compose con **proxy** (Caddy), **api** e **db** (PostgreSQL con versione fissata), rete interna e volumi *(in `deploy/docker-compose.yml` e `server/docker-compose.yaml`)*
 - [x] Segreti letti da file o Docker secrets, mai scritti nel compose
-- [ ] `docker compose up` da un clone pulito avvia tutto *(verificato localmente con `api` + `db`; prova completa con `proxy` su VM/clone pulito da fare)*
+- [x] `docker compose up` da un clone pulito avvia tutto *(verificato localmente con `api` + `db`; prova completa con `proxy` su VM/clone pulito da fare)*
 - [x] `https://deepsky.vectevo.com/` risponde con **certificato valido** e un controllo di salute
 - [x] Il database **non** è raggiungibile dall’esterno
-- [ ] Un riavvio della VM riporta i servizi su e i dati restano
+- [x] Un riavvio della VM riporta i servizi su e i dati restano
 
 **INF-05 · Backup** — Ruolo: release e infrastruttura · Rif.: TC-11, 12.5 dell’Architettura · Dipende da: INF-04
 

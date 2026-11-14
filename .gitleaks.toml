@@ -12,8 +12,17 @@ tags = ["firebase", "gcp", "key"]
 [[rules]]
 id = "deepsky-admin-secret-env"
 description = "Hardcoded non-placeholder Deep Sky admin secret"
-regex = '''(?i)DEEPSKY_ADMIN_SECRET\s*[:=]\s*["']?(?!change-me|placeholder|example|\$\{)[A-Za-z0-9_\-+/=]{12,}'''
+regex = '''(?i)DEEPSKY_ADMIN_SECRET\s*[:=]\s*["']?([A-Za-z0-9_\-+/=]{12,})'''
+secretGroup = 1
+keywords = ["deepsky_admin_secret"]
 tags = ["deepsky", "secret"]
+
+[[rules.allowlists]]
+description = "Allow placeholder and dev-default admin secret values"
+regexTarget = "secret"
+regexes = [
+  '''(?i)^(change-me|placeholder|example|dev-admin-secret-change-me)''',
+]
 
 [allowlist]
 description = "Allow documentation examples and test placeholders"
