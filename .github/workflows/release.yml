@@ -64,7 +64,7 @@ jobs:
           EOF
 
       - name: Upload unsigned release artifacts for local offline signing
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deep-sky-unsigned-${{ inputs.version_name }}-${{ inputs.version_code }}
           path: release-unsigned/
