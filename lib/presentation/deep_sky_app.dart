@@ -3,7 +3,9 @@ import 'package:material_ui/material_ui.dart';
 
 /// Root widget for the Deep Sky application (APP-01, V-06).
 class DeepSkyApp extends StatelessWidget {
-  const DeepSkyApp({super.key});
+  const DeepSkyApp({super.key, this.home});
+
+  final Widget? home;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +28,7 @@ class DeepSkyApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const HomePlaceholderPage(),
+      home: home ?? const HomePlaceholderPage(),
     );
   }
 }

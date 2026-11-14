@@ -35,6 +35,29 @@ class PlatformBridgePlugin(
         when (call.method) {
             "ping" -> result.success("pong")
             "getPlatformCapabilities" -> result.success(buildCapabilitiesMap())
+            "canRequestPackageInstalls" -> result.success(installerCoordinator.canRequestPackageInstalls())
+            "openInstallPermissionSettings" -> {
+                installerCoordinator.openInstallUnknownAppsSettings()
+                result.success(null)
+            }
+            "getUpdateStorageInfo" -> result.success(
+                mapOf(
+                    "stagingDir" to installerCoordinator.getStagingDirectory().absolutePath,
+                    "availableBytes" to installerCoordinator.getAvailableStorageBytes(),
+                ),
+            )
+            "installVerifiedApk" -> {
+                val path = call.argument<String>("apkPath").orEmpty()
+                installerCoordinator.installVerifiedApk(path)
+                    .onSuccess { status -> result.success(status) }
+                    .onFailure { err ->
+                        val msg = err.message ?: "unknown_error:Failed to install APK."
+                        val splitIdx = msg.indexOf(':')
+                        val code = if (splitIdx > 0) msg.substring(0, splitIdx) else "install_failed"
+                        val detail = if (splitIdx > 0) msg.substring(splitIdx + 1) else msg
+                        result.error(code, detail, null)
+                    }
+            }
             else -> result.notImplemented()
         }
     }

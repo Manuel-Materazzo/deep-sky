@@ -1,4 +1,5 @@
 import 'package:deep_sky/domain/platform_capabilities.dart';
+import 'package:deep_sky/domain/update/apk_update_models.dart';
 import 'package:flutter/services.dart';
 
 /// Bridge to Android native capabilities (installer, widgets, runtime FCM)
@@ -10,7 +11,6 @@ class NativeBridge {
 
   final MethodChannel _channel;
 
-  /// Verifies the Flutter <-> Kotlin channel responds as expected.
   Future<String> ping() async {
     final String? reply = await _channel.invokeMethod<String>('ping');
     if (reply == null) {
@@ -22,7 +22,6 @@ class NativeBridge {
     return reply;
   }
 
-  /// Queries Android runtime metadata and install-permission support.
   Future<PlatformCapabilities> getPlatformCapabilities() async {
     final Map<Object?, Object?>? result = await _channel
         .invokeMethod<Map<Object?, Object?>>('getPlatformCapabilities');
@@ -33,5 +32,44 @@ class NativeBridge {
       );
     }
     return PlatformCapabilities.fromMap(result);
+  }
+
+  Future<bool> canRequestPackageInstalls() async {
+    final bool? granted = await _channel.invokeMethod<bool>(
+      'canRequestPackageInstalls',
+    );
+    return granted ?? false;
+  }
+
+  Future<void> openInstallPermissionSettings() async {
+    await _channel.invokeMethod<void>('openInstallPermissionSettings');
+  }
+
+  Future<UpdateStorageInfo> getUpdateStorageInfo() async {
+    final Map<Object?, Object?>? result = await _channel
+        .invokeMethod<Map<Object?, Object?>>('getUpdateStorageInfo');
+    if (result == null) {
+      throw PlatformException(
+        code: 'null_reply',
+        message:
+            'Native platform channel returned null for getUpdateStorageInfo.',
+      );
+    }
+    return UpdateStorageInfo.fromMap(result);
+  }
+
+  Future<String> installVerifiedApk(String apkPath) async {
+    final String? status = await _channel.invokeMethod<String>(
+      'installVerifiedApk',
+      <String, String>{'apkPath': apkPath},
+    );
+    if (status == null) {
+      throw PlatformException(
+        code: 'null_reply',
+        message:
+            'Native platform channel returned null for installVerifiedApk.',
+      );
+    }
+    return status;
   }
 }
