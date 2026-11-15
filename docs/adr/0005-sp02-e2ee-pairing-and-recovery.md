@@ -1,7 +1,7 @@
 # ADR-0005: E2EE Pairing, Recovery, Cross-Device Enrollment, and Revocation (`SP-02`)
 
-- **Status:** Accepted as M1/M2 baseline (`PD-05` physical 2-phone & non-technical walkthrough tracked at M2 start before real couple data)
-- **Date:** 2026-11-14
+- **Status:** Accepted (verified on real Android hardware; `PD-05` non-technical walkthrough & `G-5` independent review tracked before real couple data / `G-5`)
+- **Date:** 2026-11-15 (baseline 2026-11-14)
 - **Reference IDs:** `S-01`, `S-03`, `S-04`, `S-05`, `S-06`, `F-01`, `F-02`, `AD-01`, `AD-02`, `AD-03`, `SP-02`
 
 ## Context
@@ -25,10 +25,11 @@ The prototype on branch `proto/sp-02` implements and validates the protocol spec
 ## Consequences & Points for Independent Review (`G-5`)
 
 - **Verified in M1 automation (`proto/sp-02`):** Domain crypto tests (`test/domain/deep_sky_crypto_test.dart`, 7 tests), repository + UI harness tests (`flutter test` -> 17 passed, `flutter analyze` -> 0 issues), `check-licenses.py --skip-maven` PASSED (75 packages), and backend ArchUnit + Testcontainers PostgreSQL 17 integration suite (`./mvnw.cmd -B verify`).
+- **Verified in M2 on physical hardware (2026-11-15):** Real Android multi-device verification passed for SAS-verified pairing (`F-01`), Recovery Key restoration (`F-20`), cross-device enrollment, E2EE gesture sync (`F-03`), and device revocation (`S-06`).
 - **Independent review (`G-5`) focus areas:**
   1. Entropy, domain separation strings, and AAD canonical encoding in `DeepSkyCrypto` & `RecoveryKeyCodec`.
   2. Recovery challenge rate-limiting / brute-force resistance when promoted alongside M2 production controllers.
   3. Key-rotation (`keyGeneration > 1`) automation strategy upon `S-06` revocation of a stolen device.
   4. Pure-Dart cryptography (`package:cryptography` without `cryptography_flutter`): evaluate constant-time guarantees and timing side-channel risk on Android devices for `X25519`, `Ed25519`, and `XChaCha20-Poly1305`, deciding whether to add `cryptography_flutter` before `G-5` (`G5-09`).
   5. Android Auto Backup & offline cache exclusion (`AD-06`): verify `AndroidManifest.xml` (`allowBackup="false"`, `dataExtractionRules`, `fullBackupContent`) prevents Google Auto Backup, `adb backup`, or device-to-device transfer from extracting key material, `SharedPreferences`, or local cache (`G5-06`).
-- **Remaining physical verification transitioned from `G-1` into M2 (`PD-05` gate):** Complete two real Android device pairing/recovery/enrollment/revocation checks and observed completion by two non-technical testers without verbal coaching (tracked in `docs/m2-operative-plan.md`) before storing real couple data (`PD-05`).
+- **Remaining pre-dogfooding gate (`PD-05`):** Observe completion by two non-technical testers without verbal coaching (tracked in `docs/m2-operative-plan.md`) before storing real couple data (`PD-05`).
