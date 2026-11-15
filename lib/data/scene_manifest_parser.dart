@@ -145,7 +145,7 @@ class SceneManifestParser {
             }
             return SceneLayer(
               id: _requireString(layerObj, 'id'),
-              asset: _requireString(layerObj, 'assets'),
+              asset: _requireString(layerObj, 'asset'),
               zOffset: _requireInt(layerObj, 'zOffset'),
               opacity: (layerObj['opacity'] as num?)?.toDouble() ?? 1.0,
             );

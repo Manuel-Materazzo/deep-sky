@@ -338,7 +338,9 @@ void main() {
       // Invita hero
       expect(find.text('La vostra casa'), findsOneWidget);
       expect(
-        find.text('Uno spazio intimo e privato, solo per voi due'),
+        find.text(
+          'Uno spazio intimo e privato, solo per voi due. Invita la tua dolce metà.',
+        ),
         findsOneWidget,
       );
 
