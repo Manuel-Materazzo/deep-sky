@@ -152,4 +152,33 @@ void main() {
       });
     },
   );
+
+  test('shareText sends text and subject and handles missing plugin', () async {
+    expect(
+      await bridge.shareText(
+        text: 'https://deepsky.vectevo.com/join#token=abc',
+      ),
+      isFalse,
+    );
+
+    MethodCall? captured;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (MethodCall call) async {
+          captured = call;
+          if (call.method == 'shareText') {
+            return true;
+          }
+          return null;
+        });
+
+    final bool launched = await bridge.shareText(
+      text: 'https://deepsky.vectevo.com/join#token=abc',
+      subject: 'Deep Sky',
+    );
+    expect(launched, isTrue);
+    expect(captured?.arguments, <String, Object?>{
+      'text': 'https://deepsky.vectevo.com/join#token=abc',
+      'subject': 'Deep Sky',
+    });
+  });
 }

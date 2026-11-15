@@ -2,6 +2,7 @@ package com.vectevo.deep_sky.platform
 
 import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.ActivityCompat
@@ -82,6 +83,7 @@ class PlatformBridgePlugin(
                 result.success(null)
             }
             "requestNotificationPermission" -> handleRequestNotificationPermission(result)
+            "shareText" -> handleShareText(call, result)
             else -> result.notImplemented()
         }
     }
@@ -123,6 +125,33 @@ class PlatformBridgePlugin(
             arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
             REQ_POST_NOTIFICATIONS,
         )
+    }
+
+    private fun handleShareText(call: MethodCall, result: MethodChannel.Result) {
+        val text = call.argument<String>("text")?.trim().orEmpty()
+        val subject = call.argument<String>("subject")?.trim()
+        if (text.isEmpty()) {
+            result.success(false)
+            return
+        }
+        val sendIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+            if (!subject.isNullOrEmpty()) {
+                putExtra(Intent.EXTRA_SUBJECT, subject)
+            }
+        }
+        val chooser = Intent.createChooser(sendIntent, subject ?: "Deep Sky")
+        val launchContext = activity ?: context
+        if (activity == null) {
+            chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return try {
+            launchContext.startActivity(chooser)
+            result.success(true)
+        } catch (_: Exception) {
+            result.success(false)
+        }
     }
 
     @Suppress("DEPRECATION")

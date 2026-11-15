@@ -131,4 +131,24 @@ class NativeBridge {
     );
     return granted ?? false;
   }
+
+  /// Opens the native Android share sheet with [text] and optional [subject].
+  ///
+  /// Returns `false` when unavailable (e.g. headless tests or desktop hosts).
+  Future<bool> shareText({required String text, String? subject}) async {
+    try {
+      final bool? launched = await _channel.invokeMethod<bool>(
+        'shareText',
+        <String, Object?>{
+          'text': text,
+          if (subject != null && subject.isNotEmpty) 'subject': subject,
+        },
+      );
+      return launched ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
 }
