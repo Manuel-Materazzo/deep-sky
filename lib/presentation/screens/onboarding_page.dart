@@ -855,7 +855,7 @@ class _WelcomeHeroSection extends StatelessWidget {
           child: Center(child: Icon(icon, size: 36, color: tokens.amberGlow)),
         ),
         const SizedBox(height: 16),
-        Text(title, textAlign: TextAlign.center, style: textTheme.displayLarge),
+        Text(title, textAlign: TextAlign.center, style: textTheme.displaySmall),
         const SizedBox(height: 6),
         Text(
           subtitle,

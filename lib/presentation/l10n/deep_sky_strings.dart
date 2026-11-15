@@ -14,16 +14,16 @@ class DeepSkyStrings {
   // Welcome & Invite (`S1-D02`, `S1-D03`, `S1-D05`, `S1-D06`, `S1-D10`)
   String get welcomeTitle => isIt ? 'La vostra casa' : 'Your home';
   String get welcomeSubtitle => isIt
-      ? 'Uno spazio intimo e privato, solo per voi due'
+      ? 'Uno spazio intimo e privato, solo per voi due. Invita la tua dolce metà.'
       : 'An intimate, private space, just for the two of you';
   String get joinTitle => isIt ? 'Raggiungi chi ami' : 'Reach the one you love';
   String get joinSubtitle => isIt
-      ? 'Se il tuo partner ha già acceso la casa, inquadra il suo schermo o inserisci l\'invito per aprire la porta insieme.'
+      ? 'Se il tuo partner è già pronto, inquadra il suo schermo o inserisci l\'invito.'
       : 'If your partner already lit your home, scan their screen or enter the invite to open the door together.';
   String get recoverTitle =>
       isIt ? 'Ritrova la tua stanza' : 'Find your room again';
   String get recoverSubtitle => isIt
-      ? 'Hai cambiato telefono o reinstallato l\'app? Con le tue 24 parole segrete puoi rientrare nella vostra casa esattamente come l\'avete lasciata.'
+      ? 'Con le 24 parole segrete puoi rientrare nella vostra casa esattamente come l\'avete lasciata.'
       : 'Changed phones or reinstalled the app? With your 24 secret words you can step back into your home just as you left it.';
 
   String get inviteTab => isIt ? 'Invita' : 'Invite';
