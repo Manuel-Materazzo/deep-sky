@@ -384,4 +384,24 @@ void main() {
     );
     expect(controller.updateFeedback, contains('Chiave pubblica Ed25519'));
   });
+
+  test(
+    'ApkReleaseManifest.fromJson accepts stringified numeric versionCode',
+    () {
+      final ApkReleaseManifest
+      manifest = ApkReleaseManifest.fromJson(<String, dynamic>{
+        'schemaVersion': 1,
+        'packageId': 'com.vectevo.deep_sky',
+        'versionCode': '3',
+        'versionName': '0.3',
+        'apkFile': 'deep-sky-0.3-3.apk',
+        'apkSha256':
+            'b8d3a76ec53fcaddf3bf21c5bf04217df6fcb6e2d40fc804bb65cc6e27d59660',
+        'apkSizeBytes': 54580461,
+        'createdAt': '2026-11-15T01:56:50Z',
+      });
+      expect(manifest.versionCode, 3);
+      expect(manifest.apkSizeBytes, 54580461);
+    },
+  );
 }

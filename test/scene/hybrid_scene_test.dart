@@ -36,7 +36,7 @@ void main() {
     },
   );
 
-  test('AssetOverrideRegistry swaps and restores layer asset without mutating manifest', () {
+  test('AssetOverrideRegistry swaps and restores layer assets without mutating manifest', () {
     final SceneSlot petSlot = manifest.slots.firstWhere(
       (SceneSlot s) => s.id == 'pet',
     );

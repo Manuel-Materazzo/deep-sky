@@ -1,6 +1,8 @@
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
+import 'package:deep_sky/presentation/screens/code_verification_page.dart';
 import 'package:deep_sky/presentation/screens/home_shell_page.dart';
 import 'package:deep_sky/presentation/screens/onboarding_page.dart';
+import 'package:deep_sky/presentation/screens/space_setup_page.dart';
 import 'package:deep_sky/presentation/screens/upgrade_required_page.dart';
 import 'package:deep_sky/presentation/theme/deep_sky_theme.dart';
 import 'package:material_ui/material_ui.dart';
@@ -74,8 +76,15 @@ class _DeepSkyAppState extends State<DeepSkyApp> {
       case AppBootPhase.upgradeRequired:
         return UpgradeRequiredPage(controller: _controller);
       case AppBootPhase.unpaired:
+      case AppBootPhase.waiting:
+        if (_controller.needsCodeVerification) {
+          return CodeVerificationPage(controller: _controller);
+        }
         return OnboardingPage(controller: _controller);
       case AppBootPhase.paired:
+        if (_controller.needsSpaceSetup) {
+          return SpaceSetupPage(controller: _controller);
+        }
         return HomeShellPage(controller: _controller);
     }
   }

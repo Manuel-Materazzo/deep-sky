@@ -163,6 +163,8 @@ class LocalDeviceIdentity {
     required this.kemPublicKey,
     this.recoverySeed,
     this.recoverySavedConfirmed = false,
+    this.pairingCompleted = true,
+    this.nameSetupCompleted = true,
   });
 
   final String serverUrl;
@@ -175,6 +177,8 @@ class LocalDeviceIdentity {
   final Uint8List kemPublicKey;
   final Uint8List? recoverySeed;
   final bool recoverySavedConfirmed;
+  final bool pairingCompleted;
+  final bool nameSetupCompleted;
 
   bool get hasCoupleRoot => recoverySeed != null && recoverySeed!.length == 32;
 
@@ -189,6 +193,8 @@ class LocalDeviceIdentity {
     Uint8List? kemPublicKey,
     Uint8List? recoverySeed,
     bool? recoverySavedConfirmed,
+    bool? pairingCompleted,
+    bool? nameSetupCompleted,
   }) {
     return LocalDeviceIdentity(
       serverUrl: serverUrl ?? this.serverUrl,
@@ -202,6 +208,8 @@ class LocalDeviceIdentity {
       recoverySeed: recoverySeed ?? this.recoverySeed,
       recoverySavedConfirmed:
           recoverySavedConfirmed ?? this.recoverySavedConfirmed,
+      pairingCompleted: pairingCompleted ?? this.pairingCompleted,
+      nameSetupCompleted: nameSetupCompleted ?? this.nameSetupCompleted,
     );
   }
 
@@ -218,6 +226,8 @@ class LocalDeviceIdentity {
         ? null
         : base64UrlEncode(recoverySeed!),
     'recoverySavedConfirmed': recoverySavedConfirmed,
+    'pairingCompleted': pairingCompleted,
+    'nameSetupCompleted': nameSetupCompleted,
   };
 
   factory LocalDeviceIdentity.fromJson(Map<String, Object?> json) {
@@ -243,6 +253,8 @@ class LocalDeviceIdentity {
           ? null
           : Uint8List.fromList(base64Url.decode(_padB64(recoveryB64))),
       recoverySavedConfirmed: json['recoverySavedConfirmed'] as bool? ?? false,
+      pairingCompleted: json['pairingCompleted'] as bool? ?? true,
+      nameSetupCompleted: json['nameSetupCompleted'] as bool? ?? true,
     );
   }
 }

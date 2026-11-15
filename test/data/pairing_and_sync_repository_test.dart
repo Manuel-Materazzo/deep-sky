@@ -197,6 +197,109 @@ void main() {
     );
   });
 
+  test('unlinkCurrentDevice revokes only calling device and wipes local state even on 401/offline', () async {
+    final _FakeServer fakeServer = _FakeServer();
+    bool simulateOffline = false;
+    final MockClient mockHttp = MockClient((http.Request req) async {
+      if (simulateOffline) {
+        throw const SocketException('Network unreachable');
+      }
+      return fakeServer.handle(req);
+    });
+    final DeepSkyCrypto crypto = DeepSkyCrypto();
+
+    PairingAndSyncRepository makeRepo(InMemorySecureKeyStore store) =>
+        PairingAndSyncRepository(
+          keyStore: store,
+          crypto: crypto,
+          clientFactory: (String url) => CoupleApiClient(
+            baseUrl: url,
+            httpClient: mockHttp,
+            crypto: crypto,
+          ),
+        );
+
+    final InMemorySecureKeyStore storeA = InMemorySecureKeyStore();
+    final InMemorySecureKeyStore storeB = InMemorySecureKeyStore();
+    final InMemorySecureKeyStore storeC = InMemorySecureKeyStore();
+    final PairingAndSyncRepository repoA = makeRepo(storeA);
+    final PairingAndSyncRepository repoB = makeRepo(storeB);
+    final PairingAndSyncRepository repoC = makeRepo(storeC);
+
+    final init = await repoA.createInitialInvite(
+      serverUrl: 'https://test.local',
+      deviceLabel: 'Phone A',
+    );
+    final PendingJoinSession joinB = await repoB.acceptInvite(
+      serverUrl: 'https://test.local',
+      inviteToken: init.invite.inviteToken,
+      deviceLabel: 'Phone B',
+    );
+    final status = await repoA.checkInviteAndSas(init.invite.inviteToken);
+    await repoA.confirmSasAndDeliverRootKey(
+      targetDeviceId: status.status.acceptedDeviceId!,
+      targetKemPublicKey: status.status.acceptedKemPublicKey!,
+    );
+    final LocalDeviceIdentity idB = await repoB.completeKeyDelivery(
+      session: joinB,
+    );
+    await repoB.confirmRecoveryKeySaved();
+
+    // Enroll Phone C via recovery key
+    await repoC.recoverWithRecoveryKey(
+      serverUrl: 'https://test.local',
+      recoveryInput: RecoveryKeyCodec.toSentence(init.identity.recoverySeed!),
+      deviceLabel: 'Phone C',
+    );
+    final LocalDeviceIdentity idC = (await repoC.loadIdentity())!;
+
+    // Populate offline cache on Phone B before unlinking
+    await repoA.sendEncryptedEvent(
+      eventType: 'thinking_of_you',
+      body: <String, Object?>{'note': 'Ciao'},
+    );
+    await repoB.syncEventsWithOfflineFallback();
+    expect(await storeB.read('deep_sky.offline_cache.v1'), isNotNull);
+
+    // 1. Phone B unlinks itself: ONLY Phone B is revoked; Phone A and C stay active
+    await repoB.unlinkCurrentDevice();
+    expect(await repoB.loadIdentity(), isNull);
+    expect(await storeB.read('deep_sky.offline_cache.v1'), isNull);
+    expect(fakeServer.devices[idB.deviceId]!['revokedAt'], isNotNull);
+    expect(fakeServer.devices[init.identity.deviceId]!['revokedAt'], isNull);
+    expect(fakeServer.devices[idC.deviceId]!['revokedAt'], isNull);
+
+    // Phone A can still send and Phone C can still sync
+    await repoA.sendEncryptedEvent(
+      eventType: 'thinking_of_you',
+      body: <String, Object?>{'note': 'Ancora qui'},
+    );
+    final eventsOnC = await repoC.fetchAndDecryptEvents();
+    expect(eventsOnC, hasLength(2));
+
+    // 2. Phone A revokes Phone C remotely -> Phone C gets 401 -> unlinkCurrentDevice still clears Phone C
+    await repoA.revokeDevice(idC.deviceId);
+    await expectLater(
+      repoC.fetchAndDecryptEvents(),
+      throwsA(
+        isA<ApiRequestException>().having(
+          (ApiRequestException e) => e.isDeviceUnknownOrRevoked,
+          'isDeviceUnknownOrRevoked',
+          isTrue,
+        ),
+      ),
+    );
+    await repoC.unlinkCurrentDevice();
+    expect(await repoC.loadIdentity(), isNull);
+    expect(await storeC.read('deep_sky.offline_cache.v1'), isNull);
+
+    // 3. Offline unlink still clears local identity & cache cleanly
+    simulateOffline = true;
+    await repoA.unlinkCurrentDevice();
+    expect(await repoA.loadIdentity(), isNull);
+    expect(await storeA.read('deep_sky.offline_cache.v1'), isNull);
+  });
+
   test('CoupleApiClient sends version headers and surfaces 426 ClientUpgradeRequiredException (F-19)', () async {
     String? seenClientHeader;
     String? seenProtoHeader;

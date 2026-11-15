@@ -91,7 +91,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $ed25519Tool = Join-Path $PSScriptRoot "Ed25519Tool.java"
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
-$apkFileName = "deep-sky-$VersionName-$VersionCode.apk"
+$apkFileName = "deep-sky-$VersionName-$VersionCodeInt.apk"
 $signedApkPath = Join-Path $OutDir $apkFileName
 $manifestPath = Join-Path $OutDir "manifest.json"
 $manifestSigPath = Join-Path $OutDir "manifest.json.sig"
@@ -127,7 +127,7 @@ $apkSize = (Get-Item $signedApkPath).Length
 $manifestObj = [ordered]@{
     schemaVersion = 1
     packageId     = $PackageId
-    versionCode   = $VersionCode
+    versionCode   = $VersionCodeInt
     versionName   = $VersionName
     apkFile       = $apkFileName
     apkSha256     = $apkHash

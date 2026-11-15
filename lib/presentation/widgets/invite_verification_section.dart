@@ -1,4 +1,5 @@
 import 'package:deep_sky/data/couple_api_client.dart';
+import 'package:deep_sky/domain/pairing/invite_link_codec.dart';
 import 'package:deep_sky/presentation/theme/deep_sky_theme.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -44,17 +45,35 @@ class InviteVerificationSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(context);
-    final String inviteUri =
-        'deepsky://pair?server=${Uri.encodeComponent(serverUrl.trim())}&token=${invite.inviteToken}';
+    final String inviteUri = InviteLinkCodec.buildInviteUri(
+      serverUrl: serverUrl,
+      inviteToken: invite.inviteToken,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Center(
           child: Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(8),
-            child: QrImageView(data: inviteUri, size: 150),
+            decoration: BoxDecoration(
+              color: tokens.qrFrameSurface,
+              borderRadius: BorderRadius.circular(DeepSkyTheme.radiusLg),
+            ),
+            padding: const EdgeInsets.all(10),
+            child: QrImageView(
+              data: inviteUri,
+              size: 150,
+              backgroundColor: tokens.qrFrameSurface,
+              errorCorrectionLevel: QrErrorCorrectLevel.H,
+              eyeStyle: const QrEyeStyle(
+                eyeShape: QrEyeShape.square,
+                color: Color(0xFF13091E),
+              ),
+              dataModuleStyle: const QrDataModuleStyle(
+                dataModuleShape: QrDataModuleShape.circle,
+                color: Color(0xFF13091E),
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 8),

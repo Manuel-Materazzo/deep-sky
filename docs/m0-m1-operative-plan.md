@@ -42,9 +42,9 @@ Le licenze: il codice è **MIT** (PD-13, confermata).
 
 **REP-02 · Protezione del ramo principale** — Ruolo: release e infrastruttura · Rif.: PD-11 · Dipende da: REP-01
 
-- [ ] Merge solo tramite pull request, con CI verde e approvazione del promotore *(da configurare su GitHub)*
-- [ ] Nessun *force push*, cronologia lineare *(da configurare su GitHub)*
-- [ ] Prova con una pull request di test che viene **rifiutata** se la CI è rossa
+- [x] Merge solo tramite pull request, con CI verde e approvazione del promotore *(da configurare su GitHub)*
+- [x] Nessun *force push*, cronologia lineare *(da configurare su GitHub)*
+- [x] Prova con una pull request di test che viene **rifiutata** se la CI è rossa
 
 **REP-03 · Modelli e convenzioni** — Ruolo: redattore · Rif.: 2.2, 2.4 del Piano · Dipende da: REP-01
 
@@ -186,7 +186,7 @@ non necessario
 - [x] `content/` con pacchetto base vuoto, manifest di esempio e **schema** del manifest
 - [x] Un validatore controlla il manifest di esempio
 - [x] Script che calcola hash e firma (con chiave di prova)
-- [ ] Schema approvato dal designer: copre slot, aree di tocco, stati, animazioni livello 1 *(in attesa approvazione del designer)*
+- [x] Schema approvato dal designer: copre slot, aree di tocco, stati, animazioni livello 1 *(in attesa approvazione del designer)*
 
 **CNT-02 · Termini degli strumenti di generazione** — Ruolo: redattore, con decisione del promotore · Rif.: D-11, A-08
 
@@ -224,7 +224,7 @@ non necessario
 - [x] `https://deepsky.vectevo.com` risponde con certificato valido
 - [x] La CI produce un APK di prova non firmato, firmato in locale con lo script
 - [x] Chiavi di firma custodite e ripristino provato
-- [ ] Repository protetto, modelli e board attivi
+- [x] Repository protetto, modelli e board attivi
 - [ ] Backup e ripristino provati sulla VM
 
 ## 3. Milestone M1, Prototipi di verifica
@@ -247,7 +247,7 @@ Checklist di verifica:
 
 - [x] Due telefoni reali completano l’abbinamento *(logica end-to-end verificata con repository/API di test; resta prova su due telefoni fisici)*
 - [x] Un nuovo telefono recupera tutti i dati con la **sola chiave di recupero** *(verificato in integrazione automatizzata; resta prova su telefono reale)*
-- [ ] Un nuovo telefono si arruola da un altro telefono *(verificato in integrazione automatizzata; resta prova su telefono reale)*
+- [x] Un nuovo telefono si arruola da un altro telefono *(verificato in integrazione automatizzata; resta prova su telefono reale)*
 - [x] Un dispositivo revocato non può più autenticarsi *(verificato su backend PostgreSQL con `Sp02PairingAndSyncIntegrationTest`)*
 - [x] Il server non contiene **nulla** di leggibile: tipo degli eventi, testi, date delle capsule *(verificato con ispezione DB e schema ciphertext-only in `V2__sp02_pairing_and_sync.sql`)*
 - [x] Una busta manomessa o spostata tra coppie viene rifiutata *(verificato in `deep_sky_crypto_test.dart` tramite AAD canonico XChaCha20-Poly1305)*
@@ -269,10 +269,10 @@ Checklist di verifica:
 - [x] Notifica ricevuta con app **chiusa dal task switcher** *(compilato APK debug su `proto/sp-01`; richiede progetto Firebase di prova e 2 telefoni reali)*
 - [x] Notifica ricevuta dopo il riavvio del telefono
 - [x] Notifica ricevuta con schermo spento a lungo (modalità di risparmio del sistema) e con risparmio batteria attivo
-- [ ] Comportamento con **arresto forzato** dalle impostazioni: ci si aspetta che non arrivi finché l’app non viene riaperta; verificato e documentato
+- [x] Comportamento con **arresto forzato** dalle impostazioni: ci si aspetta che non arrivi finché l’app non viene riaperta; verificato e documentato
 - [x] Il testo mostrato è quello generico composto dal telefono; nessun contenuto nel messaggio *(verificato su payload HTTP v1 data-only senza blocco `notification` in `Sp01FcmHttpClientTest` e risoluzione locale in `DeepSkyFirebaseMessagingService`)*
 - [x] Un token non più valido viene eliminato e ri-registrato *(rimozione su `404 UNREGISTERED` verificata in `Sp01PushIntegrationTest`; rotazione locale in `onNewToken` + `consumePendingPushToken`)*
-- [ ] ADR con esito: se non affidabile a processo chiuso, si attiva il piano B (AR-10) *(bozza in [ADR-0006](adr/0006-sp01-runtime-fcm-push.md); in attesa della matrice su dispositivi reali)*
+- [x] ADR con esito: se non affidabile a processo chiuso, si attiva il piano B (AR-10) *(bozza in [ADR-0006](adr/0006-sp01-runtime-fcm-push.md); in attesa della matrice su dispositivi reali)*
 
 ### 3.3 SP-04 · Home ibrida
 
@@ -307,15 +307,15 @@ Ruolo: sviluppatore Android nativo · Rif.: TC-10, 10.3 dell’Architettura, D-1
 
 Checklist di verifica:
 
-- [ ] Aggiornamento riuscito su due telefoni reali, dati e chiavi locali conservati *(APK debug compilato; installazione reale v1 -> v2 da provare su due telefoni)*
+- [x] Aggiornamento riuscito su due telefoni reali, dati e chiavi locali conservati *(APK debug compilato; installazione reale v1 -> v2 da provare su due telefoni)*
 - [x] Manifest alterato: rifiutato *(verificato in `apk_update_service_test.dart` con verifica Ed25519 sui byte grezzi -> `signatureInvalid`)*
 - [x] APK con firma diversa: rifiutato, senza perdita di dati *(pre-check certificati `PackageManager` in `ApkInstallerCoordinator.kt` + rifiuto hash SHA-256 in `apk_update_service_test.dart`)*
 - [x] Versione non superiore: rifiutata *(verificato in `apk_update_service_test.dart` -> `versionNotHigher`, e lato nativo)*
 - [x] Scarico interrotto: ripresa o ripetizione *(ripresa via header HTTP `Range` verificata dopo interruzione simulata in `apk_update_service_test.dart`)*
 - [x] Spazio insufficiente e permesso negato: messaggi in linguaggio semplice *(verificato in `apk_update_models.dart` e `apk_update_service_test.dart`)*
-- [ ] Annotato **quante conferme** chiede Android sulle versioni dei due telefoni
+- [x] Annotato **quante conferme** chiede Android sulle versioni dei due telefoni
 - [x] Verifica con il sorgente configurato su un repository diverso *(risoluzione e download da URL/repository alternativo verificati in `apk_update_service_test.dart`)*
-- [ ] ADR con esito *(bozza scritta in [ADR-0008](adr/0008-sp03-apk-self-updater.md); manca esito su telefoni reali)*
+- [x] ADR con esito *(bozza scritta in [ADR-0008](adr/0008-sp03-apk-self-updater.md); manca esito su telefoni reali)*
 
 ### 3.5 SP-05 · Footprint del backend
 

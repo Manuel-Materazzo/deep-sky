@@ -2,6 +2,7 @@ package com.vectevo.deep_sky_server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -143,6 +144,23 @@ class Sp02PairingAndSyncIntegrationTest {
 				.andExpect(jsonPath("$.fromDeviceId").value(devAId))
 				.andExpect(jsonPath("$.ciphertextB64").value(b64(wrapCipher)));
 
+		// 4b. Device B updates its own visible name (`S1-D07-2`)
+		String renameBody = objectMapper.writeValueAsString(new UpdateDeviceLabelBody("Luna"));
+		mockMvc.perform(signed(
+						patch("/api/v1/pairing/devices/me")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(renameBody),
+						devBId,
+						devBAuthKp,
+						renameBody))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.deviceId").value(devBId))
+				.andExpect(jsonPath("$.label").value("Luna"));
+
+		mockMvc.perform(signed(get("/api/v1/pairing/devices"), devAId, devAAuthKp, ""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[1].label").value("Luna"));
+
 		// 5. Device A uploads an opaque encrypted envelope (server must not see eventType or unlock dates)
 		String envId = UUID.randomUUID().toString();
 		byte[] envNonce = new byte[24];
@@ -229,7 +247,21 @@ class Sp02PairingAndSyncIntegrationTest {
 		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), devBId, devBAuthKp, ""))
 				.andExpect(status().isUnauthorized());
 
-		// 8. Server visibility audit (SP02-07)
+		// 8. Self-revocation only revokes the calling device while keeping the couple & other devices active
+		mockMvc.perform(signed(
+						post("/api/v1/pairing/devices/" + devRId + "/revoke"),
+						devRId,
+						devRAuthKp,
+						""))
+				.andExpect(status().isNoContent());
+
+		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), devRId, devRAuthKp, ""))
+				.andExpect(status().isUnauthorized());
+		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), devAId, devAAuthKp, ""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[0].envelopeId").value(envId));
+
+		// 9. Server visibility audit (SP02-07)
 		MvcResult pairAudit = mockMvc.perform(signed(get("/api/v1/pairing/visibility"), devAId, devAAuthKp, ""))
 				.andExpect(status().isOk())
 				.andReturn();
@@ -239,6 +271,16 @@ class Sp02PairingAndSyncIntegrationTest {
 		assertThat(pairAudit.getResponse().getContentAsString()).contains(coupleId);
 		assertThat(syncAudit.getResponse().getContentAsString()).contains(envId);
 		assertThat(syncAudit.getResponse().getContentAsString()).doesNotContain("time_capsule");
+
+		// 10. Unilateral couple unpair (S-03) revokes all remaining devices and blocks recovery
+		mockMvc.perform(signed(post("/api/v1/pairing/unpair"), devAId, devAAuthKp, ""))
+				.andExpect(status().isNoContent());
+		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), devAId, devAAuthKp, ""))
+				.andExpect(status().isUnauthorized());
+		mockMvc.perform(post("/api/v1/recovery/challenges")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(challengeReq))
+				.andExpect(status().isConflict());
 	}
 
 	@Test
@@ -439,6 +481,8 @@ class Sp02PairingAndSyncIntegrationTest {
 			String ciphertextB64) {}
 
 	private record ChallengeBody(String recoveryAuthPublicKeyB64) {}
+
+	private record UpdateDeviceLabelBody(String deviceLabel) {}
 
 	private record CompleteRecoveryBody(
 			String challengeId,

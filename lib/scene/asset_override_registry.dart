@@ -1,6 +1,6 @@
 import 'package:deep_sky/scene/scene_manifest.dart';
 
-/// Non-destructive asset override table keyed by `slotId:layerId` (SP04-05, TC-08).
+/// Non-destructive assets override table keyed by `slotId:layerId` (SP04-05, TC-08).
 /// Leaves the parsed [SceneManifest] immutable so default assets can be restored anytime.
 class AssetOverrideRegistry {
   const AssetOverrideRegistry([

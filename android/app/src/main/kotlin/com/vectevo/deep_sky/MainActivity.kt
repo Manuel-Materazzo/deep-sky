@@ -1,5 +1,6 @@
 package com.vectevo.deep_sky
 
+import android.content.Intent
 import com.vectevo.deep_sky.platform.PlatformBridgePlugin
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -22,5 +23,13 @@ class MainActivity : FlutterActivity() {
         if (::platformBridge.isInitialized) {
             platformBridge.onRequestPermissionsResult(requestCode, grantResults)
         }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (::platformBridge.isInitialized && platformBridge.onActivityResult(requestCode, resultCode, data)) {
+            return
+        }
+        super.onActivityResult(requestCode, resultCode, data)
     }
 }

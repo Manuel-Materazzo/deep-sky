@@ -208,7 +208,7 @@ Uso tra voi due per **2 – 3 settimane**, con le sole funzioni del nucleo. Un d
 
 | Milestone | Contenuto principale | Uscita |
 | :-- | :-- | :-- |
-| **M5 Memoria** | Corkboard (F-08), foto del giorno (F-10), timeline (F-11), giorni insieme (F-12), widget (F-13), messaggi brevi (F-15), esportazione e scioglimento (F-17, S-03) | Archivio dei ricordi usato davvero da entrambi |
+| **M5 Memoria** | Corkboard (F-08), foto del giorno (F-10), timeline (F-11), giorni insieme (F-12), widget (F-13), messaggi brevi (F-15), esportazione, cancellazione definitiva, scioglimento e riattivazione consensuale della coppia (F-17, S-03, S-04) | Archivio dei ricordi usato davvero da entrambi |
 | **M6 Mondo** | Pet e stanza (F-09), personalizzazione degli asset (F-18), decorazioni, animazione di livello 1 con più livelli; esplorazione del livello 3 (DD-11) | Pet e casa che reagiscono alle attività |
 | **M7 Gioco del giorno** | Modulo unico (F-14) | Contenuti ricorrenti senza pressione |
 | **M8 Apertura** | Revisione indipendente di sicurezza (G-5), verifica sviluppatore Android (D-14), licenza e apertura del codice (D-05), guida completa al self-hosting, collaudo multi-coppia | Pubblicazione per altri |

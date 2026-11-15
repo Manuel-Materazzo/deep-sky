@@ -9,6 +9,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -44,6 +45,8 @@ public class PairingController {
 			@NotNull UUID toDeviceId,
 			@NotBlank String nonceB64,
 			@NotBlank String ciphertextB64) {}
+
+	public record UpdateDeviceLabelRequest(@NotBlank String deviceLabel) {}
 
 	@PostMapping("/invites")
 	@ResponseStatus(HttpStatus.CREATED)
@@ -96,6 +99,13 @@ public class PairingController {
 	@GetMapping("/devices")
 	public List<PairingService.DeviceView> listDevices(@AuthenticationPrincipal DevicePrincipal principal) {
 		return pairingService.listDevices(principal);
+	}
+
+	@PatchMapping("/devices/me")
+	public PairingService.DeviceView updateOwnDeviceLabel(
+			@AuthenticationPrincipal DevicePrincipal principal,
+			@Valid @RequestBody UpdateDeviceLabelRequest req) {
+		return pairingService.updateOwnDeviceLabel(principal, req.deviceLabel());
 	}
 
 	@PostMapping("/devices/{deviceId}/revoke")
