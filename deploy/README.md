@@ -37,4 +37,5 @@ Reference IDs: `INF-04`, `INF-05`, `INF-06`, `TC-03`, `SRV-02`, `SRV-03`.
 - `db` is attached **only** to the `internal` Docker network (`internal: true`) and publishes no host ports (`INF-04`).
 - `Caddyfile` allows `/actuator/health*` and blocks external access to all other `/actuator*` paths (`INF-02`).
 - Caddy access logs strip request headers and mask client IPs (`INF-06`, `S-07`); Docker `json-file` logs are capped at `10m` x `3` files.
+- `Caddyfile` serves `deploy/web/join/index.html` at `/join` (invite secrets remain strictly in `#fragment`, never sent to the backend) and `deploy/web/.well-known/assetlinks.json` at `/.well-known/assetlinks.json` (`S1-INF-01`). Replace the placeholder SHA-256 certificate fingerprint in `assetlinks.json` once the release signing keystore is generated.
 - Secrets are injected via Docker secrets (`/run/secrets/`) and Spring Boot `configtree`, never hardcoded in `docker-compose.yml`.

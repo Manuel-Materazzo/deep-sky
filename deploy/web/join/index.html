@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="referrer" content="no-referrer" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Deep Sky — Unisciti al vostro cielo / Join your sky</title>
+  <style>
+    :root {
+      --bg: #0c0e13;
+      --surface: #151821;
+      --surface-high: #1f232e;
+      --border: #2b3040;
+      --text: #eae9ee;
+      --muted: #b0b3be;
+      --accent: #e09c72;
+      --accent-soft: rgba(224, 156, 114, 0.14);
+      --sage: #8da691;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: radial-gradient(circle at 20% 0%, #1b2234 0%, var(--bg) 55%);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 24px 16px 40px;
+      line-height: 1.55;
+    }
+    main {
+      width: 100%;
+      max-width: 460px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--accent);
+      font-size: 0.95rem;
+    }
+    .lang-toggle {
+      display: inline-flex;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px;
+      gap: 4px;
+    }
+    .lang-toggle button {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .lang-toggle button.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 24px 20px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: 1.65rem;
+      line-height: 1.25;
+      font-weight: 650;
+    }
+    p {
+      margin: 0 0 14px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 18px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      border-radius: 14px;
+      padding: 14px 18px;
+      font-weight: 650;
+      font-size: 0.95rem;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+    }
+    .btn:hover { opacity: 0.92; }
+    .btn-primary {
+      background: var(--accent);
+      color: #16110e;
+    }
+    .btn-secondary {
+      background: var(--surface-high);
+      color: var(--text);
+      border-color: var(--border);
+    }
+    .steps {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    .steps li { margin-bottom: 8px; }
+    .code-box {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+      color: var(--text);
+      word-break: break-all;
+    }
+    .badge {
+      display: inline-block;
+      margin-bottom: 12px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: rgba(141, 166, 145, 0.16);
+      color: var(--sage);
+    }
+    .hidden { display: none; }
+    .footnote {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--muted);
+      opacity: 0.85;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="topbar">
+      <div class="brand">DEEP SKY</div>
+      <div class="lang-toggle" role="group" aria-label="Language">
+        <button id="btn-it" type="button" class="active">IT</button>
+        <button id="btn-en" type="button">EN</button>
+      </div>
+    </div>
+
+    <section class="card">
+      <span class="badge" id="badge-status"></span>
+      <h1 id="hero-title"></h1>
+      <p id="hero-subtitle"></p>
+
+      <div class="actions">
+        <a id="open-app-btn" class="btn btn-primary hidden" href="#"></a>
+        <a
+          id="download-apk-btn"
+          class="btn btn-secondary"
+          href="https://github.com/manuel-materazzo/deep-sky/releases/latest"
+          rel="noopener noreferrer"
+        ></a>
+      </div>
+
+      <div id="token-section" class="hidden" style="margin-top: 18px;">
+        <p id="manual-hint" style="margin-bottom: 6px; font-size: 0.85rem;"></p>
+        <div id="invite-code-box" class="code-box"></div>
+        <button id="copy-btn" type="button" class="btn btn-secondary" style="width: 100%; margin-top: 10px;"></button>
+      </div>
+    </section>
+
+    <section class="card">
+      <p id="steps-title" style="color: var(--text); font-weight: 650; margin-bottom: 10px;"></p>
+      <ol class="steps">
+        <li id="step-1"></li>
+        <li id="step-2"></li>
+        <li id="step-3"></li>
+      </ol>
+    </section>
+
+    <div class="footnote" id="privacy-note"></div>
+  </main>
+
+  <script>
+    (function () {
+      var COPY = {
+        it: {
+          badgeReady: 'Invito privato pronto sul dispositivo',
+          badgeInstall: 'App Android privata per due persone',
+          titleReady: 'Ti hanno invitato nel vostro cielo',
+          titleInstall: 'Entra in Deep Sky',
+          subtitleReady: 'Se hai già installato Deep Sky, aprilo direttamente con il link qui sotto. Altrimenti scarica prima l\'APK ufficiale e poi usa questo stesso link o il codice invito.',
+          subtitleInstall: 'Deep Sky è una stanza privata cifrata end-to-end. Scarica l\'app ufficiale Android o apri un link di invito dal tuo partner.',
+          openApp: 'Apri in Deep Sky',
+          downloadApk: 'Scarica l\'APK ufficiale (GitHub Releases)',
+          manualHint: 'Se il pulsante non apre l\'app, copia il link completo e incollalo nella scheda Unisciti:',
+          copy: 'Copia link invito',
+          copied: 'Link copiato',
+          stepsTitle: 'Come entrare in 3 passi',
+          step1: 'Scarica e installa l\'ultima versione dell\'APK da GitHub Releases.',
+          step2: 'Apri Deep Sky e scegli «Unisciti» (oppure tocca «Apri in Deep Sky» qui sopra).',
+          step3: 'Incolla questo link o inquadra il QR sullo schermo del tuo partner.',
+          privacy: 'Il codice di invito rimane solo nel frammento locale (#) del browser e non viene mai inviato o registrato dal server.'
+        },
+        en: {
+          badgeReady: 'Private invite ready on this device',
+          badgeInstall: 'Private Android app for two',
+          titleReady: 'You were invited into your shared sky',
+          titleInstall: 'Join Deep Sky',
+          subtitleReady: 'If Deep Sky is already installed, open it directly below. Otherwise download the official APK first, then tap this link or paste the invite inside the app.',
+          subtitleInstall: 'Deep Sky is an end-to-end encrypted private room. Download the official Android APK or open an invite link from your partner.',
+          openApp: 'Open in Deep Sky',
+          downloadApk: 'Download official APK (GitHub Releases)',
+          manualHint: 'If the button does not launch the app, copy the full link and paste it in the Join tab:',
+          copy: 'Copy invite link',
+          copied: 'Link copied',
+          stepsTitle: 'Join in 3 quiet steps',
+          step1: 'Download and install the latest APK from GitHub Releases.',
+          step2: 'Open Deep Sky and choose "Join" (or tap "Open in Deep Sky" above).',
+          step3: 'Paste this link or scan the QR code on your partner\'s screen.',
+          privacy: 'Your invite secret stays strictly inside the browser URL fragment (#) and is never transmitted to or logged by the server.'
+        }
+      };
+
+      var rawHash = window.location.hash ? window.location.hash.slice(1) : '';
+      var hasInvite = rawHash.indexOf('token=') !== -1;
+      var deepLink = hasInvite ? ('deepsky://pair#' + rawHash) : 'deepsky://pair';
+
+      var lang = (navigator.language || 'it').toLowerCase().startsWith('it') ? 'it' : 'en';
+
+      function render() {
+        var t = COPY[lang];
+        document.documentElement.lang = lang;
+        document.getElementById('btn-it').classList.toggle('active', lang === 'it');
+        document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+
+        document.getElementById('badge-status').textContent = hasInvite ? t.badgeReady : t.badgeInstall;
+        document.getElementById('hero-title').textContent = hasInvite ? t.titleReady : t.titleInstall;
+        document.getElementById('hero-subtitle').textContent = hasInvite ? t.subtitleReady : t.subtitleInstall;
+
+        var openBtn = document.getElementById('open-app-btn');
+        openBtn.textContent = t.openApp;
+        openBtn.href = deepLink;
+        openBtn.classList.toggle('hidden', !hasInvite);
+
+        var downloadBtn = document.getElementById('download-apk-btn');
+        downloadBtn.textContent = t.downloadApk;
+        downloadBtn.classList.toggle('btn-primary', !hasInvite);
+        downloadBtn.classList.toggle('btn-secondary', hasInvite);
+
+        var tokenSection = document.getElementById('token-section');
+        tokenSection.classList.toggle('hidden', !hasInvite);
+        if (hasInvite) {
+          document.getElementById('manual-hint').textContent = t.manualHint;
+          document.getElementById('invite-code-box').textContent = window.location.href;
+          document.getElementById('copy-btn').textContent = t.copy;
+        }
+
+        document.getElementById('steps-title').textContent = t.stepsTitle;
+        document.getElementById('step-1').textContent = t.step1;
+        document.getElementById('step-2').textContent = t.step2;
+        document.getElementById('step-3').textContent = t.step3;
+        document.getElementById('privacy-note').textContent = t.privacy;
+      }
+
+      document.getElementById('btn-it').addEventListener('click', function () {
+        lang = 'it';
+        render();
+      });
+      document.getElementById('btn-en').addEventListener('click', function () {
+        lang = 'en';
+        render();
+      });
+      document.getElementById('copy-btn').addEventListener('click', function () {
+        var btn = document.getElementById('copy-btn');
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(window.location.href).then(function () {
+            btn.textContent = COPY[lang].copied;
+          });
+        }
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>

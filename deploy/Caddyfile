@@ -24,6 +24,25 @@
 		reverse_proxy api:8080
 	}
 
+	# Android App Links verification without touching the Spring Boot API (`S1-INF-01`).
+	handle /.well-known/assetlinks.json {
+		root * /srv/web
+		header Content-Type application/json
+		header Cache-Control "public, max-age=3600"
+		file_server
+	}
+
+	# Static bilingual invite/install landing page (`S1-INF-01`, `S1-DES-03`).
+	# Invite secrets reside solely in the browser `#fragment` and never reach Caddy logs.
+	handle /join* {
+		root * /srv/web
+		try_files {path} /join/index.html
+		header Cache-Control "no-store"
+		header X-Content-Type-Options "nosniff"
+		header Referrer-Policy "no-referrer"
+		file_server
+	}
+
 	# Block external access to all other actuator endpoints (INF-02)
 	handle /actuator* {
 		respond 404
