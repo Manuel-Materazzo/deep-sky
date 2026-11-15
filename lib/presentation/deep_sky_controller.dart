@@ -38,7 +38,7 @@ class DeepSkyController extends ChangeNotifier {
     this.clientVersionCode = 1,
     this.protocolVersion = 1,
     this.defaultServerUrl = 'https://deepsky.vectevo.com',
-    this.defaultUpdateSource = 'manuel-materazzo/deep_sky',
+    this.defaultUpdateSource = 'Manuel-Materazzo/deep-sky',
     this.trustedUpdatePublicKeyB64 =
         'MCowBQYDK2VwAyEAHDblTk6u65qfWgGXDDULNtIsR9JrXd1u4Pc6y7+Z+WM=',
   }) : _httpClient = httpClient ?? http.Client(),
@@ -478,20 +478,35 @@ class DeepSkyController extends ChangeNotifier {
     required String trustedKeyB64,
     bool force = true,
   }) => _runGuarded(() async {
+    updateFeedback = null;
     final String keyToUse = trustedKeyB64.trim().isNotEmpty
         ? trustedKeyB64.trim()
         : trustedUpdatePublicKeyB64.trim();
     if (keyToUse.isEmpty) {
-      throw StateError(
-        'Inserisci la chiave pubblica Ed25519 delle release firmate.',
-      );
+      const String message =
+          'Inserisci la chiave pubblica Ed25519 delle release firmate.';
+      updateFeedback = message;
+      throw StateError(message);
     }
-    final ApkUpdateCheckResult res = await _updateService.checkForUpdate(
-      sourceBaseUri: ApkUpdateService.resolveSourceBaseUri(source),
-      trustedPublicKey: ApkUpdateService.parseEd25519PublicKey(keyToUse),
-      currentApp: capabilities,
-      force: force,
-    );
+    final Uri sourceBaseUri;
+    try {
+      sourceBaseUri = ApkUpdateService.resolveSourceBaseUri(source);
+    } on FormatException catch (ex) {
+      updateFeedback = 'Sorgente aggiornamenti non valida (${ex.message}).';
+      rethrow;
+    }
+    final ApkUpdateCheckResult res;
+    try {
+      res = await _updateService.checkForUpdate(
+        sourceBaseUri: sourceBaseUri,
+        trustedPublicKey: ApkUpdateService.parseEd25519PublicKey(keyToUse),
+        currentApp: capabilities,
+        force: force,
+      );
+    } on FormatException catch (ex) {
+      updateFeedback = 'Chiave pubblica Ed25519 non valida (${ex.message}).';
+      rethrow;
+    }
     availableUpdate = res.manifest;
     switch (res.status) {
       case ApkUpdateCheckStatus.updateAvailable:
