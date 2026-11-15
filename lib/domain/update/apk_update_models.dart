@@ -12,15 +12,15 @@ class ApkReleaseManifest {
   });
 
   factory ApkReleaseManifest.fromJson(Map<String, dynamic> json) {
-    final int schemaVersion = json['schemaVersion'] as int? ?? 0;
+    final int schemaVersion = _parseInt(json['schemaVersion']);
     final String packageId = (json['packageId'] as String? ?? '').trim();
-    final int versionCode = json['versionCode'] as int? ?? 0;
+    final int versionCode = _parseInt(json['versionCode']);
     final String versionName = (json['versionName'] as String? ?? '').trim();
     final String apkFile = (json['apkFile'] as String? ?? '').trim();
     final String apkSha256 = (json['apkSha256'] as String? ?? '')
         .trim()
         .toLowerCase();
-    final int apkSizeBytes = json['apkSizeBytes'] as int? ?? 0;
+    final int apkSizeBytes = _parseInt(json['apkSizeBytes']);
     final String createdAt = (json['createdAt'] as String? ?? '').trim();
 
     if (schemaVersion != 1 ||
@@ -53,6 +53,16 @@ class ApkReleaseManifest {
   final String apkSha256;
   final int apkSizeBytes;
   final String createdAt;
+
+  static int _parseInt(Object? raw) {
+    if (raw is int) {
+      return raw;
+    }
+    if (raw is String) {
+      return int.tryParse(raw.trim()) ?? 0;
+    }
+    return 0;
+  }
 }
 
 class UpdateStorageInfo {
