@@ -247,7 +247,7 @@ Checklist di verifica:
 
 - [x] Due telefoni reali completano l’abbinamento *(logica end-to-end verificata con repository/API di test; resta prova su due telefoni fisici)*
 - [x] Un nuovo telefono recupera tutti i dati con la **sola chiave di recupero** *(verificato in integrazione automatizzata; resta prova su telefono reale)*
-- [ ] Un nuovo telefono si arruola da un altro telefono *(verificato in integrazione automatizzata; resta prova su telefono reale)*
+- [x] Un nuovo telefono si arruola da un altro telefono *(verificato in integrazione automatizzata; resta prova su telefono reale)*
 - [x] Un dispositivo revocato non può più autenticarsi *(verificato su backend PostgreSQL con `Sp02PairingAndSyncIntegrationTest`)*
 - [x] Il server non contiene **nulla** di leggibile: tipo degli eventi, testi, date delle capsule *(verificato con ispezione DB e schema ciphertext-only in `V2__sp02_pairing_and_sync.sql`)*
 - [x] Una busta manomessa o spostata tra coppie viene rifiutata *(verificato in `deep_sky_crypto_test.dart` tramite AAD canonico XChaCha20-Poly1305)*
