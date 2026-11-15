@@ -180,4 +180,37 @@ class NativeBridge {
       return null;
     }
   }
+
+  /// Registers a listener for deep-link invite URIs arriving while the app is open (`S1-APP-01`).
+  void setDeepLinkListener(void Function(String uri)? listener) {
+    if (listener == null) {
+      _channel.setMethodCallHandler(null);
+      return;
+    }
+    _channel.setMethodCallHandler((MethodCall call) async {
+      if (call.method == 'onDeepLink') {
+        final String? uri = call.arguments as String?;
+        if (uri != null && uri.trim().isNotEmpty) {
+          listener(uri.trim());
+        }
+      }
+    });
+  }
+
+  /// Reads and clears any pending deep-link invite URI captured at app launch (`S1-APP-01`).
+  Future<String?> consumePendingDeepLink() async {
+    try {
+      final String? uri = await _channel.invokeMethod<String>(
+        'consumePendingDeepLink',
+      );
+      if (uri == null || uri.trim().isEmpty) {
+        return null;
+      }
+      return uri.trim();
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
 }

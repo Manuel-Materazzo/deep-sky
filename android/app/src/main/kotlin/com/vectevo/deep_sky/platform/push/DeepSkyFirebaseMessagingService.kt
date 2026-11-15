@@ -44,6 +44,7 @@ class DeepSkyFirebaseMessagingService : FirebaseMessagingService() {
             "wakeup.new_moment" -> R.string.push_body_new_moment
             "wakeup.capsule_ready" -> R.string.push_body_capsule_ready
             "wakeup.daily_prompt" -> R.string.push_body_daily_prompt
+            "wakeup.pairing_request" -> R.string.push_body_pairing_request
             else -> R.string.push_body_generic
         }
 

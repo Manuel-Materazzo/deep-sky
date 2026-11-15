@@ -33,12 +33,31 @@ class PlatformBridgePlugin(
         private const val REQ_SCAN_QR = 4104
     }
 
+    private var methodChannel: MethodChannel? = null
     private var pendingPermissionResult: MethodChannel.Result? = null
     private var pendingScanResult: MethodChannel.Result? = null
+    private var pendingDeepLink: String? = null
 
     fun register(flutterEngine: FlutterEngine) {
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
-            .setMethodCallHandler(this)
+        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME).also {
+            it.setMethodCallHandler(this)
+        }
+    }
+
+    fun handleIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_VIEW) {
+            return
+        }
+        val data = intent.data ?: return
+        val scheme = data.scheme?.lowercase() ?: return
+        val isInviteUri = (scheme == "https" && (data.path?.startsWith("/join") == true)) ||
+            (scheme == "deepsky" && data.host == "pair")
+        if (!isInviteUri) {
+            return
+        }
+        val uriString = data.toString()
+        pendingDeepLink = uriString
+        methodChannel?.invokeMethod("onDeepLink", uriString)
     }
 
     fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray): Boolean {
@@ -88,6 +107,11 @@ class PlatformBridgePlugin(
             "requestNotificationPermission" -> handleRequestNotificationPermission(result)
             "shareText" -> handleShareText(call, result)
             "scanQrCode" -> handleScanQrCode(call, result)
+            "consumePendingDeepLink" -> {
+                val uri = pendingDeepLink
+                pendingDeepLink = null
+                result.success(uri ?: "")
+            }
             else -> result.notImplemented()
         }
     }

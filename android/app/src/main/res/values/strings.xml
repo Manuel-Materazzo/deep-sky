@@ -8,4 +8,5 @@
     <string name="push_body_new_moment">Something new appeared under your sky.</string>
     <string name="push_body_capsule_ready">A time capsule may be ready to open.</string>
     <string name="push_body_daily_prompt">Today\'s quiet prompt is ready.</string>
+    <string name="push_body_pairing_request">A new device is asking to join your sky.</string>
 </resources>

@@ -8,4 +8,5 @@
     <string name="push_body_new_moment">Qualcosa di nuovo è apparso sotto il vostro cielo.</string>
     <string name="push_body_capsule_ready">Una capsula del tempo potrebbe essere pronta.</string>
     <string name="push_body_daily_prompt">La domanda di oggi è pronta.</string>
+    <string name="push_body_pairing_request">Un nuovo dispositivo chiede di entrare nel vostro cielo.</string>
 </resources>
