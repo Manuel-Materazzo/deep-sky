@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Crescent moon -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9.90,3.44A9.2,9.2 0 1,0 20.63,13.60A7.4,7.4 0 1,1 9.90,3.44Z" />
+    <!-- Heart nestled in the crescent -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M16.40,11.63C13.00,9.59 12.83,6.87 14.77,6.09C15.86,5.65 16.40,6.63 16.40,7.11C16.40,6.63 16.94,5.65 18.03,6.09C19.97,6.87 19.80,9.59 16.40,11.63Z" />
+</vector>
