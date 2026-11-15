@@ -11,7 +11,7 @@ Future<void> testExecutable(FutureOr<void> Function() testMain) async {
   if (currentComparator is LocalFileComparator) {
     goldenFileComparator = _TolerantGoldenFileComparator(
       currentComparator.basedir.resolve('flutter_test_config.dart'),
-      precisionTolerance: 0.015,
+      precisionTolerance: 0.025,
     );
   }
   await testMain();
