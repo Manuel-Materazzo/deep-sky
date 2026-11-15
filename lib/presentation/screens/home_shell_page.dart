@@ -9,6 +9,7 @@ import 'package:deep_sky/domain/update/apk_update_models.dart';
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
 import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
 import 'package:deep_sky/presentation/theme/deep_sky_theme.dart';
+import 'package:deep_sky/presentation/widgets/invite_verification_section.dart';
 import 'package:deep_sky/scene/hybrid_scene_canvas.dart';
 import 'package:deep_sky/scene/scene_manifest.dart';
 import 'package:material_ui/material_ui.dart';
@@ -372,6 +373,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
 
   Widget _buildDevicesTab(BuildContext context, DeepSkyController c) {
     final LocalDeviceIdentity id = c.identity!;
+    final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(context);
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
@@ -379,7 +381,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 Text(
                   'Questo dispositivo: ${id.deviceLabel}',
@@ -389,6 +391,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
                 Text('ID coppia: ${id.coupleId}'),
                 const SizedBox(height: 12),
                 FilledButton.tonalIcon(
+                  key: const Key('create-enrollment-invite-button'),
                   onPressed: c.busy || c.isOffline
                       ? null
                       : c.createEnrollmentInvite,
@@ -396,9 +399,41 @@ class _HomeShellPageState extends State<HomeShellPage> {
                   label: const Text('Aggiungi un altro telefono'),
                 ),
                 if (c.activeInvite != null) ...<Widget>[
-                  const SizedBox(height: 8),
-                  SelectableText(
-                    'Invito nuovo telefono: ${c.activeInvite!.inviteToken}',
+                  const SizedBox(height: 12),
+                  InviteVerificationSection(
+                    invite: c.activeInvite!,
+                    serverUrl: id.serverUrl,
+                    sasCode: c.activeSasCode,
+                    acceptedDeviceLabel: c.activeInviteStatus?.acceptedLabel,
+                    busy: c.busy || c.isOffline,
+                    onPoll: c.pollActiveInvite,
+                    onConfirmSas: c.confirmSasAndDeliverRootKey,
+                    onCancel: c.cancelActiveInvite,
+                    tokenLabelPrefix: 'Invito nuovo telefono',
+                    pollButtonLabel: 'Verifica se il nuovo telefono si è unito',
+                    confirmButtonLabel:
+                        'Il codice coincide · Completa arruolamento',
+                    tokenKey: const Key('enroll-invite-token'),
+                    pollButtonKey: const Key('enroll-poll-invite-button'),
+                    sasCodeKey: const Key('enroll-sas-code'),
+                    confirmButtonKey: const Key('enroll-confirm-sas-button'),
+                  ),
+                ],
+                if (c.statusNotice != null) ...<Widget>[
+                  const SizedBox(height: 10),
+                  Text(
+                    c.statusNotice!,
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: tokens.calmAccent),
+                  ),
+                ],
+                if (c.errorNotice != null) ...<Widget>[
+                  const SizedBox(height: 10),
+                  Text(
+                    c.errorNotice!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ],
               ],

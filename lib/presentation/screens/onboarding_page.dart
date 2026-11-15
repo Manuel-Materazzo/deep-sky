@@ -3,8 +3,8 @@ import 'package:deep_sky/data/pairing_and_sync_repository.dart';
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
 import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
 import 'package:deep_sky/presentation/theme/deep_sky_theme.dart';
+import 'package:deep_sky/presentation/widgets/invite_verification_section.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 /// DS-2 onboarding screen supporting couple creation (`F-01`), invite joining
 /// with SAS verification, and 24-word/QR recovery (`F-20`).
@@ -28,6 +28,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
   final TextEditingController _recoveryController = TextEditingController();
 
   int _modeIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.controller.pendingJoin != null) {
+      _modeIndex = 1;
+    }
+  }
 
   @override
   void dispose() {
@@ -121,6 +129,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     if (_modeIndex == 0) _buildCreateSection(c),
                     if (_modeIndex == 1) _buildJoinSection(c),
                     if (_modeIndex == 2) _buildRecoverSection(c),
+                    if (c.statusNotice != null) ...<Widget>[
+                      const SizedBox(height: 12),
+                      Text(
+                        c.statusNotice!,
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: tokens.calmAccent),
+                      ),
+                    ],
                     if (c.errorNotice != null) ...<Widget>[
                       const SizedBox(height: 12),
                       Text(
@@ -156,47 +172,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
       );
     }
 
-    final String inviteUri =
-        'deepsky://pair?server=${Uri.encodeComponent(_serverController.text.trim())}&token=${invite.inviteToken}';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        Center(
-          child: Container(
-            color: Colors.white,
-            padding: const EdgeInsets.all(8),
-            child: QrImageView(data: inviteUri, size: 150),
-          ),
-        ),
-        const SizedBox(height: 8),
-        SelectableText(
-          'Codice invito: ${invite.inviteToken}',
-          key: const Key('active-invite-token'),
-        ),
-        const SizedBox(height: 12),
-        if (c.activeSasCode == null)
-          FilledButton.tonalIcon(
-            key: const Key('poll-invite-button'),
-            onPressed: c.busy ? null : c.pollActiveInvite,
-            icon: const Icon(Icons.sync),
-            label: const Text('Verifica se il partner si è unito'),
-          )
-        else ...<Widget>[
-          Text(
-            'Codice di verifica SAS: ${c.activeSasCode}',
-            key: const Key('inviter-sas-code'),
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            key: const Key('confirm-sas-button'),
-            onPressed: c.busy ? null : c.confirmSasAndDeliverRootKey,
-            icon: const Icon(Icons.verified_user_outlined),
-            label: const Text('Il codice coincide · Completa abbinamento'),
-          ),
-        ],
-      ],
+    return InviteVerificationSection(
+      invite: invite,
+      serverUrl: _serverController.text,
+      sasCode: c.activeSasCode,
+      acceptedDeviceLabel: c.activeInviteStatus?.acceptedLabel,
+      busy: c.busy,
+      onPoll: c.pollActiveInvite,
+      onConfirmSas: c.confirmSasAndDeliverRootKey,
     );
   }
 
@@ -233,12 +216,22 @@ class _OnboardingPageState extends State<OnboardingPage> {
             key: const Key('joiner-sas-code'),
             style: Theme.of(context).textTheme.titleMedium,
           ),
+          const SizedBox(height: 6),
+          Text(
+            'Chiedi a ${pending.peerLabel} di premere "Verifica" e poi "Il codice coincide" prima di completare qui.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
           const SizedBox(height: 8),
           FilledButton.icon(
             key: const Key('complete-join-button'),
             onPressed: c.busy ? null : c.completeJoinDelivery,
             icon: const Icon(Icons.verified_outlined),
             label: const Text('Completa ricezione chiavi'),
+          ),
+          const SizedBox(height: 4),
+          TextButton(
+            onPressed: c.busy ? null : c.cancelPendingJoin,
+            child: const Text('Usa un altro codice'),
           ),
         ],
       ],

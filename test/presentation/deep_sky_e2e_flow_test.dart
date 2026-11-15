@@ -156,7 +156,69 @@ void main() {
       expect(ctrlC.phase, AppBootPhase.paired);
       expect(ctrlC.events.single.payload.body['note'], 'Pensiero della sera');
 
-      // 7) Server enforces minimum version (HTTP 426) -> UpgradeRequiredPage (F-19).
+      // 7) Cross-device enrollment from Devices tab UI -> Phone D (F-20).
+      // Render Phone A back in HomeShellPage and switch to Dispositivi tab.
+      await tester.pumpWidget(
+        DeepSkyApp(controller: ctrlA, autoInitialize: false),
+      );
+      await tester.pumpAndSettle();
+      await tapVisible(find.text('Dispositivi'));
+      await tapVisible(
+        find.byKey(const Key('create-enrollment-invite-button')),
+      );
+      expect(find.byKey(const Key('enroll-invite-token')), findsOneWidget);
+      final String enrollToken = server.lastInviteToken!;
+
+      // Phone D opens Onboarding -> Unisciti tab and accepts the enrollment invite.
+      final DeepSkyController ctrlD = DeepSkyController(
+        keyStore: InMemorySecureKeyStore(),
+        httpClient: httpClient,
+        loadAssetString: (_) async => pilotManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+      );
+      ctrlD.reduceMotion = true;
+      await tester.pumpWidget(DeepSkyApp(controller: ctrlD));
+      await tester.pumpAndSettle();
+      await tapVisible(find.text('Unisciti'));
+      await tester.enterText(
+        find.byKey(const Key('join-token-field')),
+        enrollToken,
+      );
+      await tapVisible(find.byKey(const Key('accept-invite-button')));
+      expect(find.byKey(const Key('joiner-sas-code')), findsOneWidget);
+      final String enrollSas = ctrlD.pendingJoin!.sasCode;
+
+      // If Phone D taps "Completa ricezione chiavi" before Phone A confirms SAS,
+      // it gets a clear friendly message instead of a raw 404 exception.
+      await tapVisible(find.byKey(const Key('complete-join-button')));
+      expect(
+        find.textContaining('non ha ancora confermato il codice SAS'),
+        findsOneWidget,
+      );
+
+      // Phone A (Dispositivi tab) polls, sees the matching SAS, and delivers keys.
+      await tester.pumpWidget(
+        DeepSkyApp(controller: ctrlA, autoInitialize: false),
+      );
+      await tester.pumpAndSettle();
+      await tapVisible(find.text('Dispositivi'));
+      await tapVisible(find.byKey(const Key('enroll-poll-invite-button')));
+      expect(find.text('Codice di verifica SAS: $enrollSas'), findsOneWidget);
+      await tapVisible(find.byKey(const Key('enroll-confirm-sas-button')));
+      expect(find.byKey(const Key('enroll-invite-token')), findsNothing);
+      expect(find.text('Telefono B'), findsWidgets);
+
+      // Phone D completes key reception and lands on Home with decrypted thoughts.
+      await tester.pumpWidget(
+        DeepSkyApp(controller: ctrlD, autoInitialize: false),
+      );
+      await tester.pumpAndSettle();
+      await tapVisible(find.byKey(const Key('complete-join-button')));
+      expect(find.byKey(const Key('home-shell-page')), findsOneWidget);
+      expect(find.textContaining('Pensiero della sera'), findsWidgets);
+
+      // 8) Server enforces minimum version (HTTP 426) -> UpgradeRequiredPage (F-19).
       server.minClientVersionCode = 5;
       await tapVisible(find.byKey(const Key('refresh-sync-button')));
       expect(find.byKey(const Key('upgrade-required-page')), findsOneWidget);
@@ -171,6 +233,8 @@ class _FakeM2Server {
   int minProtocolVersion = 1;
 
   String? lastInviteToken;
+  int _inviteSeq = 0;
+  int _deviceSeq = 0;
   String? coupleId;
   String? recoveryAuthKeyB64;
   String? inviterDeviceId;
@@ -249,16 +313,37 @@ class _FakeM2Server {
       }, status: 201);
     }
 
+    if (req.method == 'POST' && path == '/api/v1/pairing/enrollment-invites') {
+      final String caller = req.headers['X-Device-Id']!;
+      final Map<String, Object?> creator = devices[caller]!;
+      inviterDeviceId = caller;
+      inviterLabel = creator['label'] as String;
+      acceptedDeviceId = null;
+      acceptedLabel = null;
+      acceptedAuthB64 = null;
+      acceptedKemB64 = null;
+      lastInviteToken = 'enroll-tok-${++_inviteSeq}';
+      return _json(<String, Object?>{
+        'coupleId': coupleId,
+        'deviceId': caller,
+        'inviteToken': lastInviteToken,
+        'expiresAt': DateTime.now()
+            .toUtc()
+            .add(const Duration(minutes: 15))
+            .toIso8601String(),
+      }, status: 201);
+    }
+
     if (req.method == 'POST' &&
         path == '/api/v1/pairing/invites/$lastInviteToken/accept') {
-      acceptedDeviceId = 'dev-b';
+      acceptedDeviceId = 'dev-join-${++_deviceSeq}';
       acceptedLabel = body['deviceLabel'] as String;
       acceptedAuthB64 = body['deviceAuthPublicKeyB64'] as String;
       acceptedKemB64 = body['deviceKemPublicKeyB64'] as String;
       devices[acceptedDeviceId!] = <String, Object?>{
         'deviceId': acceptedDeviceId,
         'label': acceptedLabel,
-        'enrolledVia': 'PAIRING_JOINER',
+        'enrolledVia': _deviceSeq == 1 ? 'PAIRING_JOINER' : 'ENROLLMENT',
         'createdAt': DateTime.now().toUtc().toIso8601String(),
         'revokedAt': null,
       };
@@ -297,7 +382,13 @@ class _FakeM2Server {
 
     if (req.method == 'GET' && path == '/api/v1/pairing/key-deliveries/me') {
       final String caller = req.headers['X-Device-Id']!;
-      return _json(keyDeliveries[caller]!);
+      final Map<String, Object?>? pending = keyDeliveries[caller];
+      if (pending == null) {
+        return _json(<String, Object?>{
+          'message': 'No key delivery ready for this device',
+        }, status: 404);
+      }
+      return _json(pending);
     }
 
     if (req.method == 'POST' && path == '/api/v1/pairing/confirm-recovery') {

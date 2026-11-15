@@ -39,7 +39,8 @@ class DeepSkyController extends ChangeNotifier {
     this.protocolVersion = 1,
     this.defaultServerUrl = 'https://deepsky.vectevo.com',
     this.defaultUpdateSource = 'manuel-materazzo/deep_sky',
-    this.trustedUpdatePublicKeyB64 = '',
+    this.trustedUpdatePublicKeyB64 =
+        'MCowBQYDK2VwAyEAHDblTk6u65qfWgGXDDULNtIsR9JrXd1u4Pc6y7+Z+WM=',
   }) : _httpClient = httpClient ?? http.Client(),
        _loadAssetString = loadAssetString ?? rootBundle.loadString,
        _loadCapabilitiesOverride = loadCapabilities {
@@ -130,7 +131,11 @@ class DeepSkyController extends ChangeNotifier {
     await _loadCapabilities();
     identity = await _repository.loadIdentity();
 
-    if (identity == null) {
+    if (identity == null || !identity!.hasCoupleRoot) {
+      if (identity != null && !identity!.hasCoupleRoot) {
+        await _repository.clearIdentity();
+        identity = null;
+      }
       await _checkCompatibility(defaultServerUrl);
       if (phase != AppBootPhase.upgradeRequired) {
         phase = AppBootPhase.unpaired;
@@ -273,6 +278,15 @@ class DeepSkyController extends ChangeNotifier {
     final result = await _repository.checkInviteAndSas(invite.inviteToken);
     activeInviteStatus = result.status;
     activeSasCode = result.sasCode;
+    if (result.status.accepted && result.sasCode != null) {
+      statusNotice = languageCode == 'it'
+          ? 'Dispositivo collegato! Confronta il codice SAS e conferma.'
+          : 'Device connected! Compare the SAS code and confirm.';
+    } else {
+      statusNotice = languageCode == 'it'
+          ? 'Nessun nuovo dispositivo collegato ancora. Riprova dopo che ha inserito il codice.'
+          : 'No device has joined yet. Try again after it enters the code.';
+    }
   });
 
   Future<void> confirmSasAndDeliverRootKey() => _runGuarded(() async {
@@ -292,6 +306,9 @@ class DeepSkyController extends ChangeNotifier {
     activeSasCode = null;
     phase = AppBootPhase.paired;
     await _refreshPairedState();
+    statusNotice = languageCode == 'it'
+        ? 'Chiavi inviate in modo cifrato. Ora completa la ricezione sull\'altro telefono.'
+        : 'Keys delivered in encrypted form. Now finish receiving on the other phone.';
   });
 
   Future<void> acceptInvite({
@@ -312,10 +329,27 @@ class DeepSkyController extends ChangeNotifier {
     if (session == null) {
       return;
     }
-    identity = await _repository.completeKeyDelivery(session: session);
+    try {
+      identity = await _repository.completeKeyDelivery(session: session);
+    } on ApiRequestException catch (ex) {
+      if (ex.statusCode == 404) {
+        throw StateError(
+          languageCode == 'it'
+              ? 'L\'altro telefono non ha ancora confermato il codice SAS. Conferma prima sull\'altro telefono, poi riprova.'
+              : 'The other phone has not confirmed the SAS code yet. Confirm on the other device first, then try again.',
+        );
+      }
+      rethrow;
+    }
     pendingJoin = null;
     phase = AppBootPhase.paired;
     await _refreshPairedState();
+  });
+
+  Future<void> cancelPendingJoin() => _runGuarded(() async {
+    await _repository.clearIdentity();
+    identity = null;
+    pendingJoin = null;
   });
 
   Future<void> recoverWithKey({
@@ -375,7 +409,19 @@ class DeepSkyController extends ChangeNotifier {
     activeInvite = await _repository.createEnrollmentInvite();
     activeInviteStatus = null;
     activeSasCode = null;
+    statusNotice = languageCode == 'it'
+        ? 'Invito pronto: inseriscilo dal nuovo telefono e poi premi Verifica.'
+        : 'Invite ready: enter it on the new phone and then tap Verify.';
   });
+
+  void cancelActiveInvite() {
+    activeInvite = null;
+    activeInviteStatus = null;
+    activeSasCode = null;
+    statusNotice = null;
+    errorNotice = null;
+    notifyListeners();
+  }
 
   Future<void> revokeDevice(String targetDeviceId) => _runGuarded(() async {
     await _repository.revokeDevice(targetDeviceId);
@@ -522,6 +568,7 @@ class DeepSkyController extends ChangeNotifier {
 
   Future<void> _runGuarded(Future<void> Function() action) async {
     busy = true;
+    statusNotice = null;
     errorNotice = null;
     notifyListeners();
     try {
