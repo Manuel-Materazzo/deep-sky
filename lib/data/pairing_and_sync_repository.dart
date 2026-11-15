@@ -56,6 +56,7 @@ class PairingAndSyncRepository {
        _localCache = localCache ?? EncryptedLocalCache(keyStore: _keyStore);
 
   static const String _identityStorageKey = 'deep_sky.device_identity.v1';
+  static const String _pendingInviteStorageKey = 'deep_sky.pending_invite.v1';
 
   final SecureKeyStore _keyStore;
   final DeepSkyCrypto _crypto;
@@ -76,8 +77,43 @@ class PairingAndSyncRepository {
     await _keyStore.write(_identityStorageKey, jsonEncode(identity.toJson()));
   }
 
+  Future<void> savePendingInvite(CreateInviteResponse invite) async {
+    await _keyStore.write(
+      _pendingInviteStorageKey,
+      jsonEncode(<String, Object?>{
+        'coupleId': invite.coupleId,
+        'deviceId': invite.deviceId,
+        'inviteToken': invite.inviteToken,
+        'expiresAt': invite.expiresAt.toUtc().toIso8601String(),
+      }),
+    );
+  }
+
+  Future<CreateInviteResponse?> loadPendingInvite() async {
+    final String? raw = await _keyStore.read(_pendingInviteStorageKey);
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+    try {
+      final Map<String, Object?> json = jsonDecode(raw) as Map<String, Object?>;
+      return CreateInviteResponse(
+        coupleId: json['coupleId'] as String,
+        deviceId: json['deviceId'] as String,
+        inviteToken: json['inviteToken'] as String,
+        expiresAt: DateTime.parse(json['expiresAt'] as String).toUtc(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> clearPendingInvite() async {
+    await _keyStore.delete(_pendingInviteStorageKey);
+  }
+
   Future<void> clearIdentity() async {
     await _localCache.clear();
+    await clearPendingInvite();
     await _keyStore.delete(_identityStorageKey);
   }
 
@@ -127,16 +163,22 @@ class PairingAndSyncRepository {
       kemPrivateKey: kemPriv,
       kemPublicKey: kemPub,
       recoverySeed: recoverySeed,
+      pairingCompleted: false,
     );
     await saveIdentity(identity);
+    await savePendingInvite(invite);
     return (identity: identity, invite: invite);
   }
 
   /// Existing active device creates a one-time enrollment invite for a new phone (`F-20`).
   Future<CreateInviteResponse> createEnrollmentInvite() async {
     final LocalDeviceIdentity identity = await _requireRootIdentity();
-    return _clientFactory(identity.serverUrl)
+    final CreateInviteResponse invite = await _clientFactory(identity.serverUrl)
         .createEnrollmentInvite(identity: identity);
+    if (!identity.pairingCompleted) {
+      await savePendingInvite(invite);
+    }
+    return invite;
   }
 
   /// Partner A (or enrolling device) checks if the invite was accepted and computes SAS.
@@ -188,6 +230,10 @@ class PairingAndSyncRepository {
     );
     await _clientFactory(identity.serverUrl)
         .uploadKeyDelivery(identity: identity, package: pkg);
+    if (!identity.pairingCompleted) {
+      await saveIdentity(identity.copyWith(pairingCompleted: true));
+    }
+    await clearPendingInvite();
   }
 
   /// Partner B (or new phone) accepts an invite link/token and calculates SAS.
@@ -228,7 +274,9 @@ class PairingAndSyncRepository {
       authPublicKey: authPub,
       kemPrivateKey: kemPriv,
       kemPublicKey: kemPub,
+      pairingCompleted: false,
     );
+    await clearPendingInvite();
     await saveIdentity(identity);
 
     final Uint8List shared = await _crypto.computeSharedSecret(
@@ -281,8 +329,10 @@ class PairingAndSyncRepository {
 
     final LocalDeviceIdentity completed = session.identity.copyWith(
       recoverySeed: recoverySeed,
+      pairingCompleted: true,
     );
     await saveIdentity(completed);
+    await clearPendingInvite();
     return completed;
   }
 
@@ -291,6 +341,7 @@ class PairingAndSyncRepository {
     final LocalDeviceIdentity identity = await _requireRootIdentity();
     final LocalDeviceIdentity updated = identity.copyWith(
       recoverySavedConfirmed: true,
+      pairingCompleted: true,
     );
     await saveIdentity(updated);
     return updated;
@@ -358,7 +409,9 @@ class PairingAndSyncRepository {
       kemPublicKey: kemPub,
       recoverySeed: recoverySeed,
       recoverySavedConfirmed: true,
+      pairingCompleted: true,
     );
+    await clearPendingInvite();
     await saveIdentity(recovered);
     return recovered;
   }
