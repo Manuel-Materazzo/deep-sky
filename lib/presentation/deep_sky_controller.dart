@@ -9,6 +9,7 @@ import 'package:deep_sky/data/scene_manifest_parser.dart';
 import 'package:deep_sky/data/secure_key_store.dart';
 import 'package:deep_sky/domain/crypto/deep_sky_crypto.dart';
 import 'package:deep_sky/domain/crypto/e2ee_models.dart';
+import 'package:deep_sky/domain/pairing/invite_link_codec.dart';
 import 'package:deep_sky/domain/platform_capabilities.dart';
 import 'package:deep_sky/domain/push_models.dart';
 import 'package:deep_sky/domain/update/apk_update_models.dart';
@@ -21,7 +22,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
-enum AppBootPhase { loading, unpaired, paired, upgradeRequired }
+enum AppBootPhase { loading, unpaired, waiting, paired, upgradeRequired }
 
 /// Application-wide state coordinator for M2 flows:
 /// pairing (`F-01`), recovery (`F-20`), thinking-of-you (`F-03`),
@@ -82,10 +83,13 @@ class DeepSkyController extends ChangeNotifier {
   bool busy = false;
   bool isOffline = false;
   bool isDeviceRevoked = false;
-  bool isNight = false;
+  bool isNight = true;
   bool reduceMotion = false;
   bool petOverrideActive = false;
+  bool autoInviteAttempted = false;
   String languageCode = 'it';
+  late String activeServerUrl = defaultServerUrl;
+  String deviceLabel = 'Telefono principale';
   String? statusNotice;
   String? errorNotice;
 
@@ -134,15 +138,30 @@ class DeepSkyController extends ChangeNotifier {
     await _loadPilotScene();
     await _loadCapabilities();
     identity = await _repository.loadIdentity();
+    activeServerUrl = identity?.serverUrl ?? defaultServerUrl;
+    if (identity != null && identity!.deviceLabel.trim().isNotEmpty) {
+      deviceLabel = identity!.deviceLabel;
+    }
 
     if (identity == null || !identity!.hasCoupleRoot) {
       if (identity != null && !identity!.hasCoupleRoot) {
         await _repository.clearIdentity();
         identity = null;
       }
-      await _checkCompatibility(defaultServerUrl);
+      await _checkCompatibility(activeServerUrl);
       if (phase != AppBootPhase.upgradeRequired) {
         phase = AppBootPhase.unpaired;
+      }
+      notifyListeners();
+      return;
+    }
+
+    if (!identity!.pairingCompleted) {
+      activeInvite = await _repository.loadPendingInvite();
+      autoInviteAttempted = activeInvite != null;
+      await _checkCompatibility(identity!.serverUrl);
+      if (phase != AppBootPhase.upgradeRequired) {
+        phase = AppBootPhase.waiting;
       }
       notifyListeners();
       return;
@@ -286,19 +305,169 @@ class DeepSkyController extends ChangeNotifier {
     );
   }
 
+  bool get isCustomServer =>
+      InviteLinkCodec.displayHost(activeServerUrl).toLowerCase() !=
+      InviteLinkCodec.displayHost(defaultServerUrl).toLowerCase();
+
+  String? get activeInviteUri {
+    final CreateInviteResponse? invite = activeInvite;
+    if (invite == null) {
+      return null;
+    }
+    return InviteLinkCodec.buildInviteUri(
+      serverUrl: activeServerUrl,
+      inviteToken: invite.inviteToken,
+      defaultServerUrl: defaultServerUrl,
+    );
+  }
+
+  String? get activeInviteDisplayLink {
+    final CreateInviteResponse? invite = activeInvite;
+    if (invite == null) {
+      return null;
+    }
+    return InviteLinkCodec.formatCompactDisplayLink(
+      serverUrl: activeServerUrl,
+      inviteToken: invite.inviteToken,
+      defaultServerUrl: defaultServerUrl,
+    );
+  }
+
+  Future<void> ensureInitialInvite() async {
+    if (activeInvite != null ||
+        busy ||
+        autoInviteAttempted ||
+        phase == AppBootPhase.paired ||
+        phase == AppBootPhase.upgradeRequired) {
+      return;
+    }
+    autoInviteAttempted = true;
+    if (identity != null &&
+        identity!.hasCoupleRoot &&
+        !identity!.pairingCompleted &&
+        identity!.serverUrl == activeServerUrl) {
+      await regenerateInitialInvite();
+    } else {
+      await createInitialInvite(
+        serverUrl: activeServerUrl,
+        deviceLabel: deviceLabel,
+      );
+    }
+  }
+
+  Future<void> retryInitialInvite() async {
+    autoInviteAttempted = false;
+    await ensureInitialInvite();
+  }
+
   Future<void> createInitialInvite({
     required String serverUrl,
     required String deviceLabel,
   }) => _runGuarded(() async {
+    final String cleanServer = serverUrl.trim();
+    final String cleanLabel = deviceLabel.trim().isEmpty
+        ? DeepSkyStrings(languageCode).defaultDeviceLabel
+        : deviceLabel.trim();
     final result = await _repository.createInitialInvite(
-      serverUrl: serverUrl.trim(),
-      deviceLabel: deviceLabel.trim(),
+      serverUrl: cleanServer,
+      deviceLabel: cleanLabel,
+    );
+    activeServerUrl = cleanServer;
+    this.deviceLabel = cleanLabel;
+    identity = result.identity;
+    activeInvite = result.invite;
+    activeInviteStatus = null;
+    activeSasCode = null;
+    phase = AppBootPhase.waiting;
+  });
+
+  Future<void> regenerateInitialInvite() => _runGuarded(() async {
+    final LocalDeviceIdentity? current = identity;
+    if (current != null &&
+        current.hasCoupleRoot &&
+        !current.pairingCompleted &&
+        current.serverUrl == activeServerUrl) {
+      activeInvite = await _repository.createEnrollmentInvite();
+      activeInviteStatus = null;
+      activeSasCode = null;
+      phase = AppBootPhase.waiting;
+      return;
+    }
+    final String cleanLabel = deviceLabel.trim().isEmpty
+        ? DeepSkyStrings(languageCode).defaultDeviceLabel
+        : deviceLabel.trim();
+    final result = await _repository.createInitialInvite(
+      serverUrl: activeServerUrl,
+      deviceLabel: cleanLabel,
     );
     identity = result.identity;
     activeInvite = result.invite;
     activeInviteStatus = null;
     activeSasCode = null;
+    phase = AppBootPhase.waiting;
   });
+
+  Future<void> updateServerUrl(
+    String rawServerAddress, {
+    bool createInvite = true,
+  }) => _runGuarded(() async {
+    final String normalized = InviteLinkCodec.normalizeServerUrl(
+      rawServerAddress,
+    );
+    final bool serverChanged = normalized != activeServerUrl;
+    activeServerUrl = normalized;
+
+    if (serverChanged && identity != null && !identity!.pairingCompleted) {
+      await _repository.clearIdentity();
+      await _repository.clearPendingInvite();
+      identity = null;
+      activeInvite = null;
+      activeInviteStatus = null;
+      activeSasCode = null;
+      phase = AppBootPhase.unpaired;
+    }
+
+    if (!createInvite) {
+      autoInviteAttempted = false;
+      return;
+    }
+
+    autoInviteAttempted = true;
+    final String cleanLabel = deviceLabel.trim().isEmpty
+        ? DeepSkyStrings(languageCode).defaultDeviceLabel
+        : deviceLabel.trim();
+    final result = await _repository.createInitialInvite(
+      serverUrl: activeServerUrl,
+      deviceLabel: cleanLabel,
+    );
+    identity = result.identity;
+    activeInvite = result.invite;
+    activeInviteStatus = null;
+    activeSasCode = null;
+    phase = AppBootPhase.waiting;
+  });
+
+  Future<void> resetToOfficialServer({bool createInvite = true}) =>
+      updateServerUrl(defaultServerUrl, createInvite: createInvite);
+
+  Future<void> shareActiveInvite({
+    required String messagePrefix,
+    required String copiedFallbackNotice,
+  }) async {
+    final String? uri = activeInviteUri;
+    if (uri == null) {
+      return;
+    }
+    final bool launched = await _nativeBridge.shareText(
+      text: '$messagePrefix $uri',
+      subject: 'Deep Sky',
+    );
+    if (!launched) {
+      await Clipboard.setData(ClipboardData(text: uri));
+      statusNotice = copiedFallbackNotice;
+      notifyListeners();
+    }
+  }
 
   Future<void> pollActiveInvite() => _runGuarded(() async {
     final CreateInviteResponse? invite = activeInvite;
@@ -331,6 +500,7 @@ class DeepSkyController extends ChangeNotifier {
       targetDeviceId: status.acceptedDeviceId!,
       targetKemPublicKey: status.acceptedKemPublicKey!,
     );
+    identity = identity?.copyWith(pairingCompleted: true);
     activeInvite = null;
     activeInviteStatus = null;
     activeSasCode = null;
@@ -346,10 +516,14 @@ class DeepSkyController extends ChangeNotifier {
     required String inviteToken,
     required String deviceLabel,
   }) => _runGuarded(() async {
+    final parsed = InviteLinkCodec.parseInviteInput(inviteToken);
+    final String resolvedServer = (parsed.serverUrl ?? serverUrl).trim();
+    activeServerUrl = resolvedServer;
+    this.deviceLabel = deviceLabel.trim();
     pendingJoin = await _repository.acceptInvite(
-      serverUrl: serverUrl.trim(),
-      inviteToken: _extractInviteToken(inviteToken),
-      deviceLabel: deviceLabel.trim(),
+      serverUrl: resolvedServer,
+      inviteToken: parsed.inviteToken,
+      deviceLabel: this.deviceLabel,
     );
     identity = pendingJoin!.identity;
   });
@@ -388,8 +562,14 @@ class DeepSkyController extends ChangeNotifier {
 
   Future<void> cancelPendingJoin() => _runGuarded(() async {
     await _repository.clearIdentity();
+    await _repository.clearPendingInvite();
     identity = null;
     pendingJoin = null;
+    activeInvite = null;
+    activeInviteStatus = null;
+    activeSasCode = null;
+    phase = AppBootPhase.unpaired;
+    autoInviteAttempted = false;
   });
 
   Future<void> recoverWithKey({
@@ -518,6 +698,8 @@ class DeepSkyController extends ChangeNotifier {
     pushStatus = null;
     isOffline = false;
     isDeviceRevoked = false;
+    autoInviteAttempted = false;
+    activeServerUrl = defaultServerUrl;
     sceneState = const SceneStateSnapshot(
       slotStates: <String, String>{'window': 'calm'},
     );
@@ -649,6 +831,15 @@ class DeepSkyController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setDeviceLabel(String label) {
+    final String trimmed = label.trim();
+    if (trimmed.isEmpty) {
+      return;
+    }
+    deviceLabel = trimmed;
+    notifyListeners();
+  }
+
   void clearNotices() {
     statusNotice = null;
     errorNotice = null;
@@ -686,15 +877,6 @@ class DeepSkyController extends ChangeNotifier {
       busy = false;
       notifyListeners();
     }
-  }
-
-  static String _extractInviteToken(String raw) {
-    final String trimmed = raw.trim();
-    final Uri? uri = Uri.tryParse(trimmed);
-    if (uri != null && uri.queryParameters.containsKey('token')) {
-      return uri.queryParameters['token']!.trim();
-    }
-    return trimmed;
   }
 
   Uint8List? get recoverySeed => identity?.recoverySeed;

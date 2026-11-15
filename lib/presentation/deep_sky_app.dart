@@ -74,6 +74,7 @@ class _DeepSkyAppState extends State<DeepSkyApp> {
       case AppBootPhase.upgradeRequired:
         return UpgradeRequiredPage(controller: _controller);
       case AppBootPhase.unpaired:
+      case AppBootPhase.waiting:
         return OnboardingPage(controller: _controller);
       case AppBootPhase.paired:
         return HomeShellPage(controller: _controller);

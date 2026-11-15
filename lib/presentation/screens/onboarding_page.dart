@@ -1,13 +1,20 @@
-import 'package:deep_sky/data/couple_api_client.dart';
+import 'dart:async';
+
 import 'package:deep_sky/data/pairing_and_sync_repository.dart';
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
 import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
 import 'package:deep_sky/presentation/theme/deep_sky_theme.dart';
-import 'package:deep_sky/presentation/widgets/invite_verification_section.dart';
+import 'package:deep_sky/presentation/widgets/welcome_invite_panel.dart';
+import 'package:deep_sky/presentation/widgets/welcome_server_drawer.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// DS-2 onboarding screen supporting couple creation (`F-01`), invite joining
-/// with SAS verification, and 24-word/QR recovery (`F-20`).
+/// Welcome & Onboarding screen (`S1-D02-D03-D05`) following the
+/// "Intimate Sanctuary" design language.
+///
+/// Opens directly into automatic initial invite creation (`S1-D03`) and QR/link
+/// sharing (`S1-D05`), while keeping `Unisciti` (`F-01`) and `Recupera` (`F-20`)
+/// accessible via a segmented control and hiding server details in a
+/// collapsed-by-default drawer (`P-09`).
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({super.key, required this.controller});
 
@@ -19,10 +26,10 @@ class OnboardingPage extends StatefulWidget {
 
 class _OnboardingPageState extends State<OnboardingPage> {
   late final TextEditingController _serverController = TextEditingController(
-    text: widget.controller.defaultServerUrl,
+    text: widget.controller.activeServerUrl,
   );
-  final TextEditingController _labelController = TextEditingController(
-    text: 'Telefono principale',
+  late final TextEditingController _labelController = TextEditingController(
+    text: widget.controller.deviceLabel,
   );
   final TextEditingController _inviteTokenController = TextEditingController();
   final TextEditingController _recoveryController = TextEditingController();
@@ -34,6 +41,15 @@ class _OnboardingPageState extends State<OnboardingPage> {
     super.initState();
     if (widget.controller.pendingJoin != null) {
       _modeIndex = 1;
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        if (_modeIndex == 0 && widget.controller.pendingJoin == null) {
+          unawaited(widget.controller.ensureInitialInvite());
+        }
+      });
     }
   }
 
@@ -46,144 +62,371 @@ class _OnboardingPageState extends State<OnboardingPage> {
     super.dispose();
   }
 
+  void _selectMode(int index) {
+    if (_modeIndex == index) {
+      return;
+    }
+    setState(() => _modeIndex = index);
+    if (index == 0 &&
+        widget.controller.activeInvite == null &&
+        widget.controller.pendingJoin == null &&
+        !widget.controller.busy) {
+      unawaited(widget.controller.ensureInitialInvite());
+    }
+  }
+
+  Future<void> _handleSaveServer(String normalizedUrl) async {
+    await widget.controller.updateServerUrl(
+      normalizedUrl,
+      createInvite: _modeIndex == 0 && widget.controller.pendingJoin == null,
+    );
+    if (mounted) {
+      _serverController.text = widget.controller.activeServerUrl;
+    }
+  }
+
+  Future<void> _handleResetOfficialServer() async {
+    await widget.controller.resetToOfficialServer(
+      createInvite: _modeIndex == 0 && widget.controller.pendingJoin == null,
+    );
+    if (mounted) {
+      _serverController.text = widget.controller.activeServerUrl;
+    }
+  }
+
+  void _showHelpSheet(DeepSkyStrings s) {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (BuildContext sheetContext) {
+          final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(sheetContext);
+          final TextTheme textTheme = Theme.of(sheetContext).textTheme;
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 4, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text(s.helpSheetTitle, style: textTheme.titleLarge),
+                  const SizedBox(height: 16),
+                  _HelpPointRow(
+                    icon: Icons.favorite_outline_rounded,
+                    accent: tokens.calmAccent,
+                    title: s.helpPointSpaceTitle,
+                    body: s.helpPointSpaceBody,
+                  ),
+                  const SizedBox(height: 14),
+                  _HelpPointRow(
+                    icon: Icons.qr_code_2_rounded,
+                    accent: tokens.amberGlow,
+                    title: s.helpPointPairingTitle,
+                    body: s.helpPointPairingBody,
+                  ),
+                  const SizedBox(height: 14),
+                  _HelpPointRow(
+                    icon: Icons.lock_outline_rounded,
+                    accent: tokens.blushPetal,
+                    title: s.helpPointPrivacyTitle,
+                    body: s.helpPointPrivacyBody,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showPreferencesSheet() {
+    unawaited(
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
+        builder: (BuildContext sheetContext) {
+          return AnimatedBuilder(
+            animation: widget.controller,
+            builder: (BuildContext innerContext, _) {
+              final DeepSkyController c = widget.controller;
+              final DeepSkyStrings s = DeepSkyStrings(c.languageCode);
+              final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(innerContext);
+              final TextTheme textTheme = Theme.of(innerContext).textTheme;
+              final EdgeInsets viewInsets = MediaQuery.viewInsetsOf(
+                innerContext,
+              );
+
+              return SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    4,
+                    24,
+                    24 + viewInsets.bottom,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Text(
+                        s.preferencesSheetTitle,
+                        style: textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        key: const Key('preferences-device-label-field'),
+                        controller: _labelController,
+                        textInputAction: TextInputAction.done,
+                        onChanged: c.setDeviceLabel,
+                        onSubmitted: c.setDeviceLabel,
+                        decoration: InputDecoration(
+                          labelText: s.deviceNameFieldLabel,
+                          prefixIcon: Icon(
+                            Icons.smartphone_outlined,
+                            color: tokens.mutedInk,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SwitchListTile(
+                        key: const Key('preferences-theme-switch'),
+                        contentPadding: EdgeInsets.zero,
+                        secondary: Icon(
+                          c.isNight
+                              ? Icons.dark_mode_outlined
+                              : Icons.light_mode_outlined,
+                          color: tokens.amberGlow,
+                        ),
+                        title: Text(s.nightThemeToggleLabel),
+                        value: c.isNight,
+                        onChanged: (_) => c.toggleNightMode(),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        s.languageSelectorLabel,
+                        style: textTheme.labelMedium?.copyWith(
+                          color: tokens.mutedInk,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SegmentedButton<String>(
+                        segments: const <ButtonSegment<String>>[
+                          ButtonSegment<String>(
+                            value: 'it',
+                            label: Text(
+                              'Italiano',
+                              key: Key('preferences-lang-it'),
+                            ),
+                          ),
+                          ButtonSegment<String>(
+                            value: 'en',
+                            label: Text(
+                              'English',
+                              key: Key('preferences-lang-en'),
+                            ),
+                          ),
+                        ],
+                        selected: <String>{c.languageCode},
+                        onSelectionChanged: (Set<String> selected) {
+                          if (selected.isNotEmpty) {
+                            c.setLanguageCode(selected.first);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final DeepSkyController c = widget.controller;
     final DeepSkyStrings s = DeepSkyStrings(c.languageCode);
     final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(context);
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final TextTheme textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       key: const Key('onboarding-page'),
-      appBar: AppBar(title: Text(s.appTitle), centerTitle: true),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: <Widget>[
-            Icon(
-              Icons.nights_stay_outlined,
-              size: 48,
-              color: tokens.calmAccent,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              s.ourHomeTitle,
-              style: Theme.of(context).textTheme.headlineSmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              s.calmSubtitle,
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: tokens.mutedInk),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            SegmentedButton<int>(
-              segments: <ButtonSegment<int>>[
-                ButtonSegment<int>(
-                  value: 0,
-                  label: Text(s.createSpaceTab),
-                  icon: const Icon(Icons.home_outlined),
-                ),
-                ButtonSegment<int>(
-                  value: 1,
-                  label: Text(s.joinSpaceTab),
-                  icon: const Icon(Icons.link),
-                ),
-                ButtonSegment<int>(
-                  value: 2,
-                  label: Text(s.recoverSpaceTab),
-                  icon: const Icon(Icons.key_outlined),
-                ),
-              ],
-              selected: <int>{_modeIndex},
-              onSelectionChanged: (Set<int> next) {
-                setState(() => _modeIndex = next.first);
-              },
-            ),
-            const SizedBox(height: 16),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    TextField(
-                      key: const Key('onboarding-server-field'),
-                      controller: _serverController,
-                      decoration: const InputDecoration(
-                        labelText: 'Server della coppia (HTTPS)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      key: const Key('onboarding-label-field'),
-                      controller: _labelController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nome di questo telefono',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (_modeIndex == 0) _buildCreateSection(c),
-                    if (_modeIndex == 1) _buildJoinSection(c),
-                    if (_modeIndex == 2) _buildRecoverSection(c),
-                    if (c.statusNotice != null) ...<Widget>[
-                      const SizedBox(height: 12),
-                      Text(
-                        c.statusNotice!,
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: tokens.calmAccent),
-                      ),
+      backgroundColor: tokens.skyBackdrop,
+      body: Stack(
+        children: <Widget>[
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -0.78),
+                    radius: 1.05,
+                    colors: <Color>[
+                      tokens.elevatedSurface.withValues(alpha: 0.7),
+                      tokens.skyBackdrop.withValues(alpha: 0.0),
                     ],
-                    if (c.errorNotice != null) ...<Widget>[
-                      const SizedBox(height: 12),
-                      Text(
-                        c.errorNotice!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+          SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 460),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      _WelcomeTopBar(
+                        title: s.appTitle,
+                        helpTooltip: s.helpButtonTooltip,
+                        preferencesTooltip: s.preferencesTooltip,
+                        onHelpPressed: () => _showHelpSheet(s),
+                        onPreferencesPressed: _showPreferencesSheet,
+                      ),
+                      const SizedBox(height: 12),
+                      _WelcomeHeroSection(
+                        title: s.welcomeTitle,
+                        subtitle: s.welcomeSubtitle,
+                      ),
+                      const SizedBox(height: 22),
+                      _WelcomeModePill(
+                        selectedIndex: _modeIndex,
+                        inviteLabel: s.inviteTab,
+                        joinLabel: s.joinSpaceTab,
+                        recoverLabel: s.recoverSpaceTab,
+                        onSelected: _selectMode,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildActivePanel(c, s, tokens, scheme, textTheme),
+                      const SizedBox(height: 16),
+                      WelcomeServerDrawer(
+                        serverUrl: c.activeServerUrl,
+                        defaultServerUrl: c.defaultServerUrl,
+                        isCustomServer: c.isCustomServer,
+                        busy: c.busy,
+                        strings: s,
+                        serverController: _serverController,
+                        onSaveServer: _handleSaveServer,
+                        onResetOfficial: _handleResetOfficialServer,
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          Icon(
+                            Icons.lock_outline_rounded,
+                            size: 14,
+                            color: tokens.mutedInk,
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              s.welcomeFooterNote,
+                              textAlign: TextAlign.center,
+                              style: textTheme.bodySmall?.copyWith(
+                                color: tokens.mutedInk,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCreateSection(DeepSkyController c) {
-    final CreateInviteResponse? invite = c.activeInvite;
-    if (invite == null) {
-      return FilledButton.icon(
-        key: const Key('create-invite-button'),
-        onPressed: c.busy
-            ? null
-            : () => c.createInitialInvite(
-                serverUrl: _serverController.text,
-                deviceLabel: _labelController.text,
-              ),
-        icon: const Icon(Icons.add_home_outlined),
-        label: const Text('Crea invito per il partner'),
-      );
+  Widget _buildActivePanel(
+    DeepSkyController c,
+    DeepSkyStrings s,
+    DeepSkyTokens tokens,
+    ColorScheme scheme,
+    TextTheme textTheme,
+  ) {
+    if (_modeIndex == 0) {
+      return WelcomeInvitePanel(controller: c, strings: s);
     }
 
-    return InviteVerificationSection(
-      invite: invite,
-      serverUrl: _serverController.text,
-      sasCode: c.activeSasCode,
-      acceptedDeviceLabel: c.activeInviteStatus?.acceptedLabel,
-      busy: c.busy,
-      onPoll: c.pollActiveInvite,
-      onConfirmSas: c.confirmSasAndDeliverRootKey,
+    final Widget content = _modeIndex == 1
+        ? _buildJoinSection(c, s, tokens, textTheme)
+        : _buildRecoverSection(c, s);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: tokens.cardSurface,
+        borderRadius: BorderRadius.circular(DeepSkyTheme.radiusXl),
+        border: Border.all(color: tokens.cardBorder.withValues(alpha: 0.28)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          content,
+          if (c.statusNotice != null) ...<Widget>[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: tokens.surfaceHigh,
+                borderRadius: BorderRadius.circular(DeepSkyTheme.radiusMd),
+              ),
+              child: Text(
+                c.statusNotice!,
+                style: textTheme.bodySmall?.copyWith(
+                  color: tokens.accentText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+          if (c.errorNotice != null) ...<Widget>[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: scheme.errorContainer,
+                borderRadius: BorderRadius.circular(DeepSkyTheme.radiusMd),
+              ),
+              child: Text(
+                c.errorNotice!,
+                style: textTheme.bodySmall?.copyWith(
+                  color: scheme.onErrorContainer,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
-  Widget _buildJoinSection(DeepSkyController c) {
+  Widget _buildJoinSection(
+    DeepSkyController c,
+    DeepSkyStrings s,
+    DeepSkyTokens tokens,
+    TextTheme textTheme,
+  ) {
     final PendingJoinSession? pending = c.pendingJoin;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -191,12 +434,14 @@ class _OnboardingPageState extends State<OnboardingPage> {
         TextField(
           key: const Key('join-token-field'),
           controller: _inviteTokenController,
-          decoration: const InputDecoration(
-            labelText: 'Codice o link invito',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: s.isIt ? 'Codice o link invito' : 'Invite code or link',
+            hintText: s.isIt
+                ? 'Incolla il link ricevuto dal partner'
+                : 'Paste the link sent by your partner',
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         if (pending == null)
           FilledButton.icon(
             key: const Key('accept-invite-button'),
@@ -207,38 +452,59 @@ class _OnboardingPageState extends State<OnboardingPage> {
                     inviteToken: _inviteTokenController.text,
                     deviceLabel: _labelController.text,
                   ),
-            icon: const Icon(Icons.link),
-            label: const Text('Unisciti con invito'),
+            icon: const Icon(Icons.link_rounded),
+            label: Text(s.isIt ? 'Unisciti con invito' : 'Join with invite'),
           )
         else ...<Widget>[
-          Text(
-            'Conferma con ${pending.peerLabel} il codice SAS: ${pending.sasCode}',
-            key: const Key('joiner-sas-code'),
-            style: Theme.of(context).textTheme.titleMedium,
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: tokens.surfaceHigh,
+              borderRadius: BorderRadius.circular(DeepSkyTheme.radiusMd),
+              border: Border.all(
+                color: tokens.calmAccent.withValues(alpha: 0.35),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  s.isIt
+                      ? 'Conferma con ${pending.peerLabel} il codice SAS: ${pending.sasCode}'
+                      : 'Confirm SAS code with ${pending.peerLabel}: ${pending.sasCode}',
+                  key: const Key('joiner-sas-code'),
+                  style: textTheme.titleMedium,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  s.isIt
+                      ? 'Chiedi a ${pending.peerLabel} di premere "Verifica" e poi "Il codice coincide" prima di completare qui.'
+                      : 'Ask ${pending.peerLabel} to verify and confirm the matching code before completing here.',
+                  style: textTheme.bodySmall?.copyWith(color: tokens.mutedInk),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            'Chiedi a ${pending.peerLabel} di premere "Verifica" e poi "Il codice coincide" prima di completare qui.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           FilledButton.icon(
             key: const Key('complete-join-button'),
             onPressed: c.busy ? null : c.completeJoinDelivery,
             icon: const Icon(Icons.verified_outlined),
-            label: const Text('Completa ricezione chiavi'),
+            label: Text(
+              s.isIt ? 'Completa ricezione chiavi' : 'Complete key delivery',
+            ),
           ),
           const SizedBox(height: 4),
           TextButton(
             onPressed: c.busy ? null : c.cancelPendingJoin,
-            child: const Text('Usa un altro codice'),
+            child: Text(s.isIt ? 'Usa un altro codice' : 'Use another code'),
           ),
         ],
       ],
     );
   }
 
-  Widget _buildRecoverSection(DeepSkyController c) {
+  Widget _buildRecoverSection(DeepSkyController c, DeepSkyStrings s) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -246,12 +512,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
           key: const Key('recovery-words-field'),
           controller: _recoveryController,
           maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: '24 parole o payload QR della Recovery Key',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: s.isIt
+                ? '24 parole o payload QR della Recovery Key'
+                : '24 recovery words or QR payload',
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
         FilledButton.icon(
           key: const Key('recover-space-button'),
           onPressed: c.busy
@@ -261,8 +528,319 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   recoveryInput: _recoveryController.text,
                   deviceLabel: _labelController.text,
                 ),
-          icon: const Icon(Icons.key),
-          label: const Text('Recupera il vostro spazio'),
+          icon: const Icon(Icons.key_rounded),
+          label: Text(
+            s.isIt ? 'Recupera il vostro spazio' : 'Recover your space',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WelcomeTopBar extends StatelessWidget {
+  const _WelcomeTopBar({
+    required this.title,
+    required this.helpTooltip,
+    required this.preferencesTooltip,
+    required this.onHelpPressed,
+    required this.onPreferencesPressed,
+  });
+
+  final String title;
+  final String helpTooltip;
+  final String preferencesTooltip;
+  final VoidCallback onHelpPressed;
+  final VoidCallback onPreferencesPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(context);
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return SizedBox(
+      height: 52,
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: tokens.warmGlow.withValues(alpha: 0.14),
+            ),
+            child: Icon(
+              Icons.nightlight_round,
+              size: 19,
+              color: tokens.warmGlow,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ),
+          IconButton(
+            key: const Key('welcome-help-button'),
+            tooltip: helpTooltip,
+            constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+            onPressed: onHelpPressed,
+            icon: Icon(Icons.help_outline_rounded, color: tokens.mutedInk),
+          ),
+          const SizedBox(width: 4),
+          Tooltip(
+            message: preferencesTooltip,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                key: const Key('welcome-preferences-button'),
+                borderRadius: BorderRadius.circular(22),
+                onTap: onPreferencesPressed,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minWidth: 44,
+                    minHeight: 44,
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: tokens.surfaceHigh,
+                        border: Border.all(
+                          color: tokens.calmAccent.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.tune_rounded,
+                        size: 18,
+                        color: tokens.accentText,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WelcomeHeroSection extends StatelessWidget {
+  const _WelcomeHeroSection({required this.title, required this.subtitle});
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(context);
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      children: <Widget>[
+        Container(
+          width: 78,
+          height: 78,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: RadialGradient(
+              colors: <Color>[
+                tokens.warmGlow.withValues(alpha: 0.24),
+                tokens.surfaceLow.withValues(alpha: 0.85),
+              ],
+            ),
+            border: Border.all(color: tokens.amberGlow.withValues(alpha: 0.35)),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: tokens.warmGlow.withValues(alpha: 0.16),
+                blurRadius: 24,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: <Widget>[
+              Icon(Icons.cottage_rounded, size: 38, color: tokens.amberGlow),
+              Positioned(
+                bottom: 18,
+                child: Icon(
+                  Icons.favorite_rounded,
+                  size: 13,
+                  color: tokens.calmAccent,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(title, textAlign: TextAlign.center, style: textTheme.displayLarge),
+        const SizedBox(height: 6),
+        Text(
+          subtitle,
+          textAlign: TextAlign.center,
+          style: textTheme.bodyMedium?.copyWith(color: tokens.mutedInk),
+        ),
+      ],
+    );
+  }
+}
+
+class _WelcomeModePill extends StatelessWidget {
+  const _WelcomeModePill({
+    required this.selectedIndex,
+    required this.inviteLabel,
+    required this.joinLabel,
+    required this.recoverLabel,
+    required this.onSelected,
+  });
+
+  final int selectedIndex;
+  final String inviteLabel;
+  final String joinLabel;
+  final String recoverLabel;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(context);
+    return Container(
+      padding: const EdgeInsets.all(5),
+      decoration: BoxDecoration(
+        color: tokens.surfaceLow,
+        borderRadius: BorderRadius.circular(DeepSkyTheme.radiusFull),
+        border: Border.all(color: tokens.cardBorder.withValues(alpha: 0.45)),
+      ),
+      child: Row(
+        children: <Widget>[
+          _ModePillTab(
+            key: const Key('welcome-tab-invite'),
+            label: inviteLabel,
+            selected: selectedIndex == 0,
+            onTap: () => onSelected(0),
+          ),
+          _ModePillTab(
+            key: const Key('welcome-tab-join'),
+            label: joinLabel,
+            selected: selectedIndex == 1,
+            onTap: () => onSelected(1),
+          ),
+          _ModePillTab(
+            key: const Key('welcome-tab-recover'),
+            label: recoverLabel,
+            selected: selectedIndex == 2,
+            onTap: () => onSelected(2),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModePillTab extends StatelessWidget {
+  const _ModePillTab({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(context);
+    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
+        child: Material(
+          color: selected ? tokens.surfaceHighest : Colors.transparent,
+          borderRadius: BorderRadius.circular(DeepSkyTheme.radiusFull),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(DeepSkyTheme.radiusFull),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelLarge?.copyWith(
+                      color: selected ? scheme.onSurface : tokens.mutedInk,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HelpPointRow extends StatelessWidget {
+  const _HelpPointRow({
+    required this.icon,
+    required this.accent,
+    required this.title,
+    required this.body,
+  });
+
+  final IconData icon;
+  final Color accent;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(context);
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, size: 20, color: accent),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(title, style: textTheme.titleMedium),
+              const SizedBox(height: 2),
+              Text(
+                body,
+                style: textTheme.bodySmall?.copyWith(color: tokens.mutedInk),
+              ),
+            ],
+          ),
         ),
       ],
     );

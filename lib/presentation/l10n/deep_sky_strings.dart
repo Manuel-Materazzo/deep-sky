@@ -1,4 +1,4 @@
-/// Minimal bilingual (`it` / `en`) copy catalog for M2 skeleton flows (`P-02`, `V-08`).
+/// Bilingual (`it` / `en`) copy catalog (`P-02`, `V-08`, `V-10`..`V-12`, `N-07`).
 class DeepSkyStrings {
   const DeepSkyStrings(this.languageCode);
 
@@ -11,6 +11,127 @@ class DeepSkyStrings {
   String get devicesTab => isIt ? 'Dispositivi' : 'Devices';
   String get settingsTab => isIt ? 'Impostazioni' : 'Settings';
 
+  // Welcome & Invite (`S1-D02`, `S1-D03`, `S1-D05`)
+  String get welcomeTitle => isIt ? 'La vostra casa' : 'Your home';
+  String get welcomeSubtitle => isIt
+      ? 'Uno spazio intimo e privato, solo per voi due'
+      : 'An intimate, private space, just for the two of you';
+  String get inviteTab => isIt ? 'Invita' : 'Invite';
+  String get joinSpaceTab => isIt ? 'Unisciti' : 'Join';
+  String get recoverSpaceTab => isIt ? 'Recupera' : 'Recover';
+  String get createSpaceTab => inviteTab;
+
+  String get preparingHomeMessage =>
+      isIt ? 'Preparazione della vostra casa...' : 'Preparing your home...';
+  String get inviteErrorTitle => isIt
+      ? 'Non riusciamo a preparare l\'invito'
+      : 'We couldn\'t prepare the invite';
+  String get inviteErrorBody => isIt
+      ? 'Controlla la connessione o verifica l\'indirizzo del server qui sotto.'
+      : 'Check your connection or verify the server address below.';
+  String get retryButton => isIt ? 'Riprova' : 'Try again';
+
+  String get qrSemanticsLabel =>
+      isIt ? 'Codice QR d\'invito per il partner' : 'Partner invite QR code';
+  String get qrCaption => isIt
+      ? 'Inquadra con la fotocamera o invia il link'
+      : 'Scan with your camera or send the link';
+  String get serverAndKeyIncludedBadge => isIt
+      ? 'Server e chiave inclusi automaticamente'
+      : 'Server and key included automatically';
+  String get shareInviteLinkButton =>
+      isIt ? 'Condividi link d\'invito' : 'Share invite link';
+  String get shareInviteMessage => isIt
+      ? 'Ho preparato la nostra casa su Deep Sky. Apri questo link per raggiungermi:'
+      : 'I prepared our home on Deep Sky. Open this link to join me:';
+  String get shareFallbackCopiedNotice => isIt
+      ? 'Link d\'invito copiato negli appunti.'
+      : 'Invite link copied to clipboard.';
+  String get copyButton => isIt ? 'Copia' : 'Copy';
+  String get copiedButton => isIt ? 'Copiato!' : 'Copied!';
+
+  String get waitingForPartner =>
+      isIt ? 'In attesa del partner' : 'Waiting for your partner';
+  String expiresInMinutes(int minutes) {
+    if (minutes <= 1) {
+      return isIt ? 'Scade tra meno di 1 min' : 'Expires in under 1 min';
+    }
+    return isIt ? 'Scade tra $minutes min' : 'Expires in $minutes min';
+  }
+
+  String get inviteExpiredMessage => isIt
+      ? 'Questo invito è scaduto per sicurezza.'
+      : 'This invite expired for your safety.';
+  String get checkPartnerJoinedButton =>
+      isIt ? 'Verifica se si è unito' : 'Check if partner joined';
+  String get regenerateInviteButton => isIt ? 'Rigenera' : 'Regenerate';
+  String get generateNewInviteButton =>
+      isIt ? 'Genera nuovo invito' : 'Generate new invite';
+
+  // Server Drawer (`S1-D02-D03-D05`)
+  String get serverLabel => 'Server';
+  String serverOfficialSummary(String host) =>
+      isIt ? 'Ufficiale ($host)' : 'Official ($host)';
+  String serverCustomSummary(String host) =>
+      isIt ? 'Personalizzato ($host)' : 'Custom ($host)';
+  String get customizeServerAction => isIt ? 'Personalizza' : 'Customize';
+  String get closeDrawerAction => isIt ? 'Chiudi' : 'Close';
+  String get serverDrawerDescription => isIt
+      ? 'La vostra casa risiede al sicuro sul cloud ufficiale. Se desiderate ospitarla sul vostro server personale o IP privato, inseritelo qui sotto.'
+      : 'Your home lives safely on the official cloud. If you prefer to host it on your personal server or private IP, enter it below.';
+  String get customServerFieldLabel => isIt
+      ? 'Indirizzo IP o Dominio dedicato'
+      : 'Dedicated domain or IP address';
+  String get customServerFieldHint => isIt
+      ? 'Es. 192.168.1.100:8080 o casa.mioserver.it'
+      : 'e.g. 192.168.1.100:8080 or home.myserver.org';
+  String get saveButton => isIt ? 'Salva' : 'Save';
+  String get resetOfficialServerButton =>
+      isIt ? 'Usa server ufficiale' : 'Use official server';
+  String get invalidServerAddress => isIt
+      ? 'Inserisci un indirizzo valido (es. casa.mioserver.it o 192.168.1.100:8080).'
+      : 'Enter a valid address (e.g. home.myserver.org or 192.168.1.100:8080).';
+  String get serverSyncNote => isIt
+      ? 'Il link d\'invito e il QR code si sincronizzeranno in automatico.'
+      : 'Your invite link and QR code will update automatically.';
+  String get welcomeFooterNote => isIt
+      ? 'Crittografia punto a punto • Solo per voi due'
+      : 'End-to-end encrypted • Just for the two of you';
+
+  // Welcome Header Sheets
+  String get helpButtonTooltip =>
+      isIt ? 'Aiuto e informazioni' : 'Help & information';
+  String get helpSheetTitle =>
+      isIt ? 'Come funziona Deep Sky' : 'How Deep Sky works';
+  String get helpPointSpaceTitle =>
+      isIt ? 'Uno spazio per due' : 'A space for two';
+  String get helpPointSpaceBody => isIt
+      ? 'Nessuna pubblicità, nessuna classifica e nessuna pressione: solo piccoli segni della vostra presenza.'
+      : 'No ads, no streaks, no pressure: just small signs of your presence.';
+  String get helpPointPairingTitle =>
+      isIt ? 'Abbinamento semplice' : 'Simple pairing';
+  String get helpPointPairingBody => isIt
+      ? 'Condividi il link o mostra il QR al tuo partner, poi confrontate insieme il codice di verifica.'
+      : 'Share the link or show the QR to your partner, then compare the verification code together.';
+  String get helpPointPrivacyTitle =>
+      isIt ? 'Cifratura end-to-end' : 'End-to-end encryption';
+  String get helpPointPrivacyBody => isIt
+      ? 'Le chiavi restano sui vostri telefoni: nemmeno chi gestisce il server può leggere i vostri ricordi.'
+      : 'Keys stay on your phones: not even the server operator can read your memories.';
+
+  String get preferencesTooltip =>
+      isIt ? 'Preferenze e nome telefono' : 'Preferences & phone name';
+  String get preferencesSheetTitle =>
+      isIt ? 'Questo telefono e preferenze' : 'This phone & preferences';
+  String get deviceNameFieldLabel =>
+      isIt ? 'Nome di questo telefono' : 'Name of this phone';
+  String get defaultDeviceLabel =>
+      isIt ? 'Telefono principale' : 'Primary phone';
+  String get nightThemeToggleLabel => isIt ? 'Tema notturno' : 'Night theme';
+  String get languageSelectorLabel =>
+      isIt ? 'Lingua / Language' : 'Language / Lingua';
+
+  // Home & Legacy M2 flows
   String get ourHomeTitle => isIt ? 'La nostra casa' : 'Our home';
   String get calmSubtitle => isIt
       ? 'Uno spazio privato per due persone.\nPiccoli gesti, senza fretta.'
@@ -38,10 +159,6 @@ class DeepSkyStrings {
       : 'I have saved the 24 words or QR code somewhere safe';
   String get confirmRecoveryButton =>
       isIt ? 'Conferma salvataggio' : 'Confirm saved';
-
-  String get createSpaceTab => isIt ? 'Crea casa' : 'Create home';
-  String get joinSpaceTab => isIt ? 'Unisciti' : 'Join';
-  String get recoverSpaceTab => isIt ? 'Recupera' : 'Recover';
 
   String get upgradeRequiredTitle =>
       isIt ? 'Aggiornamento richiesto' : 'Update required';

@@ -25,6 +25,16 @@ void main() {
       addTearDown(tester.view.reset);
 
       Future<void> tapVisible(Finder finder) async {
+        if (finder.evaluate().isEmpty) {
+          final Finder scrollable = find.byType(Scrollable).last;
+          if (scrollable.evaluate().isNotEmpty) {
+            await tester.scrollUntilVisible(
+              finder,
+              200,
+              scrollable: scrollable,
+            );
+          }
+        }
         await tester.ensureVisible(finder);
         await tester.pumpAndSettle();
         await tester.tap(finder);
@@ -57,9 +67,9 @@ void main() {
       await tester.pumpWidget(DeepSkyApp(controller: ctrlA));
       await tester.pumpAndSettle();
 
-      // 1) Onboarding -> Partner A creates initial invite.
+      // 1) Onboarding -> Partner A auto-creates initial invite (S1-D03/S1-D05).
       expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
-      await tapVisible(find.byKey(const Key('create-invite-button')));
+      expect(find.byKey(const Key('invite-qr-view')), findsOneWidget);
       expect(find.byKey(const Key('active-invite-token')), findsOneWidget);
       final String inviteToken = server.lastInviteToken!;
 
@@ -248,6 +258,16 @@ void main() {
       });
 
       Future<void> tapVisible(Finder finder) async {
+        if (finder.evaluate().isEmpty) {
+          final Finder scrollable = find.byType(Scrollable).last;
+          if (scrollable.evaluate().isNotEmpty) {
+            await tester.scrollUntilVisible(
+              finder,
+              200,
+              scrollable: scrollable,
+            );
+          }
+        }
         await tester.ensureVisible(finder);
         await tester.pumpAndSettle();
         await tester.tap(finder);
@@ -332,10 +352,10 @@ void main() {
 
       expect(ctrlB.errorNotice, isNull);
       expect(ctrlB.busy, isFalse);
-      expect(ctrlB.phase, AppBootPhase.unpaired);
+      expect(ctrlB.phase, AppBootPhase.waiting);
       expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
-      expect(ctrlB.phase, AppBootPhase.unpaired);
-      expect(await storeB.read('deep_sky.device_identity.v1'), isNull);
+      expect(ctrlB.identity?.pairingCompleted, isFalse);
+      expect(ctrlB.identity?.coupleId, isNot('couple-1'));
       expect(server.coupleUnpaired, isFalse);
 
       // Phone A and Phone C remain active and can keep exchanging thoughts!
@@ -363,8 +383,9 @@ void main() {
       await tapVisible(find.byKey(const Key('reset-revoked-device-button')));
       await settleController(ctrlC);
       expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
-      expect(ctrlC.phase, AppBootPhase.unpaired);
-      expect(await storeC.read('deep_sky.device_identity.v1'), isNull);
+      expect(ctrlC.phase, AppBootPhase.waiting);
+      expect(ctrlC.identity?.pairingCompleted, isFalse);
+      expect(ctrlC.identity?.coupleId, isNot('couple-1'));
 
       // 3) Re-recover Phone D, then Phone A invokes S-03 "Interrompi abbinamento per entrambi"
       final InMemorySecureKeyStore storeD = InMemorySecureKeyStore();
@@ -400,35 +421,66 @@ void main() {
       await tapVisible(find.byKey(const Key('unlink-device-button')));
       await settleController(ctrlD);
       expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
-      expect(await storeD.read('deep_sky.device_identity.v1'), isNull);
+      expect(ctrlD.phase, AppBootPhase.waiting);
+      expect(ctrlD.identity?.pairingCompleted, isFalse);
+      expect(ctrlD.identity?.coupleId, isNot('couple-1'));
     },
   );
 }
 
-class _FakeM2Server {
-  bool simulateOffline = false;
-  bool coupleUnpaired = false;
-  int minClientVersionCode = 1;
-  int minProtocolVersion = 1;
+class _FakeCouple {
+  _FakeCouple({required this.coupleId, required this.recoveryAuthKeyB64});
 
-  String? lastInviteToken;
-  int _inviteSeq = 0;
-  int _deviceSeq = 0;
-  String? coupleId;
-  String? recoveryAuthKeyB64;
-  String? inviterDeviceId;
-  String? inviterLabel;
-  String? inviterAuthB64;
-  String? inviterKemB64;
+  final String coupleId;
+  final String recoveryAuthKeyB64;
+  bool unpaired = false;
+  final Map<String, Map<String, Object?>> devices =
+      <String, Map<String, Object?>>{};
+  final Map<String, ({String authB64, String kemB64})> deviceKeys =
+      <String, ({String authB64, String kemB64})>{};
+  final Map<String, Map<String, Object?>> keyDeliveries =
+      <String, Map<String, Object?>>{};
+  final List<Map<String, Object?>> envelopes = <Map<String, Object?>>[];
+}
+
+class _FakeInviteRecord {
+  _FakeInviteRecord({
+    required this.token,
+    required this.coupleId,
+    required this.inviterDeviceId,
+    required this.inviterLabel,
+    required this.inviterAuthB64,
+    required this.inviterKemB64,
+  });
+
+  final String token;
+  final String coupleId;
+  final String inviterDeviceId;
+  final String inviterLabel;
+  final String inviterAuthB64;
+  final String inviterKemB64;
   String? acceptedDeviceId;
   String? acceptedLabel;
   String? acceptedAuthB64;
   String? acceptedKemB64;
-  final Map<String, Map<String, Object?>> devices =
-      <String, Map<String, Object?>>{};
-  final Map<String, Map<String, Object?>> keyDeliveries =
-      <String, Map<String, Object?>>{};
-  final List<Map<String, Object?>> envelopes = <Map<String, Object?>>[];
+}
+
+class _FakeM2Server {
+  bool simulateOffline = false;
+  int minClientVersionCode = 1;
+  int minProtocolVersion = 1;
+
+  bool get coupleUnpaired => _couples['couple-1']?.unpaired ?? false;
+
+  String? lastInviteToken;
+  int _coupleSeq = 0;
+  int _inviteSeq = 0;
+  int _deviceSeq = 0;
+  int _challengeSeq = 0;
+  final Map<String, _FakeCouple> _couples = <String, _FakeCouple>{};
+  final Map<String, String> _deviceToCouple = <String, String>{};
+  final Map<String, _FakeInviteRecord> _invites = <String, _FakeInviteRecord>{};
+  final Map<String, String> _challengeToCouple = <String, String>{};
   String? lastChallengeId;
   String? lastChallengeNonce;
   int pushWakeupsDispatched = 0;
@@ -467,25 +519,41 @@ class _FakeM2Server {
     }
 
     if (req.method == 'POST' && path == '/api/v1/pairing/invites') {
-      coupleUnpaired = false;
-      coupleId = 'couple-1';
-      inviterDeviceId = 'dev-a';
-      inviterLabel = body['deviceLabel'] as String;
-      inviterAuthB64 = body['deviceAuthPublicKeyB64'] as String;
-      inviterKemB64 = body['deviceKemPublicKeyB64'] as String;
-      recoveryAuthKeyB64 = body['recoveryAuthPublicKeyB64'] as String;
-      lastInviteToken = 'inv-tok-123';
-      devices[inviterDeviceId!] = <String, Object?>{
+      final String createdCoupleId = 'couple-${++_coupleSeq}';
+      final String inviterDeviceId = 'dev-a-$_coupleSeq';
+      final String inviterLabel = body['deviceLabel'] as String;
+      final _FakeCouple couple = _FakeCouple(
+        coupleId: createdCoupleId,
+        recoveryAuthKeyB64: body['recoveryAuthPublicKeyB64'] as String,
+      );
+      couple.devices[inviterDeviceId] = <String, Object?>{
         'deviceId': inviterDeviceId,
         'label': inviterLabel,
         'enrolledVia': 'PAIRING_INVITER',
         'createdAt': DateTime.now().toUtc().toIso8601String(),
         'revokedAt': null,
       };
+      couple.deviceKeys[inviterDeviceId] = (
+        authB64: body['deviceAuthPublicKeyB64'] as String,
+        kemB64: body['deviceKemPublicKeyB64'] as String,
+      );
+      _couples[createdCoupleId] = couple;
+      _deviceToCouple[inviterDeviceId] = createdCoupleId;
+
+      final String token = 'inv-tok-${++_inviteSeq}';
+      lastInviteToken = token;
+      _invites[token] = _FakeInviteRecord(
+        token: token,
+        coupleId: createdCoupleId,
+        inviterDeviceId: inviterDeviceId,
+        inviterLabel: inviterLabel,
+        inviterAuthB64: body['deviceAuthPublicKeyB64'] as String,
+        inviterKemB64: body['deviceKemPublicKeyB64'] as String,
+      );
       return _json(<String, Object?>{
-        'coupleId': coupleId,
+        'coupleId': createdCoupleId,
         'deviceId': inviterDeviceId,
-        'inviteToken': lastInviteToken,
+        'inviteToken': token,
         'expiresAt': DateTime.now()
             .toUtc()
             .add(const Duration(minutes: 15))
@@ -493,43 +561,71 @@ class _FakeM2Server {
       }, status: 201);
     }
 
-    if (req.method == 'POST' &&
-        path == '/api/v1/pairing/invites/$lastInviteToken/accept') {
-      acceptedDeviceId = 'dev-join-${++_deviceSeq}';
-      acceptedLabel = body['deviceLabel'] as String;
-      acceptedAuthB64 = body['deviceAuthPublicKeyB64'] as String;
-      acceptedKemB64 = body['deviceKemPublicKeyB64'] as String;
-      devices[acceptedDeviceId!] = <String, Object?>{
-        'deviceId': acceptedDeviceId,
+    final RegExpMatch? acceptMatch = RegExp(
+      r'^/api/v1/pairing/invites/([^/]+)/accept$',
+    ).firstMatch(path);
+    if (req.method == 'POST' && acceptMatch != null) {
+      final String token = acceptMatch.group(1)!;
+      final _FakeInviteRecord? invite = _invites[token];
+      final _FakeCouple? couple = invite == null
+          ? null
+          : _couples[invite.coupleId];
+      if (invite == null || couple == null || couple.unpaired) {
+        return _json(<String, Object?>{
+          'message': 'Invite not found',
+        }, status: 404);
+      }
+      final String acceptedId = 'dev-join-${++_deviceSeq}';
+      final String acceptedLabel = body['deviceLabel'] as String;
+      invite.acceptedDeviceId = acceptedId;
+      invite.acceptedLabel = acceptedLabel;
+      invite.acceptedAuthB64 = body['deviceAuthPublicKeyB64'] as String;
+      invite.acceptedKemB64 = body['deviceKemPublicKeyB64'] as String;
+      final bool isInitialPairing = couple.devices.length <= 1;
+      couple.devices[acceptedId] = <String, Object?>{
+        'deviceId': acceptedId,
         'label': acceptedLabel,
-        'enrolledVia': _deviceSeq == 1 ? 'PAIRING_JOINER' : 'ENROLLMENT',
+        'enrolledVia': isInitialPairing ? 'PAIRING_JOINER' : 'ENROLLMENT',
         'createdAt': DateTime.now().toUtc().toIso8601String(),
         'revokedAt': null,
       };
+      couple.deviceKeys[acceptedId] = (
+        authB64: invite.acceptedAuthB64!,
+        kemB64: invite.acceptedKemB64!,
+      );
+      _deviceToCouple[acceptedId] = couple.coupleId;
       return _json(<String, Object?>{
-        'coupleId': coupleId,
-        'deviceId': acceptedDeviceId,
-        'peerDeviceId': inviterDeviceId,
-        'peerLabel': inviterLabel,
-        'peerAuthPublicKeyB64': inviterAuthB64,
-        'peerKemPublicKeyB64': inviterKemB64,
+        'coupleId': couple.coupleId,
+        'deviceId': acceptedId,
+        'peerDeviceId': invite.inviterDeviceId,
+        'peerLabel': invite.inviterLabel,
+        'peerAuthPublicKeyB64': invite.inviterAuthB64,
+        'peerKemPublicKeyB64': invite.inviterKemB64,
       });
     }
 
     if (req.method == 'POST' && path == '/api/v1/recovery/challenges') {
-      if (coupleUnpaired) {
+      final String? reqKey = body['recoveryAuthPublicKeyB64'] as String?;
+      final _FakeCouple? couple = _couples.values
+          .cast<_FakeCouple?>()
+          .firstWhere(
+            (_FakeCouple? c) => c != null && c.recoveryAuthKeyB64 == reqKey,
+            orElse: () => null,
+          );
+      if (couple == null || couple.unpaired) {
         return _json(<String, Object?>{
           'code': 'CONFLICT',
           'message': 'Couple has been unpaired',
         }, status: 409);
       }
-      lastChallengeId = 'chal-1';
+      lastChallengeId = 'chal-${++_challengeSeq}';
+      _challengeToCouple[lastChallengeId!] = couple.coupleId;
       lastChallengeNonce = base64UrlEncode(
         List<int>.generate(32, (int i) => i + 1),
       );
       return _json(<String, Object?>{
         'challengeId': lastChallengeId,
-        'coupleId': coupleId,
+        'coupleId': couple.coupleId,
         'nonceB64': lastChallengeNonce,
         'expiresAt': DateTime.now()
             .toUtc()
@@ -539,31 +635,46 @@ class _FakeM2Server {
     }
 
     if (req.method == 'POST' && path == '/api/v1/recovery/complete') {
-      if (coupleUnpaired) {
+      final String? chalId = body['challengeId'] as String?;
+      final String? cId = chalId == null ? null : _challengeToCouple[chalId];
+      final _FakeCouple? couple = cId == null ? null : _couples[cId];
+      if (couple == null || couple.unpaired) {
         return _json(<String, Object?>{
           'code': 'CONFLICT',
           'message': 'Couple has been unpaired',
         }, status: 409);
       }
       final String devId = 'dev-recovered-${++_deviceSeq}';
-      devices[devId] = <String, Object?>{
+      couple.devices[devId] = <String, Object?>{
         'deviceId': devId,
         'label': body['deviceLabel'],
         'enrolledVia': 'RECOVERY_KEY',
         'createdAt': DateTime.now().toUtc().toIso8601String(),
         'revokedAt': null,
       };
+      couple.deviceKeys[devId] = (
+        authB64: body['newDeviceAuthPublicKeyB64'] as String,
+        kemB64: body['newDeviceKemPublicKeyB64'] as String,
+      );
+      _deviceToCouple[devId] = couple.coupleId;
       return _json(<String, Object?>{
-        'coupleId': coupleId,
+        'coupleId': couple.coupleId,
         'deviceId': devId,
       }, status: 201);
     }
 
     // Authenticated endpoints: enforce DeviceAuthFilter semantics
     final String? callerId = req.headers['X-Device-Id'];
+    final String? callerCoupleId = callerId == null
+        ? null
+        : _deviceToCouple[callerId];
+    final _FakeCouple? callerCouple = callerCoupleId == null
+        ? null
+        : _couples[callerCoupleId];
     if (callerId != null) {
-      final Map<String, Object?>? callerDev = devices[callerId];
-      if (coupleUnpaired ||
+      final Map<String, Object?>? callerDev = callerCouple?.devices[callerId];
+      if (callerCouple == null ||
+          callerCouple.unpaired ||
           callerDev == null ||
           callerDev['revokedAt'] != null) {
         return _json(<String, Object?>{
@@ -574,19 +685,25 @@ class _FakeM2Server {
     }
 
     if (req.method == 'POST' && path == '/api/v1/pairing/enrollment-invites') {
-      final String caller = req.headers['X-Device-Id']!;
-      final Map<String, Object?> creator = devices[caller]!;
-      inviterDeviceId = caller;
-      inviterLabel = creator['label'] as String;
-      acceptedDeviceId = null;
-      acceptedLabel = null;
-      acceptedAuthB64 = null;
-      acceptedKemB64 = null;
-      lastInviteToken = 'enroll-tok-${++_inviteSeq}';
+      final String caller = callerId!;
+      final _FakeCouple couple = callerCouple!;
+      final Map<String, Object?> creator = couple.devices[caller]!;
+      final ({String authB64, String kemB64}) callerKeys =
+          couple.deviceKeys[caller]!;
+      final String token = 'enroll-tok-${++_inviteSeq}';
+      lastInviteToken = token;
+      _invites[token] = _FakeInviteRecord(
+        token: token,
+        coupleId: couple.coupleId,
+        inviterDeviceId: caller,
+        inviterLabel: creator['label'] as String,
+        inviterAuthB64: callerKeys.authB64,
+        inviterKemB64: callerKeys.kemB64,
+      );
       return _json(<String, Object?>{
-        'coupleId': coupleId,
+        'coupleId': couple.coupleId,
         'deviceId': caller,
-        'inviteToken': lastInviteToken,
+        'inviteToken': token,
         'expiresAt': DateTime.now()
             .toUtc()
             .add(const Duration(minutes: 15))
@@ -594,22 +711,31 @@ class _FakeM2Server {
       }, status: 201);
     }
 
-    if (req.method == 'GET' &&
-        path == '/api/v1/pairing/invites/$lastInviteToken/status') {
+    final RegExpMatch? statusMatch = RegExp(
+      r'^/api/v1/pairing/invites/([^/]+)/status$',
+    ).firstMatch(path);
+    if (req.method == 'GET' && statusMatch != null) {
+      final _FakeInviteRecord? invite = _invites[statusMatch.group(1)!];
+      if (invite == null) {
+        return _json(<String, Object?>{
+          'message': 'Invite not found',
+        }, status: 404);
+      }
       return _json(<String, Object?>{
-        'accepted': acceptedDeviceId != null,
-        'acceptedDeviceId': acceptedDeviceId,
-        'acceptedLabel': acceptedLabel,
-        'acceptedAuthPublicKeyB64': acceptedAuthB64,
-        'acceptedKemPublicKeyB64': acceptedKemB64,
+        'accepted': invite.acceptedDeviceId != null,
+        'acceptedDeviceId': invite.acceptedDeviceId,
+        'acceptedLabel': invite.acceptedLabel,
+        'acceptedAuthPublicKeyB64': invite.acceptedAuthB64,
+        'acceptedKemPublicKeyB64': invite.acceptedKemB64,
       });
     }
 
     if (req.method == 'POST' && path == '/api/v1/pairing/key-deliveries') {
+      final _FakeCouple couple = callerCouple!;
       final String target = body['toDeviceId'] as String;
-      keyDeliveries[target] = <String, Object?>{
-        'coupleId': coupleId,
-        'fromDeviceId': inviterDeviceId,
+      couple.keyDeliveries[target] = <String, Object?>{
+        'coupleId': couple.coupleId,
+        'fromDeviceId': callerId,
         'toDeviceId': target,
         'nonceB64': body['nonceB64'],
         'ciphertextB64': body['ciphertextB64'],
@@ -618,8 +744,8 @@ class _FakeM2Server {
     }
 
     if (req.method == 'GET' && path == '/api/v1/pairing/key-deliveries/me') {
-      final String caller = req.headers['X-Device-Id']!;
-      final Map<String, Object?>? pending = keyDeliveries[caller];
+      final _FakeCouple couple = callerCouple!;
+      final Map<String, Object?>? pending = couple.keyDeliveries[callerId!];
       if (pending == null) {
         return _json(<String, Object?>{
           'message': 'No key delivery ready for this device',
@@ -633,34 +759,35 @@ class _FakeM2Server {
     }
 
     if (req.method == 'POST' && path == '/api/v1/sync/envelopes') {
+      final _FakeCouple couple = callerCouple!;
       final Map<String, Object?> record = <String, Object?>{
         'envelopeId': body['envelopeId'],
-        'coupleId': coupleId,
-        'senderDeviceId': req.headers['X-Device-Id'],
+        'coupleId': couple.coupleId,
+        'senderDeviceId': callerId,
         'channel': body['channel'],
         'keyEpoch': body['keyEpoch'],
-        'seq': envelopes.length + 1,
+        'seq': couple.envelopes.length + 1,
         'nonceB64': body['nonceB64'],
         'ciphertextB64': body['ciphertextB64'],
         'createdAtServer': DateTime.now().toUtc().toIso8601String(),
       };
-      envelopes.add(record);
+      couple.envelopes.add(record);
       return _json(record, status: 201);
     }
 
     if (req.method == 'GET' && path == '/api/v1/sync/envelopes') {
-      return _json(envelopes);
+      return _json(callerCouple!.envelopes);
     }
 
     if (req.method == 'GET' && path == '/api/v1/pairing/devices') {
-      return _json(devices.values.toList());
+      return _json(callerCouple!.devices.values.toList());
     }
 
     if (req.method == 'POST' &&
         path.startsWith('/api/v1/pairing/devices/') &&
         path.endsWith('/revoke')) {
       final String targetId = path.split('/')[5];
-      final Map<String, Object?>? target = devices[targetId];
+      final Map<String, Object?>? target = callerCouple!.devices[targetId];
       if (target == null) {
         return _json(<String, Object?>{
           'message': 'Device not found',
@@ -671,9 +798,10 @@ class _FakeM2Server {
     }
 
     if (req.method == 'POST' && path == '/api/v1/pairing/unpair') {
-      coupleUnpaired = true;
+      final _FakeCouple couple = callerCouple!;
+      couple.unpaired = true;
       final String now = DateTime.now().toUtc().toIso8601String();
-      for (final Map<String, Object?> dev in devices.values) {
+      for (final Map<String, Object?> dev in couple.devices.values) {
         dev['revokedAt'] ??= now;
       }
       return http.Response('', 204);
