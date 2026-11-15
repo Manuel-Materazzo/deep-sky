@@ -191,25 +191,22 @@ public class PairingService {
 		byte[] kemPub = Ed25519SignatureVerifier.decodeBase64Url(deviceKemPublicKeyB64, 32, "deviceKemPublicKeyB64");
 
 		PairingInviteEntity invite = inviteRepository.findByTokenHash(hashToken(rawToken))
-				.orElseThrow(() -> new NoSuchElementException("Invite not found"));
+				.orElseThrow(() -> new IllegalStateException("Invite is invalid, expired, or already used"));
 
 		Instant now = Instant.now();
-		if (invite.getExpiresAt().isBefore(now)) {
-			throw new IllegalStateException("Invite has expired");
-		}
-		if (invite.getAcceptedAt() != null) {
-			throw new IllegalStateException("Invite has already been accepted");
+		if (invite.getExpiresAt().isBefore(now) || invite.getAcceptedAt() != null) {
+			throw new IllegalStateException("Invite is invalid, expired, or already used");
 		}
 		CoupleEntity couple = coupleRepository.findById(invite.getCoupleId())
-				.orElseThrow(() -> new NoSuchElementException("Couple not found"));
+				.orElseThrow(() -> new IllegalStateException("Invite is invalid, expired, or already used"));
 		if (couple.getUnpairedAt() != null) {
-			throw new IllegalStateException("Couple is unpaired");
+			throw new IllegalStateException("Invite is invalid, expired, or already used");
 		}
 
 		DeviceEntity creatorDevice = deviceRepository.findById(invite.getCreatorDeviceId())
-				.orElseThrow(() -> new NoSuchElementException("Creator device not found"));
+				.orElseThrow(() -> new IllegalStateException("Invite is invalid, expired, or already used"));
 		if (creatorDevice.getRevokedAt() != null) {
-			throw new IllegalStateException("Creator device has been revoked");
+			throw new IllegalStateException("Invite is invalid, expired, or already used");
 		}
 
 		UUID newDeviceId = UUID.randomUUID();
@@ -226,6 +223,9 @@ public class PairingService {
 		invite.setAcceptedAt(now);
 		invite.setAcceptedDeviceId(newDeviceId);
 		inviteRepository.save(invite);
+
+		// Notify the approving/inviting device with a generic data-only wakeup (`S-02`, `S1-SRV-02`).
+		pushService.dispatchPartnerWakeup(invite.getCoupleId(), newDeviceId, "wakeup.pairing_request");
 
 		return new AcceptInviteResult(
 				invite.getCoupleId(),

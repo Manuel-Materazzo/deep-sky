@@ -197,13 +197,31 @@ class Sp01PushIntegrationTest {
 		mockMvc.perform(signed(get("/api/v1/push/register"), couple.devBId(), couple.devBKp(), ""))
 				.andExpect(status().isNotFound());
 
-		// Re-register B, then revoke B -> push token is removed cleanly
+		// Re-register B, then accept a new enrollment invite -> approver device A receives wakeup.pairing_request
 		mockMvc.perform(signed(
 						post("/api/v1/push/register").contentType(MediaType.APPLICATION_JSON).content(regB2),
 						couple.devBId(), couple.devBKp(), regB2))
 				.andExpect(status().isOk());
 		assertThat(registrationRepository.findByDeviceId(couple.devBId())).isPresent();
 
+		doNothing().when(pushProvider).sendWakeup("token-a-initial-123456", "wakeup.pairing_request");
+		MvcResult enrollRes = mockMvc.perform(signed(
+						post("/api/v1/pairing/enrollment-invites"),
+						couple.devAId(), couple.devAKp(), ""))
+				.andExpect(status().isCreated())
+				.andReturn();
+		String enrollToken = objectMapper.readTree(enrollRes.getResponse().getContentAsString())
+				.get("inviteToken").asText();
+		KeyPair devCKp = generateEd25519();
+		String acceptEnrollBody = objectMapper.writeValueAsString(new AcceptInviteBody(
+				"Tablet C", rawEd25519B64(devCKp), b64(randomBytes32())));
+		mockMvc.perform(post("/api/v1/pairing/invites/" + enrollToken + "/accept")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(acceptEnrollBody))
+				.andExpect(status().isOk());
+		verify(pushProvider).sendWakeup("token-a-initial-123456", "wakeup.pairing_request");
+
+		// Revoke B -> push token is removed cleanly
 		mockMvc.perform(signed(
 						post("/api/v1/pairing/devices/" + couple.devBId() + "/revoke"),
 						couple.devAId(), couple.devAKp(), ""))

@@ -28,7 +28,8 @@ public class PushService {
 			"wakeup.thinking_of_you",
 			"wakeup.new_moment",
 			"wakeup.capsule_ready",
-			"wakeup.daily_prompt");
+			"wakeup.daily_prompt",
+			"wakeup.pairing_request");
 
 	private final PushConfig config;
 	private final PushRegistrationRepository repository;

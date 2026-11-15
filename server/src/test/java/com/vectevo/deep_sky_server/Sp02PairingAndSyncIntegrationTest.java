@@ -391,6 +391,56 @@ class Sp02PairingAndSyncIntegrationTest {
 						.content(challengePayload))
 				.andExpect(status().isTooManyRequests())
 				.andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+
+		// 6. Invite redemption anti-enumeration, stricter redeem rate-limit, expired invite cleanup,
+		// and stale unapproved enrollment cleanup (S1-SRV-01, S1-SRV-02)
+		MvcResult extraEnroll = mockMvc.perform(signed(
+						post("/api/v1/pairing/enrollment-invites"), devAId, devAKp, ""))
+				.andExpect(status().isCreated())
+				.andReturn();
+		String extraEnrollToken = objectMapper.readTree(extraEnroll.getResponse().getContentAsString())
+				.get("inviteToken").asText();
+		KeyPair staleDevKp = generateEd25519();
+		String staleAcceptBody = objectMapper.writeValueAsString(new AcceptInviteBody(
+				"Unapproved Tablet", rawEd25519B64(staleDevKp), b64(randomBytes32())));
+		MvcResult staleAcceptRes = mockMvc.perform(post("/api/v1/pairing/invites/" + extraEnrollToken + "/accept")
+						.header("X-Forwarded-For", "198.51.100.44")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(staleAcceptBody))
+				.andExpect(status().isOk())
+				.andReturn();
+		String staleDevId = objectMapper.readTree(staleAcceptRes.getResponse().getContentAsString())
+				.get("deviceId").asText();
+
+		// Unknown and already-accepted tokens both yield uniform 409 Conflict (no state enumeration),
+		// and the 6th redeem attempt from the same IP is rate-limited (5/window).
+		for (int i = 0; i < 4; i++) {
+			String tok = (i % 2 == 0) ? "unknown-token-" + i : extraEnrollToken;
+			mockMvc.perform(post("/api/v1/pairing/invites/" + tok + "/accept")
+							.header("X-Forwarded-For", "198.51.100.44")
+							.contentType(MediaType.APPLICATION_JSON)
+							.content(staleAcceptBody))
+					.andExpect(status().isConflict());
+		}
+		mockMvc.perform(post("/api/v1/pairing/invites/extra-attempt/accept")
+						.header("X-Forwarded-For", "198.51.100.44")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(staleAcceptBody))
+				.andExpect(status().isTooManyRequests())
+				.andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+
+		// Stale unapproved device (no key delivery) is automatically revoked by cleanup,
+		// while approved Device A remains valid.
+		int revokedUnapproved = cleanupService.purgeStaleUnapprovedDevices(Instant.now().plusSeconds(60));
+		assertThat(revokedUnapproved).isGreaterThanOrEqualTo(1);
+		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), staleDevId, staleDevKp, ""))
+				.andExpect(status().isUnauthorized());
+		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), devAId, devAKp, ""))
+				.andExpect(status().isOk());
+
+		// Expired invites purge removes past-expiry invites cleanly.
+		int purgedInvites = cleanupService.purgeExpiredInvites(Instant.now().plusSeconds(3600));
+		assertThat(purgedInvites).isGreaterThanOrEqualTo(1);
 	}
 
 	private MockHttpServletRequestBuilder signed(

@@ -57,8 +57,10 @@ public class PublicEndpointRateLimitFilter extends OncePerRequestFilter {
 			return null;
 		}
 		String path = request.getRequestURI();
-		if ("/api/v1/pairing/invites".equals(path)
-				|| (path.startsWith("/api/v1/pairing/invites/") && path.endsWith("/accept"))) {
+		if (path.startsWith("/api/v1/pairing/invites/") && path.endsWith("/accept")) {
+			return PublicEndpointRateLimiter.RouteGroup.INVITE_REDEEM;
+		}
+		if ("/api/v1/pairing/invites".equals(path)) {
 			return PublicEndpointRateLimiter.RouteGroup.INVITES;
 		}
 		if ("/api/v1/recovery/challenges".equals(path) || "/api/v1/recovery/complete".equals(path)) {
