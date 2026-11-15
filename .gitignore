@@ -58,6 +58,7 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 /android/.gradle/
+/android/.kotlin/
 /android/captures/
 /android/local.properties
 
