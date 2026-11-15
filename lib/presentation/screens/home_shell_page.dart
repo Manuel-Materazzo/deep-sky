@@ -1,9 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:deep_sky/data/couple_api_client.dart';
 import 'package:deep_sky/data/encrypted_local_cache.dart';
 import 'package:deep_sky/domain/crypto/e2ee_models.dart';
-import 'package:deep_sky/domain/crypto/recovery_key_codec.dart';
 import 'package:deep_sky/domain/push_models.dart';
 import 'package:deep_sky/domain/update/apk_update_models.dart';
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
@@ -13,7 +10,6 @@ import 'package:deep_sky/presentation/widgets/invite_verification_section.dart';
 import 'package:deep_sky/scene/hybrid_scene_canvas.dart';
 import 'package:deep_sky/scene/scene_manifest.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:qr_flutter/qr_flutter.dart';
 
 /// Authenticated couple space shell with Hybrid Home (`F-02`, `F-03`),
 /// paired Devices & Recovery management (`F-20`, `S-03`), and Settings (`SP-01`, `F-19`).
@@ -41,7 +37,6 @@ class _HomeShellPageState extends State<HomeShellPage> {
   );
 
   int _navIndex = 0;
-  bool _recoveryCheckbox = false;
 
   @override
   void dispose() {
@@ -216,8 +211,8 @@ class _HomeShellPageState extends State<HomeShellPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          if (!id.recoverySavedConfirmed && id.recoverySeed != null)
-            _buildRecoveryGateCard(context, c, s, id.recoverySeed!),
+          if (c.shouldShowPushOptInPrompt)
+            _buildPushOptInCard(context, c, s, tokens),
           Card(
             key: const Key('ds2-status-card'),
             child: Padding(
@@ -371,59 +366,59 @@ class _HomeShellPageState extends State<HomeShellPage> {
     );
   }
 
-  Widget _buildRecoveryGateCard(
+  Widget _buildPushOptInCard(
     BuildContext context,
     DeepSkyController c,
     DeepSkyStrings s,
-    Uint8List seed,
+    DeepSkyTokens tokens,
   ) {
-    final String sentence = RecoveryKeyCodec.toSentence(seed);
-    final String qrPayload = RecoveryKeyCodec.toQrPayload(seed);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Card(
-        key: const Key('recovery-gate-card'),
+        key: const Key('push-optin-card'),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Icon(
+                    Icons.notifications_active_outlined,
+                    size: 20,
+                    color: tokens.calmAccent,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      s.pushPromptTitle,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
               Text(
-                s.saveRecoveryFirstHint,
-                style: Theme.of(context).textTheme.titleSmall,
+                s.pushPromptBody,
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: tokens.mutedInk),
               ),
-              const SizedBox(height: 8),
-              SelectableText(
-                sentence,
-                key: const Key('recovery-24-words'),
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-              ),
-              const SizedBox(height: 8),
-              Center(
-                child: Container(
-                  color: Colors.white,
-                  padding: const EdgeInsets.all(6),
-                  child: QrImageView(data: qrPayload, size: 110),
-                ),
-              ),
-              CheckboxListTile(
-                key: const Key('recovery-saved-checkbox'),
-                contentPadding: EdgeInsets.zero,
-                value: _recoveryCheckbox,
-                onChanged: (bool? v) =>
-                    setState(() => _recoveryCheckbox = v ?? false),
-                title: Text(s.confirmRecoveryCheckbox),
-              ),
-              FilledButton(
-                key: const Key('confirm-recovery-button'),
-                onPressed:
-                    (!c.busy &&
-                        !c.isOffline &&
-                        !c.isDeviceRevoked &&
-                        _recoveryCheckbox)
-                    ? c.confirmRecoveryKeySaved
-                    : null,
-                child: Text(s.confirmRecoveryButton),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  FilledButton.tonal(
+                    key: const Key('push-optin-enable-button'),
+                    onPressed: c.busy ? null : c.enableRuntimePush,
+                    child: Text(s.pushPromptEnableButton),
+                  ),
+                  TextButton(
+                    key: const Key('push-optin-later-button'),
+                    onPressed: c.busy ? null : c.dismissPushPrompt,
+                    child: Text(s.pushPromptLaterButton),
+                  ),
+                ],
               ),
             ],
           ),
@@ -512,7 +507,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  'Dispositivi collegati (${c.devices.length})',
+                  s.devicesSectionTitle(c.devices.length),
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 8),
@@ -522,18 +517,30 @@ class _HomeShellPageState extends State<HomeShellPage> {
                     title: Text(dev.label),
                     subtitle: Text(
                       dev.revokedAt != null
-                          ? 'Revocato'
+                          ? s.deviceStatusRevoked
                           : (dev.deviceId == id.deviceId
-                                ? 'Attivo · questo telefono'
-                                : 'Attivo'),
+                                ? s.deviceStatusThisPhone
+                                : s.deviceStatusActive),
                     ),
                     trailing:
                         (dev.deviceId != id.deviceId && dev.revokedAt == null)
                         ? TextButton(
+                            key: Key('revoke-device-${dev.deviceId}'),
                             onPressed: canMutateServer
-                                ? () => c.revokeDevice(dev.deviceId)
+                                ? () => _confirmActionDialog(
+                                    context: context,
+                                    title: s.revokeDialogTitle,
+                                    body: s.revokeDialogBody(dev.label),
+                                    cancelLabel: s.cancel,
+                                    confirmLabel: s.revokeDialogConfirm,
+                                    confirmKey: Key(
+                                      'confirm-revoke-${dev.deviceId}',
+                                    ),
+                                    onConfirm: () =>
+                                        c.revokeDevice(dev.deviceId),
+                                  )
                                 : null,
-                            child: const Text('Revoca'),
+                            child: Text(s.revokeDeviceAction),
                           )
                         : null,
                   ),
@@ -694,26 +701,26 @@ class _HomeShellPageState extends State<HomeShellPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  'Preferenze stanza e lingua',
+                  s.settingsPrefsTitle,
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Atmosfera notturna'),
+                  title: Text(s.settingsNightMode),
                   value: c.isNight,
                   onChanged: (_) => c.toggleNightMode(),
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Riduci movimento'),
+                  title: Text(s.settingsReduceMotion),
                   value: c.reduceMotion,
                   onChanged: (_) => c.toggleReduceMotion(),
                 ),
                 DropdownButtonFormField<String>(
                   initialValue: c.languageCode,
-                  decoration: const InputDecoration(
-                    labelText: 'Lingua / Language',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: s.settingsLanguageLabel,
+                    border: const OutlineInputBorder(),
                   ),
                   items: const <DropdownMenuItem<String>>[
                     DropdownMenuItem<String>(
@@ -743,14 +750,14 @@ class _HomeShellPageState extends State<HomeShellPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 Text(
-                  'Notifiche push discrete (FCM runtime)',
+                  s.settingsPushTitle,
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 6),
                 Text(
                   push != null && push.firebaseInitialized
-                      ? 'Attive (risvegli ricevuti: ${push.receivedCount})'
-                      : 'Non configurate su questo dispositivo.',
+                      ? s.settingsPushActiveCount(push.receivedCount)
+                      : s.settingsPushInactive,
                 ),
                 const SizedBox(height: 10),
                 FilledButton.tonalIcon(
@@ -759,7 +766,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
                       ? null
                       : c.enableRuntimePush,
                   icon: const Icon(Icons.notifications_active_outlined),
-                  label: const Text('Attiva notifiche su questo telefono'),
+                  label: Text(s.settingsPushEnableButton),
                 ),
               ],
             ),
@@ -773,27 +780,57 @@ class _HomeShellPageState extends State<HomeShellPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 Text(
-                  'Aggiornamenti app (APK firmato offline)',
+                  s.settingsUpdatesTitle,
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Versione: ${c.capabilities.versionName} (${c.capabilities.versionCode})',
+                  s.settingsVersionLine(
+                    c.capabilities.versionName,
+                    c.capabilities.versionCode,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<UpdateChannel>(
+                  key: const Key('update-channel-selector'),
+                  initialValue: c.updateChannel,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: s.updateChannelLabel,
+                    border: const OutlineInputBorder(),
+                  ),
+                  items: <DropdownMenuItem<UpdateChannel>>[
+                    for (final UpdateChannel ch in UpdateChannel.values)
+                      DropdownMenuItem<UpdateChannel>(
+                        value: ch,
+                        child: Text(
+                          ch.localizedLabel(c.languageCode),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: c.busy
+                      ? null
+                      : (UpdateChannel? ch) {
+                          if (ch != null) {
+                            c.setUpdateChannel(ch);
+                          }
+                        },
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _updateSourceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Repository GitHub o URL release',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: s.updateSourceFieldLabel,
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: _updateKeyController,
-                  decoration: const InputDecoration(
-                    labelText: 'Chiave pubblica Ed25519 (base64)',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: s.updatePublicKeyFieldLabel,
+                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -819,6 +856,17 @@ class _HomeShellPageState extends State<HomeShellPage> {
                     label: Text(
                       '${s.installUpdateButton} (${manifest.versionName})',
                     ),
+                  ),
+                ],
+                if (c.updateDownloadProgress != null) ...<Widget>[
+                  const SizedBox(height: 10),
+                  LinearProgressIndicator(value: c.updateDownloadProgress),
+                  const SizedBox(height: 4),
+                  Text(
+                    s.updateDownloadProgress(
+                      (c.updateDownloadProgress! * 100).round(),
+                    ),
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
                 if (c.updateFeedback != null) ...<Widget>[

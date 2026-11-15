@@ -270,6 +270,15 @@ void main() {
         tester,
         find.byKey(const Key('space-setup-submit-button')),
       );
+      expect(find.byKey(const Key('recovery-key-setup-page')), findsOneWidget);
+      await tapVisible(
+        tester,
+        find.byKey(const Key('recovery-saved-checkbox')),
+      );
+      await tapVisible(
+        tester,
+        find.byKey(const Key('confirm-recovery-button')),
+      );
       expect(find.byKey(const Key('home-shell-page')), findsOneWidget);
       expect(ctrlA.deviceLabel, 'Marco');
       expect(server.deviceLabels[ctrlA.identity!.deviceId], 'Marco');

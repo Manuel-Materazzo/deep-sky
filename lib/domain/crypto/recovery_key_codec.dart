@@ -86,6 +86,27 @@ class RecoveryKeyCodec {
     return Uint8List.fromList(seed);
   }
 
+  /// Splits raw user recovery phrase text into normalized lowercase tokens.
+  static List<String> tokenizeWords(String rawInput) {
+    final String cleaned = rawInput.trim().toLowerCase();
+    if (cleaned.isEmpty) {
+      return const <String>[];
+    }
+    return cleaned
+        .split(RegExp(r'\s+'))
+        .where((String w) => w.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  /// Checks whether [word] belongs to the official BIP-39 English wordlist.
+  static bool isValidWord(String word) {
+    final String normalized = word.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return false;
+    }
+    return Language.english.isValid(normalized);
+  }
+
   /// Auto-detects QR payload or 24-word mnemonic input and returns the 32-byte seed.
   static Uint8List parseUserInput(String input) {
     final String trimmed = input.trim();

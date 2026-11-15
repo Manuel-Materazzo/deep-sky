@@ -142,6 +142,67 @@ class ApkUpdateService {
     return Uri.parse('https://github.com/$trimmed/releases/download/$tag');
   }
 
+  /// Resolves the release artifact base URI honoring the selected [UpdateChannel] (`S1-UPD-01`).
+  ///
+  /// - Custom `http(s)://` mirrors are returned verbatim.
+  /// - [UpdateChannel.stable] uses `/releases/latest/download` (GitHub ignores pre-releases).
+  /// - [UpdateChannel.preview] queries the GitHub Releases API and picks the newest
+  ///   non-draft release (including pre-releases), falling back to `latest` if none match.
+  Future<Uri> resolveChannelBaseUri({
+    required String sourceInput,
+    required UpdateChannel channel,
+  }) async {
+    final String trimmed = sourceInput.trim().replaceAll(RegExp(r'/+$'), '');
+    if (trimmed.isEmpty) {
+      throw const FormatException('Empty update source.');
+    }
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return Uri.parse(trimmed);
+    }
+    if (channel == UpdateChannel.stable) {
+      return resolveSourceBaseUri(trimmed, tag: 'latest');
+    }
+
+    final Uri apiUri = Uri.parse(
+      'https://api.github.com/repos/$trimmed/releases?per_page=10',
+    );
+    final http.Response resp;
+    try {
+      resp = await _http.get(
+        apiUri,
+        headers: const <String, String>{
+          'Accept': 'application/vnd.github+json',
+        },
+      );
+    } catch (error) {
+      throw ApkUpdateException(ApkUpdateErrorCode.networkError, '$error');
+    }
+    if (resp.statusCode != 200) {
+      throw ApkUpdateException(
+        ApkUpdateErrorCode.networkError,
+        'GitHub releases API HTTP ${resp.statusCode}',
+      );
+    }
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(resp.body);
+    } catch (error) {
+      throw ApkUpdateException(ApkUpdateErrorCode.manifestInvalid, '$error');
+    }
+    if (decoded is List) {
+      for (final Object? item in decoded) {
+        if (item is Map<String, dynamic>) {
+          final bool isDraft = item['draft'] == true;
+          final String tag = (item['tag_name'] as String? ?? '').trim();
+          if (!isDraft && tag.isNotEmpty) {
+            return resolveSourceBaseUri(trimmed, tag: tag);
+          }
+        }
+      }
+    }
+    return resolveSourceBaseUri(trimmed, tag: 'latest');
+  }
+
   /// Parses either a raw 32-byte base64 Ed25519 public key or an X.509 SPKI DER base64 key.
   static SimplePublicKey parseEd25519PublicKey(String encodedBase64) {
     final String cleaned = encodedBase64.replaceAll(RegExp(r'\s+'), '');
@@ -247,6 +308,7 @@ class ApkUpdateService {
     required String stagingDir,
     required int availableBytes,
     int maxResumeAttempts = 3,
+    void Function(int receivedBytes, int totalBytes)? onProgress,
   }) async {
     if (availableBytes < manifest.apkSizeBytes + storageSafetyMarginBytes) {
       throw ApkUpdateException(
@@ -272,6 +334,7 @@ class ApkUpdateService {
     while (true) {
       final int existingLen = partFile.existsSync() ? partFile.lengthSync() : 0;
       if (existingLen >= manifest.apkSizeBytes) {
+        onProgress?.call(manifest.apkSizeBytes, manifest.apkSizeBytes);
         break;
       }
       attempts++;
@@ -292,10 +355,17 @@ class ApkUpdateService {
         final FileMode mode = streamed.statusCode == 206
             ? FileMode.append
             : FileMode.write;
+        int received = streamed.statusCode == 206 ? existingLen : 0;
+        onProgress?.call(received, manifest.apkSizeBytes);
         final IOSink sink = partFile.openWrite(mode: mode);
         try {
           await for (final List<int> chunk in streamed.stream) {
             sink.add(chunk);
+            received += chunk.length;
+            onProgress?.call(
+              received.clamp(0, manifest.apkSizeBytes),
+              manifest.apkSizeBytes,
+            );
           }
           await sink.flush();
         } finally {

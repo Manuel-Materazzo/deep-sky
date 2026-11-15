@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:deep_sky/data/apk_update_service.dart';
 import 'package:deep_sky/data/couple_api_client.dart';
@@ -32,7 +33,7 @@ class DeepSkyController extends ChangeNotifier {
     SecureKeyStore? keyStore,
     DeepSkyCrypto? crypto,
     http.Client? httpClient,
-    this._nativeBridge = const NativeBridge(),
+    NativeBridge? nativeBridge,
     this._manifestParser = const SceneManifestParser(),
     this._sceneStateMapper = const SceneStateMapper(),
     Future<String> Function(String path)? loadAssetString,
@@ -43,10 +44,13 @@ class DeepSkyController extends ChangeNotifier {
     this.defaultUpdateSource = 'Manuel-Materazzo/deep-sky',
     this.trustedUpdatePublicKeyB64 =
         'MCowBQYDK2VwAyEAHDblTk6u65qfWgGXDDULNtIsR9JrXd1u4Pc6y7+Z+WM=',
-  }) : _httpClient = httpClient ?? http.Client(),
+  }) : _hasCustomNativeBridge = nativeBridge != null,
+       _nativeBridge = nativeBridge ?? const NativeBridge(),
+       _httpClient = httpClient ?? http.Client(),
        _loadAssetString = loadAssetString ?? rootBundle.loadString,
        _loadCapabilitiesOverride = loadCapabilities {
     final SecureKeyStore resolvedKeyStore = keyStore ?? FlutterSecureKeyStore();
+    _keyStore = resolvedKeyStore;
     _crypto = crypto ?? DeepSkyCrypto();
     _repository = PairingAndSyncRepository(
       keyStore: resolvedKeyStore,
@@ -59,12 +63,19 @@ class DeepSkyController extends ChangeNotifier {
     );
   }
 
+  static const String _updateChannelStorageKey = 'deepsky.update.channel';
+  static const String _pushPromptDismissedStorageKey =
+      'deepsky.push.prompt_dismissed';
   static const String pilotManifestPath =
       'content/packs/ds2_pilot/manifest.json';
   static const String pilotAssetRoot = 'content/packs/ds2_pilot';
 
   final http.Client _httpClient;
+  final bool _hasCustomNativeBridge;
   final NativeBridge _nativeBridge;
+
+  bool get _canQueryNativeChannels =>
+      _hasCustomNativeBridge || (!kIsWeb && Platform.isAndroid);
   final SceneManifestParser _manifestParser;
   final SceneStateMapper _sceneStateMapper;
   final Future<String> Function(String path) _loadAssetString;
@@ -75,6 +86,7 @@ class DeepSkyController extends ChangeNotifier {
   final String defaultUpdateSource;
   final String trustedUpdatePublicKeyB64;
 
+  late final SecureKeyStore _keyStore;
   late final DeepSkyCrypto _crypto;
   late final PairingAndSyncRepository _repository;
   late final ApkUpdateService _updateService;
@@ -117,8 +129,13 @@ class DeepSkyController extends ChangeNotifier {
   );
   CompatibilityPolicy? compatibilityPolicy;
   NativePushStatus? pushStatus;
+  bool pushSupportedOnServer = false;
+  bool pushPromptDismissed = false;
+  UpdateChannel updateChannel = UpdateChannel.stable;
   ApkReleaseManifest? availableUpdate;
+  double? updateDownloadProgress;
   String? updateFeedback;
+  String? pendingDeepLinkInvite;
 
   CoupleApiClient _createApiClient(String baseUrl) {
     return CoupleApiClient(
@@ -139,6 +156,8 @@ class DeepSkyController extends ChangeNotifier {
 
     await _loadPilotScene();
     await _loadCapabilities();
+    await _loadClientPreferences();
+    _nativeBridge.setDeepLinkListener(handleIncomingDeepLink);
     identity = await _repository.loadIdentity();
     activeServerUrl = identity?.serverUrl ?? defaultServerUrl;
     if (identity != null && identity!.deviceLabel.trim().isNotEmpty) {
@@ -153,6 +172,13 @@ class DeepSkyController extends ChangeNotifier {
       await _checkCompatibility(activeServerUrl);
       if (phase != AppBootPhase.upgradeRequired) {
         phase = AppBootPhase.unpaired;
+        if (_canQueryNativeChannels) {
+          final String? launchDeepLink = await _nativeBridge
+              .consumePendingDeepLink();
+          if (launchDeepLink != null) {
+            handleIncomingDeepLink(launchDeepLink);
+          }
+        }
       }
       notifyListeners();
       return;
@@ -188,6 +214,44 @@ class DeepSkyController extends ChangeNotifier {
     } catch (_) {
       sceneManifest = null;
     }
+  }
+
+  Future<void> _loadClientPreferences() async {
+    try {
+      updateChannel = UpdateChannel.fromStorage(
+        await _keyStore.read(_updateChannelStorageKey),
+      );
+      pushPromptDismissed =
+          (await _keyStore.read(_pushPromptDismissedStorageKey)) == 'true';
+    } catch (_) {
+      // Fall back to safe defaults if preferences are unavailable.
+    }
+  }
+
+  /// Parses an incoming invite deep-link (`https://.../join#...` or `deepsky://pair#...`)
+  /// and pre-fills the Join flow without persisting raw tokens to backend logs (`S1-APP-01`).
+  void handleIncomingDeepLink(String rawUri) {
+    final ({String? serverUrl, String inviteToken}) parsed =
+        InviteLinkCodec.parseInviteInput(rawUri);
+    if (parsed.inviteToken.isEmpty) {
+      return;
+    }
+    if (phase == AppBootPhase.paired || phase == AppBootPhase.waiting) {
+      return;
+    }
+    pendingDeepLinkInvite = rawUri.trim();
+    if (parsed.serverUrl != null) {
+      activeServerUrl = parsed.serverUrl!;
+    }
+    onboardingTabIndex = 1;
+    errorNotice = null;
+    notifyListeners();
+  }
+
+  String? takePendingDeepLinkInvite() {
+    final String? value = pendingDeepLinkInvite;
+    pendingDeepLinkInvite = null;
+    return value;
   }
 
   Future<void> _loadCapabilities() async {
@@ -287,15 +351,25 @@ class DeepSkyController extends ChangeNotifier {
       return;
     }
     try {
-      pushStatus = await _nativeBridge.getPushStatus();
-      final String? rotated = await _nativeBridge.consumePendingPushToken();
-      if (rotated != null && rotated.isNotEmpty) {
-        await PushApiClient(apiClient: _createApiClient(current.serverUrl))
-            .registerToken(identity: current, fcmToken: rotated);
-        pushStatus = await _nativeBridge.getPushStatus();
-      }
+      final RuntimeFirebaseConfig cfg = await PushApiClient(
+        apiClient: _createApiClient(current.serverUrl),
+      ).fetchRuntimeConfig();
+      pushSupportedOnServer = cfg.enabled && cfg.isComplete;
     } catch (_) {
-      // Desktop / test mode or offline: skip quietly.
+      pushSupportedOnServer = false;
+    }
+    if (_canQueryNativeChannels) {
+      try {
+        pushStatus = await _nativeBridge.getPushStatus();
+        final String? rotated = await _nativeBridge.consumePendingPushToken();
+        if (rotated != null && rotated.isNotEmpty) {
+          await PushApiClient(apiClient: _createApiClient(current.serverUrl))
+              .registerToken(identity: current, fcmToken: rotated);
+          pushStatus = await _nativeBridge.getPushStatus();
+        }
+      } catch (_) {
+        // Desktop / test mode or offline: skip quietly.
+      }
     }
   }
 
@@ -320,6 +394,24 @@ class DeepSkyController extends ChangeNotifier {
       identity != null &&
       !identity!.nameSetupCompleted &&
       !isDeviceRevoked;
+
+  bool get needsRecoveryKeySetup =>
+      phase == AppBootPhase.paired &&
+      identity != null &&
+      identity!.nameSetupCompleted &&
+      !identity!.recoverySavedConfirmed &&
+      identity!.recoverySeed != null &&
+      !isDeviceRevoked;
+
+  bool get shouldShowPushOptInPrompt =>
+      phase == AppBootPhase.paired &&
+      !needsSpaceSetup &&
+      !needsRecoveryKeySetup &&
+      !isOffline &&
+      !isDeviceRevoked &&
+      !pushPromptDismissed &&
+      pushSupportedOnServer &&
+      (pushStatus == null || !pushStatus!.firebaseInitialized);
 
   String? get partnerDisplayLabel {
     final String? myId = identity?.deviceId;
@@ -752,14 +844,27 @@ class DeepSkyController extends ChangeNotifier {
     final String cleanLabel = deviceLabel.trim().isEmpty
         ? DeepSkyStrings(languageCode).defaultDeviceLabel
         : deviceLabel.trim();
-    identity = await _repository.recoverWithRecoveryKey(
-      serverUrl: serverUrl.trim(),
-      recoveryInput: recoveryInput.trim(),
-      deviceLabel: cleanLabel,
-    );
+    try {
+      identity = await _repository.recoverWithRecoveryKey(
+        serverUrl: serverUrl.trim(),
+        recoveryInput: recoveryInput.trim(),
+        deviceLabel: cleanLabel,
+      );
+    } on ClientUpgradeRequiredException {
+      rethrow;
+    } on FormatException {
+      throw _CalmUserException(
+        DeepSkyStrings(languageCode).recoverCalmFailureMessage,
+      );
+    } on ApiRequestException {
+      throw _CalmUserException(
+        DeepSkyStrings(languageCode).recoverCalmFailureMessage,
+      );
+    }
     this.deviceLabel = cleanLabel;
     phase = AppBootPhase.paired;
     await _refreshPairedState();
+    await _syncPendingRotatedPushToken();
   });
 
   Future<void> confirmRecoveryKeySaved() => _runGuarded(() async {
@@ -902,10 +1007,32 @@ class DeepSkyController extends ChangeNotifier {
     final String fcmToken = await _nativeBridge.configureRuntimePush(config);
     await pushApi.registerToken(identity: current, fcmToken: fcmToken);
     pushStatus = await _nativeBridge.getPushStatus();
+    pushPromptDismissed = true;
+    await _keyStore.write(_pushPromptDismissedStorageKey, 'true');
     statusNotice = languageCode == 'it'
         ? 'Notifiche discrete attivate su questo dispositivo.'
         : 'Quiet notifications enabled on this device.';
   });
+
+  Future<void> dismissPushPrompt() async {
+    pushPromptDismissed = true;
+    await _keyStore.write(_pushPromptDismissedStorageKey, 'true');
+    notifyListeners();
+  }
+
+  Future<void> setUpdateChannel(UpdateChannel channel) async {
+    if (updateChannel == channel) {
+      return;
+    }
+    updateChannel = channel;
+    availableUpdate = null;
+    updateFeedback = null;
+    await _keyStore.write(_updateChannelStorageKey, channel.storageValue);
+    notifyListeners();
+  }
+
+  Future<bool> shareText({required String text, String? subject}) =>
+      _nativeBridge.shareText(text: text, subject: subject);
 
   Future<void> checkForUpdates({
     required String source,
@@ -917,16 +1044,25 @@ class DeepSkyController extends ChangeNotifier {
         ? trustedKeyB64.trim()
         : trustedUpdatePublicKeyB64.trim();
     if (keyToUse.isEmpty) {
-      const String message =
-          'Inserisci la chiave pubblica Ed25519 delle release firmate.';
+      final String message = languageCode == 'it'
+          ? 'Inserisci la chiave pubblica Ed25519 delle release firmate.'
+          : 'Enter the Ed25519 public key for signed releases.';
       updateFeedback = message;
-      throw StateError(message);
+      throw _CalmUserException(message);
     }
     final Uri sourceBaseUri;
     try {
-      sourceBaseUri = ApkUpdateService.resolveSourceBaseUri(source);
+      sourceBaseUri = await _updateService.resolveChannelBaseUri(
+        sourceInput: source,
+        channel: updateChannel,
+      );
     } on FormatException catch (ex) {
-      updateFeedback = 'Sorgente aggiornamenti non valida (${ex.message}).';
+      updateFeedback = languageCode == 'it'
+          ? 'Sorgente aggiornamenti non valida (${ex.message}).'
+          : 'Invalid update source (${ex.message}).';
+      rethrow;
+    } on ApkUpdateException catch (ex) {
+      updateFeedback = ex.localizedMessage(languageCode);
       rethrow;
     }
     final ApkUpdateCheckResult res;
@@ -938,22 +1074,34 @@ class DeepSkyController extends ChangeNotifier {
         force: force,
       );
     } on FormatException catch (ex) {
-      updateFeedback = 'Chiave pubblica Ed25519 non valida (${ex.message}).';
+      updateFeedback = languageCode == 'it'
+          ? 'Chiave pubblica Ed25519 non valida (${ex.message}).'
+          : 'Invalid Ed25519 public key (${ex.message}).';
       rethrow;
     }
     availableUpdate = res.manifest;
+    final bool isIt = languageCode == 'it';
     switch (res.status) {
       case ApkUpdateCheckStatus.updateAvailable:
-        updateFeedback =
-            'Nuova versione disponibile: ${res.manifest!.versionName} (${res.manifest!.versionCode}).';
+        updateFeedback = isIt
+            ? 'Nuova versione disponibile (${updateChannel.localizedLabel(languageCode)}): ${res.manifest!.versionName} (${res.manifest!.versionCode}).'
+            : 'Update available (${updateChannel.localizedLabel(languageCode)}): ${res.manifest!.versionName} (${res.manifest!.versionCode}).';
       case ApkUpdateCheckStatus.upToDate:
-        updateFeedback = 'Hai già l\'ultima versione disponibile.';
+        updateFeedback = isIt
+            ? 'Hai già l\'ultima versione disponibile.'
+            : 'You already have the latest version.';
       case ApkUpdateCheckStatus.notModified304:
         updateFeedback = res.manifest != null
-            ? 'Aggiornamento già pronto: ${res.manifest!.versionName}.'
-            : 'Nessun nuovo rilascio rispetto all\'ultimo controllo.';
+            ? (isIt
+                  ? 'Aggiornamento già pronto: ${res.manifest!.versionName}.'
+                  : 'Update already ready: ${res.manifest!.versionName}.')
+            : (isIt
+                  ? 'Nessun nuovo rilascio rispetto all\'ultimo controllo.'
+                  : 'No new release since the last check.');
       case ApkUpdateCheckStatus.throttledByCooldown:
-        updateFeedback = 'Controllo recente già eseguito.';
+        updateFeedback = isIt
+            ? 'Controllo recente già eseguito.'
+            : 'Already checked recently.';
     }
   });
 
@@ -966,20 +1114,39 @@ class DeepSkyController extends ChangeNotifier {
         final bool canInstall = await _nativeBridge.canRequestPackageInstalls();
         if (!canInstall) {
           await _nativeBridge.openInstallPermissionSettings();
-          updateFeedback =
-              'Abilita "Installa app sconosciute" per Deep Sky e riprova.';
+          updateFeedback = languageCode == 'it'
+              ? 'Abilita "Installa app sconosciute" per Deep Sky e riprova.'
+              : 'Enable "Install unknown apps" for Deep Sky and try again.';
           return;
         }
         final UpdateStorageInfo storage = await _nativeBridge
             .getUpdateStorageInfo();
-        final file = await _updateService.downloadAndVerifyApk(
-          sourceBaseUri: ApkUpdateService.resolveSourceBaseUri(source),
-          manifest: manifest,
-          stagingDir: storage.stagingDir,
-          availableBytes: storage.availableBytes,
-        );
-        final String result = await _updateService.installApkFile(file);
-        updateFeedback = 'Installazione avviata ($result).';
+        updateDownloadProgress = 0.0;
+        notifyListeners();
+        try {
+          final Uri sourceBaseUri = await _updateService.resolveChannelBaseUri(
+            sourceInput: source,
+            channel: updateChannel,
+          );
+          final file = await _updateService.downloadAndVerifyApk(
+            sourceBaseUri: sourceBaseUri,
+            manifest: manifest,
+            stagingDir: storage.stagingDir,
+            availableBytes: storage.availableBytes,
+            onProgress: (int received, int total) {
+              if (total > 0) {
+                updateDownloadProgress = (received / total).clamp(0.0, 1.0);
+                notifyListeners();
+              }
+            },
+          );
+          final String result = await _updateService.installApkFile(file);
+          updateFeedback = languageCode == 'it'
+              ? 'Installazione avviata ($result).'
+              : 'Installation started ($result).';
+        } finally {
+          updateDownloadProgress = null;
+        }
       });
 
   void toggleNightMode() {
@@ -1038,8 +1205,11 @@ class DeepSkyController extends ChangeNotifier {
       );
       phase = AppBootPhase.upgradeRequired;
     } on ApkUpdateException catch (ex) {
-      errorNotice = ex.friendlyMessage;
-      updateFeedback = ex.friendlyMessage;
+      final String msg = ex.localizedMessage(languageCode);
+      errorNotice = msg;
+      updateFeedback = msg;
+    } on _CalmUserException catch (ex) {
+      errorNotice = ex.message;
     } on ApiRequestException catch (ex) {
       if (ex.isDeviceUnknownOrRevoked && phase == AppBootPhase.paired) {
         isDeviceRevoked = true;
@@ -1058,4 +1228,13 @@ class DeepSkyController extends ChangeNotifier {
   }
 
   Uint8List? get recoverySeed => identity?.recoverySeed;
+}
+
+class _CalmUserException implements Exception {
+  const _CalmUserException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }

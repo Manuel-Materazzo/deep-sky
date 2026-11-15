@@ -104,6 +104,7 @@ void main() {
       // Complete Partner B join too.
       await ctrlB.completeJoinDelivery();
       await ctrlB.skipNameSetup();
+      await ctrlB.confirmRecoveryKeySaved();
 
       // Partner A now lands on S1-D07-2 SpaceSetupPage -> names their space/self and proceeds to Home.
       expect(find.byKey(const Key('space-setup-page')), findsOneWidget);
@@ -118,21 +119,20 @@ void main() {
       );
       await tapVisible(find.byKey(const Key('space-setup-submit-button')));
 
-      // 3) Partner A lands on Home with mandatory Recovery Key confirmation gate (S-06).
-      expect(find.byKey(const Key('home-shell-page')), findsOneWidget);
-      expect(find.byKey(const Key('recovery-gate-card')), findsOneWidget);
-
-      final FilledButton disabledSend = tester.widget<FilledButton>(
-        find.byKey(const Key('send-thought-button')),
+      // 3) Partner A lands on dedicated pre-Home Recovery Key setup screen (S1-D04, S-06).
+      expect(find.byKey(const Key('recovery-key-setup-page')), findsOneWidget);
+      final FilledButton disabledConfirm = tester.widget<FilledButton>(
+        find.byKey(const Key('confirm-recovery-button')),
       );
-      expect(disabledSend.onPressed, isNull);
+      expect(disabledConfirm.onPressed, isNull);
 
       final String recoverySentence = RecoveryKeyCodec.toSentence(
         ctrlA.recoverySeed!,
       );
       await tapVisible(find.byKey(const Key('recovery-saved-checkbox')));
       await tapVisible(find.byKey(const Key('confirm-recovery-button')));
-      expect(find.byKey(const Key('recovery-gate-card')), findsNothing);
+      expect(find.byKey(const Key('recovery-key-setup-page')), findsNothing);
+      expect(find.byKey(const Key('home-shell-page')), findsOneWidget);
 
       // 4) Partner A sends "Ti penso" -> Partner B receives "Hai un pensiero in arrivo." + lit window.
       await tester.ensureVisible(find.byKey(const Key('thought-note-field')));
@@ -247,6 +247,9 @@ void main() {
       await tapVisible(find.byKey(const Key('complete-join-button')));
       expect(find.byKey(const Key('space-setup-page')), findsOneWidget);
       await tapVisible(find.byKey(const Key('space-setup-skip-button')));
+      expect(find.byKey(const Key('recovery-key-setup-page')), findsOneWidget);
+      await tapVisible(find.byKey(const Key('recovery-saved-checkbox')));
+      await tapVisible(find.byKey(const Key('confirm-recovery-button')));
       expect(find.byKey(const Key('home-shell-page')), findsOneWidget);
       expect(find.textContaining('Pensiero della sera'), findsWidgets);
 
@@ -349,6 +352,7 @@ void main() {
       await ctrlA.skipNameSetup();
       await ctrlB.completeJoinDelivery();
       await ctrlB.skipNameSetup();
+      await ctrlB.confirmRecoveryKeySaved();
       await ctrlB.confirmRecoveryKeySaved();
       await ctrlA.confirmRecoveryKeySaved();
 

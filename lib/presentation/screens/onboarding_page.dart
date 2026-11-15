@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:deep_sky/data/pairing_and_sync_repository.dart';
+import 'package:deep_sky/domain/crypto/recovery_key_codec.dart';
 import 'package:deep_sky/domain/pairing/invite_link_codec.dart';
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
 import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
@@ -41,6 +42,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
     _modeIndex = widget.controller.pendingJoin != null
         ? 1
         : widget.controller.onboardingTabIndex;
+    widget.controller.addListener(_onControllerUpdated);
+    _applyPendingDeepLinkIfAny(notifyUi: false);
     if (_modeIndex == 0 && widget.controller.pendingJoin == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
@@ -55,10 +58,29 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   @override
   void dispose() {
+    widget.controller.removeListener(_onControllerUpdated);
     _serverController.dispose();
     _inviteTokenController.dispose();
     _recoveryController.dispose();
     super.dispose();
+  }
+
+  void _onControllerUpdated() {
+    _applyPendingDeepLinkIfAny(notifyUi: true);
+  }
+
+  void _applyPendingDeepLinkIfAny({required bool notifyUi}) {
+    final String? rawDeepLink = widget.controller.takePendingDeepLinkInvite();
+    if (rawDeepLink == null) {
+      return;
+    }
+    _inviteTokenController.text = rawDeepLink;
+    _serverController.text = widget.controller.activeServerUrl;
+    if (notifyUi && mounted) {
+      setState(() => _modeIndex = 1);
+    } else {
+      _modeIndex = 1;
+    }
   }
 
   void _selectMode(int index) {
@@ -649,9 +671,26 @@ class _OnboardingPageState extends State<OnboardingPage> {
   }
 
   Widget _buildRecoverSection(DeepSkyController c, DeepSkyStrings s) {
+    final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(context);
+    final ThemeData theme = Theme.of(context);
+    final String rawInput = _recoveryController.text.trim();
+    final bool isQrPayload = rawInput.startsWith(RecoveryKeyCodec.qrPrefix);
+    final List<String> words = isQrPayload
+        ? const <String>[]
+        : RecoveryKeyCodec.tokenizeWords(rawInput);
+    final int invalidCount = words
+        .where((String w) => !RecoveryKeyCodec.isValidWord(w))
+        .length;
+    final int remaining = (24 - words.length).clamp(0, 24);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        Text(
+          s.recoverSectionSubtitle,
+          style: theme.textTheme.bodySmall?.copyWith(color: tokens.mutedInk),
+        ),
+        const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
@@ -675,12 +714,114 @@ class _OnboardingPageState extends State<OnboardingPage> {
           key: const Key('recovery-words-field'),
           controller: _recoveryController,
           maxLines: 3,
+          autocorrect: false,
+          enableSuggestions: false,
+          textInputAction: TextInputAction.done,
+          onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             labelText: s.isIt
                 ? '24 parole o payload QR della Recovery Key'
                 : '24 recovery words or QR payload',
+            hintText: s.recoverFieldPlaceholder,
           ),
         ),
+        if (isQrPayload || words.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 12),
+          Container(
+            key: const Key('recovery-word-chips-panel'),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: tokens.surfaceLow,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                if (isQrPayload)
+                  Row(
+                    children: <Widget>[
+                      Icon(
+                        Icons.qr_code_2_rounded,
+                        size: 18,
+                        color: tokens.calmAccent,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          s.isIt
+                              ? 'Codice QR Recovery rilevato e pronto per il ripristino.'
+                              : 'Recovery QR payload detected and ready to restore.',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                    ],
+                  )
+                else ...<Widget>[
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: <Widget>[
+                      for (int i = 0; i < words.length && i < 24; i++)
+                        Builder(
+                          builder: (BuildContext context) {
+                            final bool valid = RecoveryKeyCodec.isValidWord(
+                              words[i],
+                            );
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: valid
+                                    ? theme.colorScheme.surfaceContainerHigh
+                                    : theme.colorScheme.errorContainer,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                '${i + 1}. ${words[i]}',
+                                style: TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 12,
+                                  color: valid
+                                      ? theme.colorScheme.onSurface
+                                      : theme.colorScheme.onErrorContainer,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    remaining > 0
+                        ? s.recoverMissingWordsCounter(remaining)
+                        : (invalidCount == 0
+                              ? s.recoverWordsComplete
+                              : '${words.length} / 24'),
+                    key: const Key('recovery-word-count-status'),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: (remaining == 0 && invalidCount == 0)
+                          ? tokens.calmAccent
+                          : tokens.mutedInk,
+                    ),
+                  ),
+                  if (invalidCount > 0) ...<Widget>[
+                    const SizedBox(height: 4),
+                    Text(
+                      s.recoverInvalidWordsHint(invalidCount),
+                      key: const Key('recovery-invalid-words-hint'),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 14),
         FilledButton.icon(
           key: const Key('recover-space-button'),
@@ -692,9 +833,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   deviceLabel: c.deviceLabel,
                 ),
           icon: const Icon(Icons.key_rounded),
-          label: Text(
-            s.isIt ? 'Recupera il vostro spazio' : 'Recover your space',
-          ),
+          label: Text(s.recoverSubmitButton),
         ),
       ],
     );

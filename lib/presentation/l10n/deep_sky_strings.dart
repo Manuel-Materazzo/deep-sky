@@ -314,4 +314,119 @@ class DeepSkyStrings {
   String get settingsSaveNameButton => isIt ? 'Aggiorna nome' : 'Update name';
   String get deviceNameUpdatedNotice =>
       isIt ? 'Nome aggiornato.' : 'Name updated.';
+
+  // Recovery Key Setup (`S1-D04` / `S1-APP-02`)
+  String get recoverySetupAppBarTitle =>
+      isIt ? 'Chiave di recupero' : 'Recovery Key';
+  String get recoverySetupBadge =>
+      isIt ? 'Custodia privata della stanza' : 'Private room safekeeping';
+  String get recoverySetupHeadline => isIt
+      ? 'Conserva la tua chiave di recupero'
+      : 'Save your recovery key safely';
+  String get recoverySetupSubtitle => isIt
+      ? 'Queste 24 parole sono l\'unico modo per riaccendere la vostra casa se perdi o cambi entrambi i telefoni. Nessun server le conosce.'
+      : 'These 24 words are the only way to restore your home if both phones are lost or replaced. No server knows them.';
+  String get recoveryShowWordsTab => isIt ? '24 Parole' : '24 Words';
+  String get recoveryShowQrTab => isIt ? 'Codice QR' : 'QR Code';
+  String get recoveryCopyWordsButton =>
+      isIt ? 'Copia frase (24 parole)' : 'Copy phrase (24 words)';
+  String get recoveryCopiedNotice => isIt
+      ? 'Frase di recupero copiata negli appunti.'
+      : 'Recovery phrase copied to clipboard.';
+  String get recoveryExportButton =>
+      isIt ? 'Esporta promemoria offline' : 'Export offline reminder';
+  String get recoveryWarningTitle =>
+      isIt ? 'Come proteggerla davvero' : 'How to keep it truly safe';
+  String get recoveryWarningBody => isIt
+      ? '• Evita screenshot o foto che finiscono su cloud non cifrati.\n• Scrivila su carta o salvala in un gestore password cifrato offline.'
+      : '• Avoid screenshots or photos synced to unencrypted cloud backups.\n• Write it on paper or save it in an offline encrypted password vault.';
+
+  // Guided 24-word Recovery (`S1-D10` / `S1-APP-04`)
+  String get recoverSectionHeadline =>
+      isIt ? 'Ritrova la tua stanza' : 'Find your room again';
+  String get recoverSectionSubtitle => isIt
+      ? 'Inserisci le 24 parole della chiave di recupero nell\'ordine esatto, oppure inquadra il QR salvato in precedenza.'
+      : 'Enter the 24 recovery words in exact order, or scan your saved recovery QR code.';
+  String get recoverFieldPlaceholder => isIt
+      ? 'Scrivi o incolla qui le tue 24 parole (es. abandon ability ...)'
+      : 'Type or paste your 24 words here (e.g. abandon ability ...)';
+  String recoverMissingWordsCounter(int missing) =>
+      isIt ? '... $missing parole mancanti' : '... $missing words remaining';
+  String get recoverWordsComplete =>
+      isIt ? '✓ 24 parole complete' : '✓ All 24 words entered';
+  String recoverInvalidWordsHint(int count) => isIt
+      ? 'Controlla $count ${count == 1 ? 'parola non riconosciuta' : 'parole non riconosciute'} nel dizionario BIP-39.'
+      : 'Check $count unrecognized ${count == 1 ? 'word' : 'words'} against the BIP-39 dictionary.';
+  String get recoverSubmitButton =>
+      isIt ? 'Ripristina e riaccendi la casa' : 'Restore and relight your home';
+  String get recoverCalmFailureMessage => isIt
+      ? 'Non siamo riusciti a sbloccare la stanza con questa chiave e questo server. Controlla l\'ordine delle 24 parole o l\'indirizzo del server e riprova.'
+      : 'We could not unlock a room with this key and server. Check the 24 words order or server address and try again.';
+
+  // Devices Tab & Calm Revocation (`S1-D11` / `S1-APP-05`)
+  String devicesSectionTitle(int count) =>
+      isIt ? 'Dispositivi collegati ($count)' : 'Connected devices ($count)';
+  String get deviceStatusRevoked => isIt ? 'Revocato' : 'Revoked';
+  String get deviceStatusThisPhone =>
+      isIt ? 'Attivo · questo telefono' : 'Active · this phone';
+  String get deviceStatusActive => isIt ? 'Attivo' : 'Active';
+  String get revokeDeviceAction => isIt ? 'Revoca' : 'Revoke';
+  String get revokeDialogTitle =>
+      isIt ? 'Revocare questo dispositivo?' : 'Revoke this device?';
+  String revokeDialogBody(String label) => isIt
+      ? '«$label» perderà subito l\'accesso ai vostri ricordi su questo telefono. I dati cifrati condivisi restano al sicuro per gli altri dispositivi attivi.'
+      : '"$label" will immediately lose access to your memories on that device. Your shared encrypted home remains intact on active devices.';
+  String get revokeDialogConfirm => isIt ? 'Revoca accesso' : 'Revoke access';
+
+  // Contextual Push Opt-in (`S1-D12` / `S1-APP-05`) & Settings (`S1-D13`/`S1-D14`)
+  String get pushPromptTitle => isIt
+      ? 'Avvisi discreti sul telefono'
+      : 'Quiet notifications on this phone';
+  String get pushPromptBody => isIt
+      ? 'Ricevi un semplice risveglio anonimo quando il tuo partner ti pensa o chiede accesso: il server non invia mai testi o nomi.'
+      : 'Receive a quiet anonymous nudge when your partner thinks of you or requests device approval—no names or message content ever leave your phones.';
+  String get pushPromptEnableButton =>
+      isIt ? 'Attiva notifiche discrete' : 'Enable quiet notifications';
+  String get pushPromptLaterButton => isIt ? 'Non ora' : 'Not now';
+  String get settingsPrefsTitle =>
+      isIt ? 'Preferenze stanza e lingua' : 'Room & language preferences';
+  String get settingsNightMode =>
+      isIt ? 'Atmosfera notturna' : 'Night atmosphere';
+  String get settingsReduceMotion =>
+      isIt ? 'Riduci movimento' : 'Reduce motion';
+  String get settingsLanguageLabel => 'Lingua / Language';
+  String get settingsPushTitle => isIt
+      ? 'Notifiche push discrete (FCM runtime)'
+      : 'Quiet push notifications (runtime FCM)';
+  String settingsPushActiveCount(int count) => isIt
+      ? 'Attive (risvegli ricevuti: $count)'
+      : 'Active (wakeups received: $count)';
+  String get settingsPushInactive => isIt
+      ? 'Non ancora attivate su questo telefono.'
+      : 'Not yet enabled on this device.';
+  String get settingsPushEnableButton => isIt
+      ? 'Attiva notifiche su questo telefono'
+      : 'Enable notifications on this phone';
+  String get settingsUpdatesTitle => isIt
+      ? 'Aggiornamenti app (APK firmato offline)'
+      : 'App updates (offline-signed APK)';
+  String settingsVersionLine(String name, int code) =>
+      isIt ? 'Versione: $name ($code)' : 'Version: $name ($code)';
+  String get updateChannelLabel =>
+      isIt ? 'Canale aggiornamenti' : 'Update channel';
+  String get updateSourceFieldLabel => isIt
+      ? 'Sorgente release (owner/repo o URL)'
+      : 'Release source (owner/repo or URL)';
+  String get updatePublicKeyFieldLabel =>
+      isIt ? 'Chiave pubblica Ed25519 (base64)' : 'Ed25519 public key (base64)';
+  String updateDownloadProgress(int percent) => isIt
+      ? 'Scaricamento aggiornamento… $percent%'
+      : 'Downloading update… $percent%';
+  String upgradeVersionSummary(
+    String installedName,
+    int installedCode,
+    int? minCode,
+  ) => isIt
+      ? 'Versione installata: $installedName (codice $installedCode) · Minima server: ${minCode ?? '?'}'
+      : 'Installed version: $installedName (code $installedCode) · Server minimum: ${minCode ?? '?'}';
 }
