@@ -1,20 +1,57 @@
 param(
-    [Parameter(Mandatory = $true)][string]$UnsignedApk,
-    [Parameter(Mandatory = $true)][int]$VersionCode,
-    [Parameter(Mandatory = $true)][string]$VersionName,
-    [Parameter(Mandatory = $true)][int]$PreviousVersionCode,
-    [Parameter(Mandatory = $true)][string]$KeystorePath,
-    [Parameter(Mandatory = $true)][string]$KeystoreAlias,
-    [Parameter(Mandatory = $true)][string]$Ed25519PrivateKeyPath,
-    [Parameter(Mandatory = $true)][string]$OutDir,
-    [string]$Ed25519PublicKeyPath = "",
-    [string]$PackageId = "com.vectevo.deep_sky"
+    [string]$UnsignedApk           = $env:DEEPSKY_UNSIGNED_APK,
+    [string]$VersionCode           = $env:DEEPSKY_VERSION_CODE,
+    [string]$VersionName           = $env:DEEPSKY_VERSION_NAME,
+    [string]$PreviousVersionCode   = $env:DEEPSKY_PREVIOUS_VERSION_CODE,
+    [string]$KeystorePath          = $env:DEEPSKY_KEYSTORE_PATH,
+    [string]$KeystoreAlias         = $env:DEEPSKY_KEYSTORE_ALIAS,
+    [string]$Ed25519PrivateKeyPath = $env:DEEPSKY_ED25519_PRIV_KEY,
+    [string]$OutDir                = $env:DEEPSKY_OUT_DIR,
+    [string]$Ed25519PublicKeyPath  = $env:DEEPSKY_ED25519_PUB_KEY,
+    [string]$PackageId             = $(if ($env:DEEPSKY_PACKAGE_ID) { $env:DEEPSKY_PACKAGE_ID } else { "com.vectevo.deep_sky" })
 )
 
 $ErrorActionPreference = "Stop"
 
-if ($VersionCode -le $PreviousVersionCode) {
-    throw "Refusing to sign: versionCode ($VersionCode) must be strictly greater than previousVersionCode ($PreviousVersionCode)."
+function Resolve-RequiredParam {
+    param(
+        [string]$Name,
+        [string]$CurrentValue,
+        [string]$EnvVarName
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($CurrentValue)) {
+        return $CurrentValue.Trim('"') # Strips accidental quotes if dragged-and-dropped into terminal
+    }
+
+    # Fail fast in CI or headless terminals instead of hanging on Read-Host
+    if ($env:CI -eq "true" -or -not [Environment]::UserInteractive) {
+        throw "Missing required parameter '-$Name' (and '$EnvVarName' is not set)."
+    }
+
+    $inputVal = Read-Host "Enter $Name (or set $EnvVarName)"
+    if ([string]::IsNullOrWhiteSpace($inputVal)) {
+        throw "Parameter '-$Name' cannot be empty."
+    }
+
+    return $inputVal.Trim('"')
+}
+
+$UnsignedApk           = Resolve-RequiredParam -Name "UnsignedApk"           -CurrentValue $UnsignedApk           -EnvVarName "DEEPSKY_UNSIGNED_APK"
+$VersionCode           = Resolve-RequiredParam -Name "VersionCode"           -CurrentValue $VersionCode           -EnvVarName "DEEPSKY_VERSION_CODE"
+$VersionName           = Resolve-RequiredParam -Name "VersionName"           -CurrentValue $VersionName           -EnvVarName "DEEPSKY_VERSION_NAME"
+$PreviousVersionCode   = Resolve-RequiredParam -Name "PreviousVersionCode"   -CurrentValue $PreviousVersionCode   -EnvVarName "DEEPSKY_PREVIOUS_VERSION_CODE"
+$KeystorePath          = Resolve-RequiredParam -Name "KeystorePath"          -CurrentValue $KeystorePath          -EnvVarName "DEEPSKY_KEYSTORE_PATH"
+$KeystoreAlias         = Resolve-RequiredParam -Name "KeystoreAlias"         -CurrentValue $KeystoreAlias         -EnvVarName "DEEPSKY_KEYSTORE_ALIAS"
+$Ed25519PrivateKeyPath = Resolve-RequiredParam -Name "Ed25519PrivateKeyPath" -CurrentValue $Ed25519PrivateKeyPath -EnvVarName "DEEPSKY_ED25519_PRIV_KEY"
+$OutDir                = Resolve-RequiredParam -Name "OutDir"                -CurrentValue $OutDir                -EnvVarName "DEEPSKY_OUT_DIR"
+
+# Cast integers after resolution
+[int]$VersionCodeInt         = $VersionCode
+[int]$PreviousVersionCodeInt = $PreviousVersionCode
+
+if ($VersionCodeInt -le $PreviousVersionCodeInt) {
+    throw "Refusing to sign: versionCode ($VersionCodeInt) must be strictly greater than previousVersionCode ($PreviousVersionCodeInt)."
 }
 
 if (-not (Test-Path $UnsignedApk -PathType Leaf)) {

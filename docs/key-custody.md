@@ -67,5 +67,5 @@ Update this table via PR once the promoter generates the production keys (`SEC-0
 
 | Key | Algorithm | Status | Public Fingerprint (SHA-256) | Public Key / Notes |
 | :-- | :-- | :-- | :-- | :-- |
-| APK Release Signing Key (`deep-sky-release`) | RSA 4096 (PKCS#12) | *Pending offline generation by promoter* | `TBD` | Never rotate without migration plan (`D-14`) |
-| Manifest & Content Signing Key | Ed25519 | *Pending offline generation by promoter* | `TBD` | Public key will be embedded in app for `F-19` / `N-10` |
+| APK Release Signing Key (`deep-sky-release`) | RSA 4096 (PKCS#12) | *Pending offline generation by promoter* | `03:6D:19:F4:98:40:12:CC:CD:F2:1D:4E:6E:7E:C2:9A:95:84:2F:E9:78:2B:1D:70:A4:6A:55:59:84:E6:D6:0A` | Never rotate without migration plan (`D-14`) |
+| Manifest & Content Signing Key | Ed25519 | *Pending offline generation by promoter* | `b6bc0deb3a056a1c2e4f28378915cb20a45a926da1f631e7892a43b2fb299292` | Public key will be embedded in app for `F-19` / `N-10` |

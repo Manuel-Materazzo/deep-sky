@@ -3,9 +3,11 @@ import 'dart:io';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:deep_sky/data/apk_update_service.dart';
+import 'package:deep_sky/data/secure_key_store.dart';
 import 'package:deep_sky/domain/platform_capabilities.dart';
 import 'package:deep_sky/domain/update/apk_update_models.dart';
 import 'package:deep_sky/platform/native_bridge.dart';
+import 'package:deep_sky/presentation/deep_sky_controller.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -338,4 +340,48 @@ void main() {
       expect(manifestRequests, 2);
     },
   );
+
+  test('DeepSkyController defaults point to Manuel-Materazzo/deep-sky and parse trusted SPKI key', () async {
+    final rel = await buildSignedRelease(versionCode: 2);
+    Uri? requestedManifestUri;
+    final MockClient httpClient = MockClient((http.Request req) async {
+      if (req.url.path.endsWith('manifest.json')) {
+        requestedManifestUri = req.url;
+        return http.Response.bytes(rel.manifestBytes, 200);
+      }
+      if (req.url.path.endsWith('manifest.json.sig')) {
+        return http.Response.bytes(rel.sigBytes, 200);
+      }
+      return http.Response('not found', 404);
+    });
+
+    final DeepSkyController controller = DeepSkyController(
+      keyStore: InMemorySecureKeyStore(),
+      httpClient: httpClient,
+    );
+
+    expect(controller.defaultUpdateSource, 'Manuel-Materazzo/deep-sky');
+    expect(
+      ApkUpdateService.parseEd25519PublicKey(
+        controller.trustedUpdatePublicKeyB64,
+      ).bytes.length,
+      32,
+    );
+
+    await controller.checkForUpdates(
+      source: controller.defaultUpdateSource,
+      trustedKeyB64: base64Encode(rel.publicKey.bytes),
+    );
+    expect(
+      requestedManifestUri.toString(),
+      'https://github.com/Manuel-Materazzo/deep-sky/releases/latest/download/manifest.json',
+    );
+    expect(controller.availableUpdate?.versionCode, 2);
+
+    await controller.checkForUpdates(
+      source: controller.defaultUpdateSource,
+      trustedKeyB64: 'not-valid-base64!',
+    );
+    expect(controller.updateFeedback, contains('Chiave pubblica Ed25519'));
+  });
 }
