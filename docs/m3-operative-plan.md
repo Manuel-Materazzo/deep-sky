@@ -93,22 +93,22 @@ italiano e inglese, tema chiaro e scuro, accessibilità (V-07).
 
 | Codice     | Area                                         | Contenuto                                                                                                                                                                    | Formato di consegna                                             | Stato         | Note                                                                                                                                                                                                                            |
 |:-----------|:---------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:----------------------------------------------------------------|:--------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **S1-D01** | **Guida all’installazione** (fuori dall’app) | Pagina web o istruzioni illustrate: scaricare l’APK, consentire l’installazione da questa fonte, eventuale avviso di sicurezza del sistema, aprire l’app, tornare all’invito | Pagina web (codice di esempio); immagini dei passi; testi IT/EN | Da verificare | La prima installazione è il punto più fragile per chi non è tecnico                                                                                                                                                             |
+| **S1-D01** | **Guida all’installazione** (fuori dall’app) | Pagina web o istruzioni illustrate: scaricare l’APK, consentire l’installazione da questa fonte, eventuale avviso di sicurezza del sistema, aprire l’app, tornare all’invito | Pagina web (codice di esempio); immagini dei passi; testi IT/EN | Implementato  | Pagina statica `deploy/web/join/index.html` con guida in 3 passi IT/EN, apertura `deepsky://pair#...` client-side e `/.well-known/assetlinks.json`; da validare sul campo (`S1-DES-03`, `S1-REL-01`)           |
 | **S1-D02** | **Benvenuto**                                | Cos’è Deep Sky in poche frasi; scelta “Ho un invito” / “Ho già una coppia”                                                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    | Implementato in app (`S3-1`: `OnboardingPage`, temi scuro/chiaro Intimate Sanctuary, IT/EN, drawer server collassabile `P-09`)                                                                                                  |
 | **S1-D03** | **Creazione della coppia** (primo partner)   | Inserimento di invito (link, QR o codice), nome visibile                                                                                                                     | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    | Automatico all'apertura dell'app, e si passa direttamente a S1-D05; implementato con stati caricamento/errore/riprova (`S3-1`)                                                                                                  |
-| **S1-D04** | **Chiave di recupero**                       | Spiegazione, parole e QR, modi di salvarla (copia, condivisione, stampa), conferma di avvenuto salvataggio                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Da verificare | Obbligatoria (S-06). Avvertenze sugli screenshot e sul salvataggio nel cloud                                                                                                                                                    |
+| **S1-D04** | **Chiave di recupero**                       | Spiegazione, parole e QR, modi di salvarla (copia, condivisione, stampa), conferma di avvenuto salvataggio                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato  | Schermata dedicata pre-Home `RecoveryKeySetupPage` (`S-06`): toggle 24 parole/QR, copia, condivisione/esportazione JSON, avviso screenshot/cloud, checkbox + conferma server                                                  |
 | **S1-D05** | **Invito al partner**                        | Generazione di link e QR, condivisione, stato “in attesa di …”, scadenza e rigenerazione                                                                                     | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    | Implementato (`S3-1`): QR ad alto contrasto, share nativo Android, copia link `#token=`/`#server=...`, countdown 15 min, rigenerazione (placeholder mockup `lucciola.app`/`Nessuna scadenza` allineati a Deep Sky + TTL 15 min) |
 | **S1-D06** | **Unione del secondo partner**               | Apertura del link, nome, richiesta inviata, attesa                                                                                                                           | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    |                                                                                                                                                                                                                                 |
 | **S1-D07** | **Verifica reciproca**                       | Codice breve mostrato su entrambi i telefoni, istruzione di confrontarlo a voce, “coincide / non coincide”                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato  | Schermata dedicata `CodeVerificationPage` (6 cifre con stato live, copia codice, conferma e dialogo di annullamento su mancata corrispondenza)                                                                                 |
 | **S1-D08** | **Approvazione**                             | Sul telefono del primo partner: “… vuole unirsi”, approva o rifiuta                                                                                                          | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato  | Unito a S1-D07 per evitare troppi passaggi (conferma SAS + consegna chiave dal primo telefono e annullamento se non coincide)                                                                                                   |
 | **S1-D09** | **Ingresso nella casa**                      | Schermata di benvenuto che porta alla home                                                                                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato  | Schermata dedicata `SpaceSetupPage` (`S1-D07-2`: nome visibile con anteprima live per entrambi i partner, modificabile anche da Impostazioni tramite `PATCH /api/v1/pairing/devices/me`)                                        |
-| **S1-D10** | **Nuovo telefono**                           | chiave di recupero (inserimento guidato delle parole con controllo di ogni parola, avanzamento del recupero)                                                                 | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    |                                                                                                                                                                                                                                 |
-| **S1-D11** | **Gestione dispositivi**                     | Elenco, stato, revoca di un dispositivo                                                                                                                                      | Schermate e stati; codice web del mockup; testi IT/EN           | Da verificare | Tono non allarmante                                                                                                                                                                                                             |
-| **S1-D12** | **Permesso notifiche**                       | Richiesta spiegata nel momento giusto, non al primo avvio                                                                                                                    | Schermate e stati; testi IT/EN                                  | Da verificare | Su Android recenti è un permesso da chiedere esplicitamente                                                                                                                                                                     |
-| **S1-D13** | **Aggiornamenti**                            | Schermata con versione, canale, controllo, avanzamento; “aggiornamento richiesto” bloccante e gentile                                                                        | Schermate e stati; codice web del mockup; testi IT/EN           | Da verificare |                                                                                                                                                                                                                                 |
-| **S1-D14** | **Errori**                                   | Invito scaduto o già usato, server non raggiungibile, versione troppo vecchia, rete assente, tempo scaduto                                                                   | Schermate e stati; testi IT/EN                                  | Da verificare | Mai allarmistici (P-02, V-08)                                                                                                                                                                                                   |
-| **S1-D15** | **Diagramma del flusso**                     | Percorsi completi con punti di uscita e di errore, collegati ai codici S1-D02 … S1-D14                                                                                       | Diagramma                                                       | Da verificare | Deve coincidere con la macchina a stati di S1-CTR-01                                                                                                                                                                            |
-| **S1-D16** | **Componenti nuovi**                         | Campo per le parole di recupero, QR, codice di verifica                                                                                                                      | Componenti nel design system, con stati e token                 | Da verificare |                                                                                                                                                                                                                                 |
+| **S1-D10** | **Nuovo telefono**                           | chiave di recupero (inserimento guidato delle parole con controllo di ogni parola, avanzamento del recupero)                                                                 | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato  | Sezione recupero in `OnboardingPage`: conteggio parole BIP-39 live `N/24` con chip per parola (`RecoveryKeyCodec.isValidWord`), scansione QR ed errori calmi                                                                 |
+| **S1-D11** | **Gestione dispositivi**                     | Elenco, stato, revoca di un dispositivo                                                                                                                                      | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato  | Tab `Dispositivi` in `HomeShellPage`: elenco, stato, arruolamento QR/codice e dialogo di conferma calmo prima della revoca                                                                                                    |
+| **S1-D12** | **Permesso notifiche**                       | Richiesta spiegata nel momento giusto, non al primo avvio                                                                                                                    | Schermate e stati; testi IT/EN                                  | Implementato  | Prompt contestuale `push-optin-card` in `HomeShellPage` dopo l'ingresso in Home (non al primo avvio, dismissibile) + toggle in `Impostazioni`                                                                                 |
+| **S1-D13** | **Aggiornamenti**                            | Schermata con versione, canale, controllo, avanzamento; “aggiornamento richiesto” bloccante e gentile                                                                        | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato  | Versione, selettore canale `Stabile`/`Anteprima`, verifica, barra di avanzamento e schermata bloccante gentile `UpgradeRequiredPage`; da verificare live con release firmata                                                  |
+| **S1-D14** | **Errori**                                   | Invito scaduto o già usato, server non raggiungibile, versione troppo vecchia, rete assente, tempo scaduto                                                                   | Schermate e stati; testi IT/EN                                  | Implementato  | Messaggi calmi IT/EN (`P-02`, `V-08`) per invito non valido/scaduto, server offline, 426 e chiave errata senza trapelare dettagli interni                                                                                      |
+| **S1-D15** | **Diagramma del flusso**                     | Percorsi completi con punti di uscita e di errore, collegati ai codici S1-D02 … S1-D14                                                                                       | Diagramma                                                       | Implementato  | Diagramma Mermaid e stati completi documentati in `docs/enrollment-state-machine.md`, allineati a `S1-CTR-01`                                                                                                                  |
+| **S1-D16** | **Componenti nuovi**                         | Campo per le parole di recupero, QR, codice di verifica                                                                                                                      | Componenti nel design system, con stati e token                 | Da verificare | Componenti implementati nei flussi S3-1 con token `Intimate Sanctuary`; consolidamento formale nel design system da verificare con il designer                                                                                 |
 
 **Stato.** *Consegnato* (approvato dal promotore), *Parziale* (manca uno stato, un testo, un tema o
 il codice del mockup), *Da consegnare*, *Da verificare* (non ancora confrontato con il mockup già
@@ -123,16 +123,18 @@ dopo aver confermato l’identità sul telefono e con un avviso.
 **S1-CTR-01 · Macchina a stati dell’enrollment** — Ruolo: architetto · Rif.: cap. 7
 dell’Architettura
 
-- [ ] Stati e transizioni descritti (creazione, invito, richiesta, verifica, approvazione, recupero,
-  revoca)
-- [ ] Errori con **codici stabili** e mappatura sui messaggi dell’interfaccia
-- [ ] Versione del protocollo di enrollment dichiarata
-- [ ] Approvato dal designer: ogni stato ha una schermata
+- [x] Stati e transizioni descritti (creazione, invito, richiesta, verifica, approvazione, recupero,
+  revoca) *(`docs/enrollment-state-machine.md`)*
+- [x] Errori con **codici stabili** e mappatura sui messaggi dell’interfaccia
+  *(`docs/enrollment-state-machine.md`)*
+- [x] Versione del protocollo di enrollment dichiarata *(`docs/enrollment-state-machine.md`)*
+- [ ] Approvato dal designer: ogni stato ha una schermata *(bozza completa pronta per revisione)*
 
 **S1-DES-01 · Flusso e schermate finali** — Ruolo: designer
 
 - [ ] Tutte le aree del 5.2 consegnate con stati, testi IT/EN, tema chiaro e scuro
-- [ ] Diagramma del flusso con i punti di uscita e di errore
+- [ ] Diagramma del flusso con i punti di uscita e di errore *(bozza in `docs/enrollment-state-machine.md`
+  da validare)*
 - [ ] Componenti nuovi (campo per le parole, QR, codice di verifica) nel design system
 - [ ] Approvazione del promotore
 
@@ -144,38 +146,48 @@ dell’Architettura
 
 **S1-DES-03 · Guida all’installazione** — Ruolo: designer e redattore
 
-- [ ] Pagina o documento con passi illustrati, in italiano e inglese
+- [x] Pagina o documento con passi illustrati, in italiano e inglese *(`deploy/web/join/index.html`)*
 - [ ] Provata sul telefono della partner da qualcuno che non l’ha scritta
 
 **S1-INF-01 · Pagina di installazione e verifica dei link** — Ruolo: release e infrastruttura ·
 Rif.: AR-11
 
-- [ ] Pagina statica su `deepsky.vectevo.com` con la guida e il link all’ultima release stabile
+- [x] Pagina statica su `deepsky.vectevo.com` con la guida e il link all’ultima release stabile
+  *(`deploy/web/join/index.html`, servita via `deploy/Caddyfile` e `deploy/docker-compose.yml`)*
 - [ ] File di associazione tra dominio e app (asset links) pubblicato con l’impronta pubblica del
-  certificato
+  certificato *(template in `deploy/web/.well-known/assetlinks.json`; sostituire SHA-256 reale al
+  signing in `S1-REL-01`)*
 - [ ] Un link d’invito apre l’app se installata, la pagina di installazione se non lo è
+  *(intent-filter `autoVerify` in `AndroidManifest.xml` + `MainActivity`/`PlatformBridgePlugin` e
+  fallback JS in `/join` implementati; da verificare live su dominio e telefono reale)*
 - [ ] **Il segreto dell’invito non passa per il server**: proposta di metterlo nel frammento
-  dell’indirizzo; da verificare che l’app lo riceva e che non finisca nei log
-- [ ] Alternativa funzionante: inserimento manuale del codice
+  dell’indirizzo; da verificare che l’app lo riceva e che non finisca nei log *(parsing `#token=`
+  client-side e parsing nativo pronti; verifica con log di produzione in attesa del deploy)*
+- [x] Alternativa funzionante: inserimento manuale del codice
 
 **S1-SRV-01 · Creazione degli inviti** — Ruolo: sviluppatore backend · Rif.: AR-02
 
 - [x] Comando che crea un invito e ne stampa **link e QR**
 - [x] Monouso, con scadenza; un invito riscattato o scaduto è rifiutato
-- [ ] Limite di tentativi sul riscatto; nessuna possibilità di scoprire inviti validi per tentativi
-- [ ] Pulizia periodica degli inviti scaduti
+- [x] Limite di tentativi sul riscatto; nessuna possibilità di scoprire inviti validi per tentativi
+  *(`RouteGroup.INVITE_REDEEM` in `PublicEndpointRateLimiter` + risposta uniforme `409 Conflict` in
+  `PairingService.acceptInvite`; verificato con `PairingHardeningUnitTest`)*
+- [x] Pulizia periodica degli inviti scaduti *(`PairingCleanupService` con finestra
+  `INVITE_RETENTION_GRACE = 15m`; compilato e analizzato, integration test DB in attesa di Docker)*
 
 **S1-SRV-02 · Segnali dell’enrollment** — Ruolo: sviluppatore backend
 
-- [ ] Il primo partner riceve un segnale generico quando c’è una richiesta da approvare
-- [ ] Il segnale non contiene nomi né altri contenuti (S-02)
-- [ ] Richieste non approvate scadono
+- [x] Il primo partner riceve un segnale generico quando c’è una richiesta da approvare
+  *(`wakeup.pairing_request` in `PushService`, `PairingService` e `DeepSkyFirebaseMessagingService`)*
+- [x] Il segnale non contiene nomi né altri contenuti (S-02)
+- [x] Richieste non approvate scadono *(`PairingCleanupService` revoca dispositivi `INVITE_JOIN` /
+  `ENROLLMENT` non approvati oltre `UNAPPROVED_DEVICE_TTL = 30m`)*
 
 **S1-APP-01 · Guscio dell’app** — Ruolo: sviluppatore client
 
-- [ ] Navigazione, stato di sessione e gestione dei link d’invito *(in corso: `InviteLinkCodec`
-  `#token=`/`#server=...`, share nativo Android e instradamento verso `CodeVerificationPage`
-  `S1-D07` e `SpaceSetupPage` `S1-D09`/`S1-D07-2` pronti; da completare deep link OS e schermata
+- [x] Navigazione, stato di sessione e gestione dei link d’invito *(`InviteLinkCodec` `#token=`/`#server=`,
+  bridge deep link Android `MainActivity`/`PlatformBridgePlugin`/`NativeBridge`, instradamento verso
+  `CodeVerificationPage` `S1-D07`, `SpaceSetupPage` `S1-D09`/`S1-D07-2` e `RecoveryKeySetupPage`
   `S1-D04`)*
 - [x] Tema dai token del design system *(token `Intimate Sanctuary` scuro + chiaro armonizzato
   applicati in `DeepSkyTheme`; font OFL `Plus Jakarta Sans`/`Nunito Sans` da integrare in bundle
@@ -186,10 +198,10 @@ Rif.: AR-11
 **S1-APP-02 · Primo partner** — Ruolo: sviluppatore client · Dipende da: S1-APP-01
 
 - [x] Creazione della coppia da invito *(creazione automatica all'avvio per `S1-D03` e schermata
-  transitoria `SpaceSetupPage` `S1-D09`/`S1-D07-2` implementate; schermata dedicata `S1-D04`
-  ancora aperta)*
-- [ ] Chiave di recupero con **conferma obbligatoria** del salvataggio *(gate M2 già attivo;
-  schermata dedicata `S1-D04` ancora da realizzare)*
+  transitoria `SpaceSetupPage` `S1-D09`/`S1-D07-2` implementate)*
+- [x] Chiave di recupero con **conferma obbligatoria** del salvataggio *(schermata dedicata pre-Home
+  `RecoveryKeySetupPage` `S1-D04` con 24 parole/QR, copia/esportazione JSON, avviso S-06 e conferma
+  obbligatoria su server)*
 - [x] Invito al partner con stato e rigenerazione *(QR, share nativo, link compatto, scadenza 15
   min, verifica manuale e rigenerazione implementati in `WelcomeInvitePanel`)*
 - [x] Approvazione della richiesta con verifica reciproca *(implementata schermata dedicata
@@ -203,29 +215,36 @@ Rif.: AR-11
 - [x] Verifica reciproca; gestione di “non coincide” *(schermata dedicata `CodeVerificationPage`
   `S1-D07` con dialogo di conferma annullamento e rientro su `Unisciti`)*
 - [x] Ingresso nella casa dopo l’approvazione *(flusso `CodeVerificationPage` -> `SpaceSetupPage` ->
-  `HomeShellPage`)*
+  `RecoveryKeySetupPage` -> `HomeShellPage`)*
 
 **S1-APP-04 · Nuovo telefono** — Ruolo: sviluppatore client
 
-- [ ] Via altro telefono: QR o codice, verifica, approvazione
-- [ ] Via chiave di recupero: inserimento guidato, avanzamento, ripristino dei dati
-- [ ] Una chiave errata dà messaggi comprensibili, senza rivelare nulla di più
+- [x] Via altro telefono: QR o codice, verifica, approvazione
+- [x] Via chiave di recupero: inserimento guidato, avanzamento, ripristino dei dati *(chip parola
+  per parola con validazione `RecoveryKeyCodec.isValidWord` e contatore `N/24`)*
+- [x] Una chiave errata dà messaggi comprensibili, senza rivelare nulla di più
+  *(`_CalmUserException` IT/EN)*
 
 **S1-APP-05 · Dispositivi e permessi** — Ruolo: sviluppatore client
 
-- [ ] Elenco dispositivi e revoca *(già presente in `Dispositivi` con arruolamento ed elenco live;
-  esteso con aggiornamento nome visibile anche da Impostazioni)*
-- [ ] Permesso notifiche richiesto nel momento previsto dal design
-- [ ] Impostazioni minime *(aggiunto editor nome visibile sincronizzato con server tramite
-  `PATCH /api/v1/pairing/devices/me`)*
+- [x] Elenco dispositivi e revoca *(tab `Dispositivi` con arruolamento, elenco live e dialogo di
+  conferma calmo prima della revoca)*
+- [x] Permesso notifiche richiesto nel momento previsto dal design *(`push-optin-card` contestuale
+  dopo l'ingresso in Home, dismissibile, oltre al controllo in `Impostazioni`)*
+- [x] Impostazioni minime *(lingua IT/EN, tema notte/giorno, riduzione movimento, editor nome
+  visibile con `PATCH /api/v1/pairing/devices/me`, notifiche, aggiornamenti e canale)*
 
 **S1-UPD-01 · Aggiornamenti e canali** — Ruolo: sviluppatore Android nativo · Rif.: F-19, PD-18
 
-- [ ] Schermata aggiornamenti con versione, canale e avanzamento
-- [ ] Canale **stabile** (release normali) e **anteprima** (anche pre-release), selezionabile dalle
-  impostazioni
-- [ ] Versione minima imposta dal server con schermata bloccante gentile
-- [ ] Provato: la partner su stabile non riceve una anteprima
+- [x] Schermata aggiornamenti con versione, canale e avanzamento *(`Impostazioni` +
+  `UpgradeRequiredPage`)*
+- [x] Canale **stabile** (release normali) e **anteprima** (anche pre-release), selezionabile dalle
+  impostazioni *(`UpdateChannel.stable`/`preview` con persistenza locale e risoluzione GitHub
+  Releases)*
+- [x] Versione minima imposta dal server con schermata bloccante gentile *(`UpgradeRequiredPage` su
+  HTTP 426)*
+- [ ] Provato: la partner su stabile non riceve una anteprima *(logica coperta da unit test; da
+  verificare sul campo con release firmate)*
 
 **S1-SEC-01 · Revisione interna di sicurezza** — Ruolo: revisore di sicurezza, non l’autore del
 codice
@@ -251,8 +270,8 @@ codice
 
 **S1-DOC-01 · Procedura di emergenza** — Ruolo: redattore
 
-- [ ] Cosa fare se il server non risponde, se un aggiornamento è difettoso (nuova release con numero
-  più alto), se si perde un telefono o la chiave
+- [x] Cosa fare se il server non risponde, se un aggiornamento è difettoso (nuova release con numero
+  più alto), se si perde un telefono o la chiave *(`docs/emergency-procedure.md`)*
 
 **S1-REL-01 · Prima release sul campo** — Ruolo: release e infrastruttura
 
