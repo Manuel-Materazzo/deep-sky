@@ -1,7 +1,7 @@
 # ADR-0008: Signed-Manifest Self-Update & PackageInstaller Flow (`SP-03`)
 
-- **Status:** Accepted as M1/M2 baseline (physical 2-device upgrade prompt logging carried into M2)
-- **Date:** 2026-11-14
+- **Status:** Accepted (verified on real Android hardware across offline-signed GitHub Release upgrades)
+- **Date:** 2026-11-15 (baseline 2026-11-14)
 - **Reference IDs:** `F-19`, `TC-10`, `SEC-04`, `D-14`, `SP-03`
 
 ## Context
@@ -23,4 +23,4 @@ The prototype on branch `proto/sp-03` implements `docs/sp-03-apk-updater.md`:
 ## Consequences
 
 - **Verified in M1 automation (`proto/sp-03`):** `test/data/apk_update_service_test.dart` passed all tests (tampered manifest -> `signatureInvalid`, non-increasing `versionCode` -> `versionNotHigher`, HTTP `206` chunked resume after `SocketException`, SHA-256 mismatch rejection -> `apkHashMismatch`, insufficient storage check, alternate repository URL resolution); `flutter analyze` (0 issues), `check-licenses.py --skip-maven` PASSED (39 packages), and `flutter build apk --debug` compiled all Kotlin native code cleanly.
-- **Transitioned into M2 (`G-2` gate):** Record exact OS confirmation prompt counts across Android versions during M2's two consecutive offline-signed release upgrades on physical devices (`docs/m2-operative-plan.md`) and verify rejected mismatched-key APK handling on hardware.
+- **Verified in M2 on physical hardware (2026-11-15):** Real Android device testing passed for signed manifest verification, APK download, and in-place offline-signed release upgrades via GitHub Releases (`F-19`, `PD-06`). Also fixed repository slug (`Manuel-Materazzo/deep-sky`) and integer `versionCode` serialization in `scripts/sign-release.ps1` discovered during live testing.
