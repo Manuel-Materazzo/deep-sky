@@ -96,7 +96,7 @@ La scena non può essere l’unica forma di navigazione: serve un accesso minimo
 | Album, timeline, giorni insieme | F-10, F-11, F-12 | I giorni insieme non sono mai una misura d’impegno |
 | Gioco del giorno | F-14 | Un unico modulo coerente, non un pacco di mini-giochi |
 | Notifiche e widget | F-13, F-16 | Contenuto generico di default sulla schermata bloccata (S-02) |
-| Impostazioni e privacy | F-17, S-03 | Esportazione, cancellazione, interruzione dell’abbinamento con tono dignitoso e non colpevolizzante |
+| Impostazioni e privacy | F-17, S-03, S-04 | Esportazione, cancellazione definitiva, interruzione dell’abbinamento ed eventuale riattivazione consensuale della coppia con tono dignitoso e non colpevolizzante |
 | Personalizzazione | F-18 | Vedi capitolo 8 |
 | Stati vuoti, errori, offline, caricamento | tutte | Tono affettuoso, mai allarmante |
 | Aggiornamento dell’app | F-19 | Controllo, conferma e avanzamento; il permesso “Installa app sconosciute” va spiegato in modo semplice; schermata di “aggiornamento richiesto” quando il server impone una versione minima, con tono non allarmante |
