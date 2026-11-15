@@ -48,4 +48,11 @@ dependencies {
     // Runtime-configured FCM without build-time google-services.json (SP-01, TC-04).
     implementation("com.google.firebase:firebase-messaging:24.1.0")
     implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.activity:activity-ktx:1.10.1")
+    // Open-source Apache-2.0 CameraX + ZXing QR scanning (`S1-D06`, `S1-D10`, SEC-02).
+    implementation("androidx.camera:camera-core:1.4.2")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
+    implementation("com.google.zxing:core:3.5.3")
 }

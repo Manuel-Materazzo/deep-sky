@@ -8,6 +8,7 @@ import android.os.Build
 import androidx.core.app.ActivityCompat
 import com.vectevo.deep_sky.platform.installer.ApkInstallerCoordinator
 import com.vectevo.deep_sky.platform.push.RuntimeFirebaseCoordinator
+import com.vectevo.deep_sky.platform.scanner.QrScannerActivity
 import com.vectevo.deep_sky.platform.widget.HomeWidgetCoordinator
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
@@ -29,9 +30,11 @@ class PlatformBridgePlugin(
     companion object {
         const val CHANNEL_NAME = "com.vectevo.deep_sky/platform"
         private const val REQ_POST_NOTIFICATIONS = 4102
+        private const val REQ_SCAN_QR = 4104
     }
 
     private var pendingPermissionResult: MethodChannel.Result? = null
+    private var pendingScanResult: MethodChannel.Result? = null
 
     fun register(flutterEngine: FlutterEngine) {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
@@ -84,6 +87,7 @@ class PlatformBridgePlugin(
             }
             "requestNotificationPermission" -> handleRequestNotificationPermission(result)
             "shareText" -> handleShareText(call, result)
+            "scanQrCode" -> handleScanQrCode(call, result)
             else -> result.notImplemented()
         }
     }
@@ -152,6 +156,49 @@ class PlatformBridgePlugin(
         } catch (_: Exception) {
             result.success(false)
         }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun handleScanQrCode(call: MethodCall, result: MethodChannel.Result) {
+        val hostActivity = activity
+        if (hostActivity == null) {
+            result.error("camera_unavailable", "No host activity available to launch camera scanner.", null)
+            return
+        }
+        pendingScanResult?.success(null)
+        pendingScanResult = result
+
+        val scannerIntent = Intent(hostActivity, QrScannerActivity::class.java).apply {
+            call.argument<String>("title")?.let { putExtra(QrScannerActivity.EXTRA_TITLE, it) }
+            call.argument<String>("hint")?.let { putExtra(QrScannerActivity.EXTRA_HINT, it) }
+            call.argument<String>("cancelLabel")?.let { putExtra(QrScannerActivity.EXTRA_CANCEL_LABEL, it) }
+        }
+        try {
+            hostActivity.startActivityForResult(scannerIntent, REQ_SCAN_QR)
+        } catch (_: Exception) {
+            pendingScanResult = null
+            result.error("camera_unavailable", "Unable to start QR scanner activity.", null)
+        }
+    }
+
+    fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode != REQ_SCAN_QR) {
+            return false
+        }
+        val callback = pendingScanResult ?: return true
+        pendingScanResult = null
+        if (resultCode == Activity.RESULT_OK) {
+            val payload = data?.getStringExtra(QrScannerActivity.EXTRA_RESULT_PAYLOAD)?.trim()
+            callback.success(payload?.takeIf { it.isNotEmpty() })
+        } else {
+            val errCode = data?.getStringExtra(QrScannerActivity.EXTRA_ERROR_CODE)
+            if (errCode != null) {
+                callback.error(errCode, "QR scanner aborted ($errCode).", null)
+            } else {
+                callback.success(null)
+            }
+        }
+        return true
     }
 
     @Suppress("DEPRECATION")

@@ -151,4 +151,33 @@ class NativeBridge {
       return false;
     }
   }
+
+  /// Opens the native CameraX QR code scanner (`S1-D06`, `S1-D10`) and returns
+  /// the decoded text, or `null` if cancelled or unsupported on this platform.
+  ///
+  /// Propagates [PlatformException] for explicit camera permission denials or
+  /// hardware failures so the UI can display a calm localized hint.
+  Future<String?> scanQrCode({
+    String? title,
+    String? hint,
+    String? cancelLabel,
+  }) async {
+    try {
+      final String? payload = await _channel.invokeMethod<String>(
+        'scanQrCode',
+        <String, Object?>{
+          if (title != null && title.isNotEmpty) 'title': title,
+          if (hint != null && hint.isNotEmpty) 'hint': hint,
+          if (cancelLabel != null && cancelLabel.isNotEmpty)
+            'cancelLabel': cancelLabel,
+        },
+      );
+      if (payload == null || payload.trim().isEmpty) {
+        return null;
+      }
+      return payload.trim();
+    } on MissingPluginException {
+      return null;
+    }
+  }
 }

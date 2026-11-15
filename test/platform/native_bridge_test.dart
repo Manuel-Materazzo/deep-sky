@@ -181,4 +181,52 @@ void main() {
       'subject': 'Deep Sky',
     });
   });
+
+  test(
+    'scanQrCode returns decoded payload and propagates permission error',
+    () async {
+      expect(await bridge.scanQrCode(), isNull);
+
+      MethodCall? captured;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall call) async {
+            captured = call;
+            if (call.method == 'scanQrCode') {
+              return '  https://deepsky.vectevo.com/join#token=qr_99  ';
+            }
+            return null;
+          });
+
+      final String? scanned = await bridge.scanQrCode(
+        title: 'Inquadra codice QR',
+        hint: 'Inquadra il QR del partner',
+        cancelLabel: 'Annulla',
+      );
+      expect(scanned, 'https://deepsky.vectevo.com/join#token=qr_99');
+      expect(captured?.arguments, <String, Object?>{
+        'title': 'Inquadra codice QR',
+        'hint': 'Inquadra il QR del partner',
+        'cancelLabel': 'Annulla',
+      });
+
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall call) async {
+            throw PlatformException(
+              code: 'camera_permission_denied',
+              message: 'Denied',
+            );
+          });
+
+      expect(
+        bridge.scanQrCode(),
+        throwsA(
+          isA<PlatformException>().having(
+            (PlatformException e) => e.code,
+            'code',
+            'camera_permission_denied',
+          ),
+        ),
+      );
+    },
+  );
 }
