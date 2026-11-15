@@ -2,6 +2,7 @@ package com.vectevo.deep_sky_server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -142,6 +143,23 @@ class Sp02PairingAndSyncIntegrationTest {
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.fromDeviceId").value(devAId))
 				.andExpect(jsonPath("$.ciphertextB64").value(b64(wrapCipher)));
+
+		// 4b. Device B updates its own visible name (`S1-D07-2`)
+		String renameBody = objectMapper.writeValueAsString(new UpdateDeviceLabelBody("Luna"));
+		mockMvc.perform(signed(
+						patch("/api/v1/pairing/devices/me")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(renameBody),
+						devBId,
+						devBAuthKp,
+						renameBody))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.deviceId").value(devBId))
+				.andExpect(jsonPath("$.label").value("Luna"));
+
+		mockMvc.perform(signed(get("/api/v1/pairing/devices"), devAId, devAAuthKp, ""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$[1].label").value("Luna"));
 
 		// 5. Device A uploads an opaque encrypted envelope (server must not see eventType or unlock dates)
 		String envId = UUID.randomUUID().toString();
@@ -463,6 +481,8 @@ class Sp02PairingAndSyncIntegrationTest {
 			String ciphertextB64) {}
 
 	private record ChallengeBody(String recoveryAuthPublicKeyB64) {}
+
+	private record UpdateDeviceLabelBody(String deviceLabel) {}
 
 	private record CompleteRecoveryBody(
 			String challengeId,

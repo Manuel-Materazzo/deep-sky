@@ -310,6 +310,23 @@ public class PairingService {
 	}
 
 	@Transactional
+	public DeviceView updateOwnDeviceLabel(DevicePrincipal principal, String deviceLabel) {
+		DeviceEntity device = deviceRepository.findById(principal.deviceId())
+				.orElseThrow(() -> new NoSuchElementException("Device not found"));
+		if (!device.getCoupleId().equals(principal.coupleId()) || device.getRevokedAt() != null) {
+			throw new NoSuchElementException("Device not found");
+		}
+		device.setLabel(sanitizeLabel(deviceLabel));
+		deviceRepository.save(device);
+		return new DeviceView(
+				device.getId(),
+				device.getLabel(),
+				device.getEnrolledVia(),
+				device.getCreatedAt(),
+				device.getRevokedAt());
+	}
+
+	@Transactional
 	public void revokeDevice(DevicePrincipal principal, UUID targetDeviceId) {
 		DeviceEntity target = deviceRepository.findById(targetDeviceId)
 				.orElseThrow(() -> new NoSuchElementException("Device not found"));
