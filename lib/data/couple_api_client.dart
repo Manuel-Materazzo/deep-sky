@@ -300,6 +300,28 @@ class CoupleApiClient {
         .toList(growable: false);
   }
 
+  Future<DeviceSummary> updateMyDeviceLabel({
+    required LocalDeviceIdentity identity,
+    required String deviceLabel,
+  }) async {
+    final Object? raw = await _signedRequest(
+      method: 'PATCH',
+      pathWithQuery: '/api/v1/pairing/devices/me',
+      identity: identity,
+      body: <String, Object?>{'deviceLabel': deviceLabel},
+    );
+    final Map<String, Object?> d = raw! as Map<String, Object?>;
+    return DeviceSummary(
+      deviceId: d['deviceId'] as String,
+      label: d['label'] as String,
+      enrolledVia: d['enrolledVia'] as String,
+      createdAt: DateTime.parse(d['createdAt'] as String).toUtc(),
+      revokedAt: d['revokedAt'] == null
+          ? null
+          : DateTime.parse(d['revokedAt'] as String).toUtc(),
+    );
+  }
+
   Future<void> revokeDevice({
     required LocalDeviceIdentity identity,
     required String targetDeviceId,
@@ -466,6 +488,7 @@ class CoupleApiClient {
     final http.Response res = switch (method.toUpperCase()) {
       'GET' => await _http.get(uri, headers: headers),
       'POST' => await _http.post(uri, headers: headers, body: bodyBytes),
+      'PATCH' => await _http.patch(uri, headers: headers, body: bodyBytes),
       'DELETE' => await _http.delete(uri, headers: headers),
       _ => throw UnsupportedError('Unsupported method $method'),
     };

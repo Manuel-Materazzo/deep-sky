@@ -164,6 +164,7 @@ class PairingAndSyncRepository {
       kemPublicKey: kemPub,
       recoverySeed: recoverySeed,
       pairingCompleted: false,
+      nameSetupCompleted: false,
     );
     await saveIdentity(identity);
     await savePendingInvite(invite);
@@ -275,6 +276,7 @@ class PairingAndSyncRepository {
       kemPrivateKey: kemPriv,
       kemPublicKey: kemPub,
       pairingCompleted: false,
+      nameSetupCompleted: false,
     );
     await clearPendingInvite();
     await saveIdentity(identity);
@@ -410,6 +412,7 @@ class PairingAndSyncRepository {
       recoverySeed: recoverySeed,
       recoverySavedConfirmed: true,
       pairingCompleted: true,
+      nameSetupCompleted: false,
     );
     await clearPendingInvite();
     await saveIdentity(recovered);
@@ -545,6 +548,50 @@ class PairingAndSyncRepository {
         createdAtServer: rec.envelope.createdAtServer,
         payload: rec.payload,
       );
+
+  /// Updates the visible label for the current device locally and on the server (`S1-D07-2`).
+  ///
+  /// When [bestEffortRemote] is true (e.g. completing the initial welcome setup),
+  /// a missing endpoint on older servers (`404`/`405`) or transient offline
+  /// failure will not block local completion.
+  Future<LocalDeviceIdentity> updateOwnDeviceLabel({
+    required String deviceLabel,
+    bool markNameSetupCompleted = false,
+    bool bestEffortRemote = false,
+  }) async {
+    final LocalDeviceIdentity current = await _requireIdentity();
+    final String trimmed = deviceLabel.trim();
+    final String clean = trimmed.length > 64
+        ? trimmed.substring(0, 64)
+        : trimmed;
+    final LocalDeviceIdentity updated = current.copyWith(
+      deviceLabel: clean,
+      nameSetupCompleted:
+          markNameSetupCompleted ? true : current.nameSetupCompleted,
+    );
+    await saveIdentity(updated);
+
+    try {
+      await _clientFactory(updated.serverUrl).updateMyDeviceLabel(
+        identity: updated,
+        deviceLabel: clean,
+      );
+    } on ClientUpgradeRequiredException {
+      rethrow;
+    } on ApiRequestException catch (ex) {
+      if (bestEffortRemote || ex.statusCode == 404 || ex.statusCode == 405) {
+        return updated;
+      }
+      rethrow;
+    } on SocketException {
+      if (!bestEffortRemote) rethrow;
+    } on http.ClientException {
+      if (!bestEffortRemote) rethrow;
+    } on TimeoutException {
+      if (!bestEffortRemote) rethrow;
+    }
+    return updated;
+  }
 
   Future<List<DeviceSummary>> listDevices() async {
     final LocalDeviceIdentity identity = await _requireIdentity();

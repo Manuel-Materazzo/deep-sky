@@ -232,4 +232,95 @@ class DeepSkyStrings {
   String get localResetDoneNotice => isIt
       ? 'Spazio locale pulito. Puoi creare una nuova casa o ricollegarti.'
       : 'Local space cleared. You can create a new home or reconnect.';
+
+  // Code Verification (`S1-D07` / `S1-D08`)
+  String get verificationAppBarTitle =>
+      isIt ? 'Verifica abbinamento' : 'Partner verification';
+  String get verificationBadge =>
+      isIt ? 'Verifica della chiave a due' : 'Two-way key verification';
+  String get verificationHeadline =>
+      isIt ? 'Conferma con l\'altro telefono' : 'Confirm with the other phone';
+  String get verificationSubtitle => isIt
+      ? 'Chiedi al tuo partner di controllare se sullo schermo legge la stessa combinazione luminosa.'
+      : 'Ask your partner to check if their screen shows the same luminous code.';
+  String verificationConnectedPeer(String label) => isIt
+      ? '$label vuole unirsi a voi'
+      : '$label wants to join you';
+  String verificationInvitedBy(String label) =>
+      isIt ? 'Invito da $label' : 'Invite from $label';
+  String get sharedSasCodeLabel =>
+      isIt ? 'Codice SAS condiviso' : 'Shared SAS code';
+  String get verificationWaitingForPartner =>
+      isIt ? 'In attesa dell\'altro telefono…' : 'Waiting for the other phone…';
+  String get verificationReadyToConfirm => isIt
+      ? 'Pronto per la tua conferma'
+      : 'Ready for your confirmation';
+  String get verificationSyncedTag => isIt ? 'Sincrono' : 'Synced';
+  String get verificationConfirmInviterButton => isIt
+      ? 'Il codice coincide • Completa chiavi'
+      : 'Code matches • Complete keys';
+  String get verificationConfirmJoinerButton => isIt
+      ? 'Il codice coincide • Completa ricezione'
+      : 'Code matches • Complete setup';
+  String get verificationMismatchButton =>
+      isIt ? 'Il codice non coincide' : 'Code doesn\'t match';
+  String get verificationMismatchDialogTitle =>
+      isIt ? 'Il codice non coincide?' : 'Code doesn\'t match?';
+  String get verificationMismatchDialogBody => isIt
+      ? 'Se i numeri sui due schermi sono diversi, non completare l\'abbinamento. Annulleremo questo tentativo in sicurezza per riprovare con un nuovo invito.'
+      : 'If the numbers on both screens differ, do not complete pairing. We will safely cancel this attempt so you can try again with a new invite.';
+  String get verificationMismatchConfirmButton =>
+      isIt ? 'Annulla abbinamento' : 'Cancel pairing';
+  String get verificationMismatchKeepButton =>
+      isIt ? 'Torna al codice' : 'Back to code';
+  String get verificationMismatchCancelledNotice => isIt
+      ? 'Verifica annullata: i codici non coincidevano. Abbiamo chiuso il tentativo in sicurezza; riprova con un nuovo invito.'
+      : 'Verification cancelled: the codes did not match. We safely closed this attempt; try again with a new invite.';
+  String get verificationWhyTitle =>
+      isIt ? 'Perché questo passaggio?' : 'Why this step?';
+  String get verificationWhyBody => isIt
+      ? 'È un piccolo rituale iniziale per accertarvi che nessun occhio esterno possa mai intercettare i vostri ricordi, foto o sussurri notturni. Una volta confermato, non vi sarà più richiesto.'
+      : 'It is a small initial ritual to ensure no outside eyes can ever intercept your memories, photos, or late-night whispers. Once confirmed, you won\'t be asked again.';
+
+  // Space & Name Setup (`S1-D07-2` / `S1-D09`)
+  String get spaceSetupAppBarTitle =>
+      isIt ? 'Il vostro spazio' : 'Our Space Setup';
+  String get spaceSetupBadge =>
+      isIt ? 'Fase finale di accoglienza' : 'Final welcome step';
+  String get spaceSetupHeadline => isIt
+      ? 'Come vi chiamate nei vostri momenti?'
+      : 'How should your partner see you?';
+  String get spaceSetupSubtitle => isIt
+      ? 'Scegli il nome con cui chi ami ti vedrà.'
+      : 'Choose the name your loved one will see in the app.';
+  String get spaceSetupPreviewYouFallback => isIt ? 'Tu' : 'You';
+  String get spaceSetupPreviewPartnerFallback => isIt ? 'Partner' : 'Partner';
+  String get spaceSetupPreviewHomeLabel =>
+      isIt ? 'La nostra casa' : 'Our home';
+  String get spaceSetupInputLabel => isIt
+      ? 'Il tuo nome o vezzeggiativo'
+      : 'Your name or pet name';
+  String get spaceSetupInputVisibleHint =>
+      isIt ? 'Visibile a chi ami' : 'Visible to your partner';
+  String get spaceSetupInputPlaceholder =>
+      isIt ? 'es. Luca, Cucciolo, Luccio...' : 'e.g. Alex, Sam, Love...';
+  String get spaceSetupClearTooltip =>
+      isIt ? 'Cancella nome' : 'Clear name';
+  String get spaceSetupSubmitButton => isIt
+      ? 'Tutto pronto, entra nella casa'
+      : 'All set, enter our home';
+  String get spaceSetupSkipButton => isIt
+      ? 'Puoi sempre cambiarlo più tardi nelle impostazioni'
+      : 'You can always change it later in settings';
+  String get settingsProfileCardTitle => isIt
+      ? 'Il tuo nome nella casa'
+      : 'Your name in your home';
+  String get settingsProfileCardSubtitle => isIt
+      ? 'È il nome che vede chi ami nei dispositivi e nei vostri momenti condivisi.'
+      : 'This is the name your partner sees in devices and shared moments.';
+  String get settingsSaveNameButton =>
+      isIt ? 'Aggiorna nome' : 'Update name';
+  String get deviceNameUpdatedNotice => isIt
+      ? 'Nome aggiornato.'
+      : 'Name updated.';
 }

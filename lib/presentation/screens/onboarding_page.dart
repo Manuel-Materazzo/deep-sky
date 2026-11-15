@@ -30,20 +30,18 @@ class _OnboardingPageState extends State<OnboardingPage> {
   late final TextEditingController _serverController = TextEditingController(
     text: widget.controller.activeServerUrl,
   );
-  late final TextEditingController _labelController = TextEditingController(
-    text: widget.controller.deviceLabel,
-  );
   final TextEditingController _inviteTokenController = TextEditingController();
   final TextEditingController _recoveryController = TextEditingController();
 
-  int _modeIndex = 0;
+  late int _modeIndex;
 
   @override
   void initState() {
     super.initState();
-    if (widget.controller.pendingJoin != null) {
-      _modeIndex = 1;
-    } else {
+    _modeIndex = widget.controller.pendingJoin != null
+        ? 1
+        : widget.controller.onboardingTabIndex;
+    if (_modeIndex == 0 && widget.controller.pendingJoin == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
           return;
@@ -58,7 +56,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
   @override
   void dispose() {
     _serverController.dispose();
-    _labelController.dispose();
     _inviteTokenController.dispose();
     _recoveryController.dispose();
     super.dispose();
@@ -68,6 +65,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     if (_modeIndex == index) {
       return;
     }
+    widget.controller.setOnboardingTabIndex(index);
     setState(() => _modeIndex = index);
     if (index == 0 &&
         widget.controller.activeInvite == null &&
@@ -176,21 +174,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       Text(
                         s.preferencesSheetTitle,
                         style: textTheme.titleLarge,
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        key: const Key('preferences-device-label-field'),
-                        controller: _labelController,
-                        textInputAction: TextInputAction.done,
-                        onChanged: c.setDeviceLabel,
-                        onSubmitted: c.setDeviceLabel,
-                        decoration: InputDecoration(
-                          labelText: s.deviceNameFieldLabel,
-                          prefixIcon: Icon(
-                            Icons.smartphone_outlined,
-                            color: tokens.mutedInk,
-                          ),
-                        ),
                       ),
                       const SizedBox(height: 12),
                       SwitchListTile(
@@ -453,7 +436,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
     await c.acceptInvite(
       serverUrl: _serverController.text,
       inviteToken: scanned,
-      deviceLabel: _labelController.text,
+      deviceLabel: c.deviceLabel,
     );
   }
 
@@ -611,7 +594,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 : () => c.acceptInvite(
                     serverUrl: _serverController.text,
                     inviteToken: _inviteTokenController.text,
-                    deviceLabel: _labelController.text,
+                    deviceLabel: c.deviceLabel,
                   ),
             icon: const Icon(Icons.link_rounded),
             label: Text(s.isIt ? 'Unisciti con invito' : 'Join with invite'),
@@ -706,7 +689,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               : () => c.recoverWithKey(
                   serverUrl: _serverController.text,
                   recoveryInput: _recoveryController.text,
-                  deviceLabel: _labelController.text,
+                  deviceLabel: c.deviceLabel,
                 ),
           icon: const Icon(Icons.key_rounded),
           label: Text(

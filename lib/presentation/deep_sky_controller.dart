@@ -87,6 +87,7 @@ class DeepSkyController extends ChangeNotifier {
   bool reduceMotion = false;
   bool petOverrideActive = false;
   bool autoInviteAttempted = false;
+  int onboardingTabIndex = 0;
   String languageCode = 'it';
   late String activeServerUrl = defaultServerUrl;
   String deviceLabel = 'Telefono principale';
@@ -98,6 +99,7 @@ class DeepSkyController extends ChangeNotifier {
   InviteStatusResponse? activeInviteStatus;
   String? activeSasCode;
   PendingJoinSession? pendingJoin;
+  String? _lastKnownPeerLabel;
   List<CachedEventEntry> events = const <CachedEventEntry>[];
   List<DeviceSummary> devices = const <DeviceSummary>[];
   SceneManifest? sceneManifest;
@@ -308,6 +310,35 @@ class DeepSkyController extends ChangeNotifier {
   bool get isCustomServer =>
       InviteLinkCodec.displayHost(activeServerUrl).toLowerCase() !=
       InviteLinkCodec.displayHost(defaultServerUrl).toLowerCase();
+
+  bool get needsCodeVerification =>
+      (phase == AppBootPhase.unpaired || phase == AppBootPhase.waiting) &&
+      (pendingJoin != null || activeSasCode != null);
+
+  bool get needsSpaceSetup =>
+      phase == AppBootPhase.paired &&
+      identity != null &&
+      !identity!.nameSetupCompleted &&
+      !isDeviceRevoked;
+
+  String? get partnerDisplayLabel {
+    final String? myId = identity?.deviceId;
+    for (final DeviceSummary dev in devices) {
+      if (dev.deviceId != myId &&
+          dev.revokedAt == null &&
+          dev.label.trim().isNotEmpty) {
+        return dev.label.trim();
+      }
+    }
+    final String? fallback =
+        _lastKnownPeerLabel ??
+        pendingJoin?.peerLabel ??
+        activeInviteStatus?.acceptedLabel;
+    if (fallback != null && fallback.trim().isNotEmpty) {
+      return fallback.trim();
+    }
+    return null;
+  }
 
   String? get activeInviteUri {
     final CreateInviteResponse? invite = activeInvite;
@@ -520,6 +551,7 @@ class DeepSkyController extends ChangeNotifier {
         status.acceptedKemPublicKey == null) {
       throw StateError('L\'altro telefono non ha ancora aperto l\'invito.');
     }
+    _lastKnownPeerLabel = status.acceptedLabel;
     await _repository.confirmSasAndDeliverRootKey(
       targetDeviceId: status.acceptedDeviceId!,
       targetKemPublicKey: status.acceptedKemPublicKey!,
@@ -543,12 +575,17 @@ class DeepSkyController extends ChangeNotifier {
     final parsed = InviteLinkCodec.parseInviteInput(inviteToken);
     final String resolvedServer = (parsed.serverUrl ?? serverUrl).trim();
     activeServerUrl = resolvedServer;
-    this.deviceLabel = deviceLabel.trim();
+    final String cleanLabel = deviceLabel.trim().isEmpty
+        ? DeepSkyStrings(languageCode).defaultDeviceLabel
+        : deviceLabel.trim();
+    this.deviceLabel = cleanLabel;
+    onboardingTabIndex = 1;
     pendingJoin = await _repository.acceptInvite(
       serverUrl: resolvedServer,
       inviteToken: parsed.inviteToken,
-      deviceLabel: this.deviceLabel,
+      deviceLabel: cleanLabel,
     );
+    _lastKnownPeerLabel = pendingJoin!.peerLabel;
     identity = pendingJoin!.identity;
   });
 
@@ -579,6 +616,7 @@ class DeepSkyController extends ChangeNotifier {
       }
       rethrow;
     }
+    _lastKnownPeerLabel = session.peerLabel;
     pendingJoin = null;
     phase = AppBootPhase.paired;
     await _refreshPairedState();
@@ -589,23 +627,137 @@ class DeepSkyController extends ChangeNotifier {
     await _repository.clearPendingInvite();
     identity = null;
     pendingJoin = null;
+    _lastKnownPeerLabel = null;
     activeInvite = null;
     activeInviteStatus = null;
     activeSasCode = null;
     phase = AppBootPhase.unpaired;
     autoInviteAttempted = false;
+    onboardingTabIndex = 1;
   });
+
+  void returnToInviteScreen() {
+    activeSasCode = null;
+    activeInviteStatus = null;
+    statusNotice = null;
+    errorNotice = null;
+    notifyListeners();
+  }
+
+  void setOnboardingTabIndex(int index) {
+    onboardingTabIndex = index.clamp(0, 2);
+  }
+
+  /// Aborts an active SAS verification when the codes do not match (`S1-D07`).
+  Future<void> cancelVerificationOnMismatch() => _runGuarded(() async {
+    final String notice =
+        DeepSkyStrings(languageCode).verificationMismatchCancelledNotice;
+    if (pendingJoin != null) {
+      await _repository.clearIdentity();
+      await _repository.clearPendingInvite();
+      identity = null;
+      pendingJoin = null;
+      _lastKnownPeerLabel = null;
+      activeInvite = null;
+      activeInviteStatus = null;
+      activeSasCode = null;
+      phase = AppBootPhase.unpaired;
+      autoInviteAttempted = false;
+      onboardingTabIndex = 1;
+      statusNotice = notice;
+      return;
+    }
+
+    if (identity != null && !identity!.pairingCompleted) {
+      await _repository.clearIdentity();
+      await _repository.clearPendingInvite();
+      identity = null;
+      _lastKnownPeerLabel = null;
+      activeInvite = null;
+      activeInviteStatus = null;
+      activeSasCode = null;
+      phase = AppBootPhase.unpaired;
+      autoInviteAttempted = true;
+      onboardingTabIndex = 0;
+      final String cleanLabel = deviceLabel.trim().isEmpty
+          ? DeepSkyStrings(languageCode).defaultDeviceLabel
+          : deviceLabel.trim();
+      final result = await _repository.createInitialInvite(
+        serverUrl: activeServerUrl,
+        deviceLabel: cleanLabel,
+      );
+      identity = result.identity;
+      activeInvite = result.invite;
+      phase = AppBootPhase.waiting;
+      statusNotice = notice;
+      return;
+    }
+
+    activeInvite = null;
+    activeInviteStatus = null;
+    activeSasCode = null;
+    statusNotice = notice;
+  });
+
+  Future<void> completeNameSetup(String rawName) => _runGuarded(() async {
+    final String trimmed = rawName.trim();
+    final String resolved = trimmed.isEmpty
+        ? DeepSkyStrings(languageCode).defaultDeviceLabel
+        : trimmed;
+    final LocalDeviceIdentity updated = await _repository.updateOwnDeviceLabel(
+      deviceLabel: resolved,
+      markNameSetupCompleted: true,
+      bestEffortRemote: true,
+    );
+    identity = updated;
+    deviceLabel = updated.deviceLabel;
+    if (!isOffline && !isDeviceRevoked) {
+      try {
+        devices = await _repository.listDevices();
+      } catch (_) {
+        // Keep current cached devices if offline or server unreachable.
+      }
+    }
+  });
+
+  Future<void> skipNameSetup() => completeNameSetup(deviceLabel);
+
+  Future<void> updateDeviceLabelFromSettings(String rawName) =>
+      _runGuarded(() async {
+        final String trimmed = rawName.trim();
+        if (trimmed.isEmpty) {
+          return;
+        }
+        final LocalDeviceIdentity updated = await _repository
+            .updateOwnDeviceLabel(
+              deviceLabel: trimmed,
+              markNameSetupCompleted: true,
+              bestEffortRemote: false,
+            );
+        identity = updated;
+        deviceLabel = updated.deviceLabel;
+        if (!isOffline && !isDeviceRevoked) {
+          try {
+            devices = await _repository.listDevices();
+          } catch (_) {}
+        }
+        statusNotice = DeepSkyStrings(languageCode).deviceNameUpdatedNotice;
+      });
 
   Future<void> recoverWithKey({
     required String serverUrl,
     required String recoveryInput,
     required String deviceLabel,
   }) => _runGuarded(() async {
+    final String cleanLabel = deviceLabel.trim().isEmpty
+        ? DeepSkyStrings(languageCode).defaultDeviceLabel
+        : deviceLabel.trim();
     identity = await _repository.recoverWithRecoveryKey(
       serverUrl: serverUrl.trim(),
       recoveryInput: recoveryInput.trim(),
-      deviceLabel: deviceLabel.trim(),
+      deviceLabel: cleanLabel,
     );
+    this.deviceLabel = cleanLabel;
     phase = AppBootPhase.paired;
     await _refreshPairedState();
   });
@@ -719,10 +871,12 @@ class DeepSkyController extends ChangeNotifier {
     activeInviteStatus = null;
     activeSasCode = null;
     pendingJoin = null;
+    _lastKnownPeerLabel = null;
     pushStatus = null;
     isOffline = false;
     isDeviceRevoked = false;
     autoInviteAttempted = false;
+    onboardingTabIndex = 0;
     activeServerUrl = defaultServerUrl;
     sceneState = const SceneStateSnapshot(
       slotStates: <String, String>{'window': 'calm'},

@@ -28,6 +28,11 @@ class HomeShellPage extends StatefulWidget {
 
 class _HomeShellPageState extends State<HomeShellPage> {
   final TextEditingController _noteController = TextEditingController();
+  late final TextEditingController _deviceLabelController =
+      TextEditingController(
+        text: widget.controller.identity?.deviceLabel ??
+            widget.controller.deviceLabel,
+      );
   late final TextEditingController _updateSourceController =
       TextEditingController(text: widget.controller.defaultUpdateSource);
   late final TextEditingController _updateKeyController = TextEditingController(
@@ -40,6 +45,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
   @override
   void dispose() {
     _noteController.dispose();
+    _deviceLabelController.dispose();
     _updateSourceController.dispose();
     _updateKeyController.dispose();
     super.dispose();
@@ -619,6 +625,67 @@ class _HomeShellPageState extends State<HomeShellPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  s.settingsProfileCardTitle,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  s.settingsProfileCardSubtitle,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  key: const Key('settings-device-label-field'),
+                  controller: _deviceLabelController,
+                  maxLength: 64,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(
+                    labelText: s.spaceSetupInputLabel,
+                    counterText: '',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                FilledButton.tonalIcon(
+                  key: const Key('settings-save-device-label-button'),
+                  onPressed: c.busy || c.isOffline || c.isDeviceRevoked
+                      ? null
+                      : () => c.updateDeviceLabelFromSettings(
+                          _deviceLabelController.text,
+                        ),
+                  icon: const Icon(Icons.check_rounded, size: 18),
+                  label: Text(s.settingsSaveNameButton),
+                ),
+                if (c.statusNotice != null) ...<Widget>[
+                  const SizedBox(height: 8),
+                  Text(
+                    c.statusNotice!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: DeepSkyTheme.tokensOf(context).calmAccent,
+                    ),
+                  ),
+                ],
+                if (c.errorNotice != null) ...<Widget>[
+                  const SizedBox(height: 8),
+                  Text(
+                    c.errorNotice!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),

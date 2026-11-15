@@ -90,16 +90,33 @@ void main() {
       );
       expect(ctrlB.pendingJoin?.sasCode, isNotEmpty);
 
-      // Partner A polls invite, verifies matching SAS, and delivers wrapped key.
+      // Partner A polls invite -> transitions to dedicated S1-D07 CodeVerificationPage,
+      // verifies matching SAS, and delivers wrapped key.
       await tapVisible(find.byKey(const Key('poll-invite-button')));
+      expect(find.byKey(const Key('code-verification-page')), findsOneWidget);
+      expect(find.byKey(const Key('inviter-sas-code')), findsOneWidget);
       expect(
-        find.text('Codice di verifica SAS: ${ctrlB.pendingJoin!.sasCode}'),
+        find.bySemanticsLabel('SAS ${ctrlB.pendingJoin!.sasCode}'),
         findsOneWidget,
       );
       await tapVisible(find.byKey(const Key('confirm-sas-button')));
 
       // Complete Partner B join too.
       await ctrlB.completeJoinDelivery();
+      await ctrlB.skipNameSetup();
+
+      // Partner A now lands on S1-D07-2 SpaceSetupPage -> names their space/self and proceeds to Home.
+      expect(find.byKey(const Key('space-setup-page')), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const Key('space-setup-name-field')),
+        'Luca',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(find.byKey(const Key('preview-user-tag'))).data,
+        'Luca',
+      );
+      await tapVisible(find.byKey(const Key('space-setup-submit-button')));
 
       // 3) Partner A lands on Home with mandatory Recovery Key confirmation gate (S-06).
       expect(find.byKey(const Key('home-shell-page')), findsOneWidget);
@@ -221,12 +238,15 @@ void main() {
       expect(find.byKey(const Key('enroll-invite-token')), findsNothing);
       expect(find.text('Telefono B'), findsWidgets);
 
-      // Phone D completes key reception and lands on Home with decrypted thoughts.
+      // Phone D completes key reception via S1-D07, skips S1-D07-2 name setup, and lands on Home with decrypted thoughts.
       await tester.pumpWidget(
         DeepSkyApp(controller: ctrlD, autoInitialize: false),
       );
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('code-verification-page')), findsOneWidget);
       await tapVisible(find.byKey(const Key('complete-join-button')));
+      expect(find.byKey(const Key('space-setup-page')), findsOneWidget);
+      await tapVisible(find.byKey(const Key('space-setup-skip-button')));
       expect(find.byKey(const Key('home-shell-page')), findsOneWidget);
       expect(find.textContaining('Pensiero della sera'), findsWidgets);
 
@@ -326,7 +346,9 @@ void main() {
       );
       await ctrlA.pollActiveInvite();
       await ctrlA.confirmSasAndDeliverRootKey();
+      await ctrlA.skipNameSetup();
       await ctrlB.completeJoinDelivery();
+      await ctrlB.skipNameSetup();
       await ctrlB.confirmRecoveryKeySaved();
       await ctrlA.confirmRecoveryKeySaved();
 
@@ -339,6 +361,7 @@ void main() {
         recoveryInput: recoverySentence,
         deviceLabel: 'Telefono C',
       );
+      await ctrlC.skipNameSetup();
 
       // 1) Phone B unlinks ONLY itself via Dispositivi -> "Scollega questo dispositivo e pulisci spazio locale"
       await tester.pumpWidget(
@@ -396,6 +419,7 @@ void main() {
         recoveryInput: recoverySentence,
         deviceLabel: 'Telefono D',
       );
+      await ctrlD.skipNameSetup();
       expect(ctrlD.phase, AppBootPhase.paired);
 
       await tester.pumpWidget(
@@ -781,6 +805,15 @@ class _FakeM2Server {
 
     if (req.method == 'GET' && path == '/api/v1/pairing/devices') {
       return _json(callerCouple!.devices.values.toList());
+    }
+
+    if (req.method == 'PATCH' && path == '/api/v1/pairing/devices/me') {
+      final String nextLabel = (body['deviceLabel'] as String? ?? '').trim();
+      final Map<String, Object?> caller = callerCouple!.devices[callerId!]!;
+      if (nextLabel.isNotEmpty) {
+        caller['label'] = nextLabel;
+      }
+      return _json(caller);
     }
 
     if (req.method == 'POST' &&
