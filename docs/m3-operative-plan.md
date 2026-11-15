@@ -94,10 +94,10 @@ italiano e inglese, tema chiaro e scuro, accessibilità (V-07).
 | Codice     | Area                                         | Contenuto                                                                                                                                                                    | Formato di consegna                                             | Stato         | Note                                                                         |
 |:-----------|:---------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:----------------------------------------------------------------|:--------------|:-----------------------------------------------------------------------------|
 | **S1-D01** | **Guida all’installazione** (fuori dall’app) | Pagina web o istruzioni illustrate: scaricare l’APK, consentire l’installazione da questa fonte, eventuale avviso di sicurezza del sistema, aprire l’app, tornare all’invito | Pagina web (codice di esempio); immagini dei passi; testi IT/EN | Da verificare | La prima installazione è il punto più fragile per chi non è tecnico          |
-| **S1-D02** | **Benvenuto**                                | Cos’è Deep Sky in poche frasi; scelta “Ho un invito” / “Ho già una coppia”                                                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    | Tono affettuoso, nessuna pressione                                           |
-| **S1-D03** | **Creazione della coppia** (primo partner)   | Inserimento di invito (link, QR o codice), nome visibile                                                                                                                     | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    | Automatico all'apertura dell'app, e si passa direttamente a S1-D05           |
+| **S1-D02** | **Benvenuto**                                | Cos’è Deep Sky in poche frasi; scelta “Ho un invito” / “Ho già una coppia”                                                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    | Implementato in app (`S3-1`: `OnboardingPage`, temi scuro/chiaro Intimate Sanctuary, IT/EN, drawer server collassabile `P-09`) |
+| **S1-D03** | **Creazione della coppia** (primo partner)   | Inserimento di invito (link, QR o codice), nome visibile                                                                                                                     | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    | Automatico all'apertura dell'app, e si passa direttamente a S1-D05; implementato con stati caricamento/errore/riprova (`S3-1`) |
 | **S1-D04** | **Chiave di recupero**                       | Spiegazione, parole e QR, modi di salvarla (copia, condivisione, stampa), conferma di avvenuto salvataggio                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Da verificare | Obbligatoria (S-06). Avvertenze sugli screenshot e sul salvataggio nel cloud |
-| **S1-D05** | **Invito al partner**                        | Generazione di link e QR, condivisione, stato “in attesa di …”, scadenza e rigenerazione                                                                                     | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    |                                                                              |
+| **S1-D05** | **Invito al partner**                        | Generazione di link e QR, condivisione, stato “in attesa di …”, scadenza e rigenerazione                                                                                     | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    | Implementato (`S3-1`): QR ad alto contrasto, share nativo Android, copia link `#token=`/`#server=...`, countdown 15 min, rigenerazione (placeholder mockup `lucciola.app`/`Nessuna scadenza` allineati a Deep Sky + TTL 15 min) |
 | **S1-D06** | **Unione del secondo partner**               | Apertura del link, nome, richiesta inviata, attesa                                                                                                                           | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    |                                                                              |
 | **S1-D07** | **Verifica reciproca**                       | Codice breve mostrato su entrambi i telefoni, istruzione di confrontarlo a voce, “coincide / non coincide”                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    | Cosa succede se non coincide (annullamento e avviso)                         |
 | **S1-D08** | **Approvazione**                             | Sul telefono del primo partner: “… vuole unirsi”, approva o rifiuta                                                                                                          | Schermate e stati; codice web del mockup; testi IT/EN           | Consegnato    | Unito a S1-D07 per evitare troppi passaggi                                   |
@@ -173,16 +173,16 @@ Rif.: AR-11
 
 **S1-APP-01 · Guscio dell’app** — Ruolo: sviluppatore client
 
-- [ ] Navigazione, stato di sessione e gestione dei link d’invito
-- [ ] Tema dai token del design system
-- [ ] Stati globali: non abbinato, in attesa, abbinato, versione obsoleta
+- [ ] Navigazione, stato di sessione e gestione dei link d’invito *(in corso: `InviteLinkCodec` `#token=`/`#server=...` e share nativo Android pronti; da completare deep link OS e schermate `S1-D06`..`S1-D10`)*
+- [x] Tema dai token del design system *(token `Intimate Sanctuary` scuro + chiaro armonizzato applicati in `DeepSkyTheme`; font OFL `Plus Jakarta Sans`/`Nunito Sans` da integrare in bundle quando i `.ttf` saranno disponibili)*
+- [x] Stati globali: non abbinato, in attesa, abbinato, versione obsoleta *(aggiunto `AppBootPhase.waiting` con persistenza invito pendente su cold restart)*
 
 **S1-APP-02 · Primo partner** — Ruolo: sviluppatore client · Dipende da: S1-APP-01
 
-- [ ] Creazione della coppia da invito
-- [ ] Chiave di recupero con **conferma obbligatoria** del salvataggio
-- [ ] Invito al partner con stato e rigenerazione
-- [ ] Approvazione della richiesta con verifica reciproca
+- [ ] Creazione della coppia da invito *(creazione automatica all'avvio implementata per `S1-D03`; completamento onboarding con schermata dedicate `S1-D04`/`S1-D09` ancora aperto)*
+- [ ] Chiave di recupero con **conferma obbligatoria** del salvataggio *(gate M2 già attivo; schermata dedicata `S1-D04` ancora da realizzare)*
+- [x] Invito al partner con stato e rigenerazione *(QR, share nativo, link compatto, scadenza 15 min, verifica manuale e rigenerazione implementati in `WelcomeInvitePanel`)*
+- [ ] Approvazione della richiesta con verifica reciproca *(componente SAS condiviso già collegato; schermate dedicate `S1-D07`/`S1-D08` ancora da realizzare)*
 
 **S1-APP-03 · Secondo partner** — Ruolo: sviluppatore client · Dipende da: S1-APP-01
 
