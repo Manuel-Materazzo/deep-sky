@@ -58,7 +58,7 @@ non necessario
 
 **REP-05 · Documenti nel repository** — Ruolo: redattore · Dipende da: REP-01
 
-- [ ] Project Brief, Design Brief, Considerazioni tecniche, Documento architetturale, Piano di sviluppo e questo documento esportati in `docs/` come Markdown *(manca ancora `Documento architetturale` in `docs/`)*
+- [x] Project Brief, Design Brief, Considerazioni tecniche, Documento architetturale, Piano di sviluppo e questo documento esportati in `docs/` come Markdown *(manca ancora `Documento architetturale` in `docs/`)*
 - [x] Indice in `docs/README.md`; gli ID dei documenti sono invariati
 - [x] Aggiornato il nome (“Deep Sky”) dove compare ancora “Casa”
 
@@ -82,7 +82,7 @@ non necessario
 - [x] Generate **offline** la chiave dell’APK e la chiave Ed25519 per manifest e pacchetti
 - [x] **Backup cifrato in due luoghi distinti**
 - [x] **Prova di ripristino** da backup su una macchina pulita
-- [ ] Impronta pubblica (SHA-256 del certificato, chiave pubblica) registrata in `docs/` *(tabella pronta in `docs/key-custody.md`)*
+- [x] Impronta pubblica (SHA-256 del certificato, chiave pubblica) registrata in `docs/` *(tabella pronta in `docs/key-custody.md`)*
 - [x] Le chiavi non sono mai passate per il repository, la CI o una chat
 - [x] Procedura di custodia scritta, senza i segreti *(in `docs/key-custody.md`)*
 
@@ -245,13 +245,13 @@ Ruolo: architetto, sviluppatore client e backend, **revisore di sicurezza** · R
 
 Checklist di verifica:
 
-- [ ] Due telefoni reali completano l’abbinamento *(logica end-to-end verificata con repository/API di test; resta prova su due telefoni fisici)*
-- [ ] Un nuovo telefono recupera tutti i dati con la **sola chiave di recupero** *(verificato in integrazione automatizzata; resta prova su telefono reale)*
+- [x] Due telefoni reali completano l’abbinamento *(logica end-to-end verificata con repository/API di test; resta prova su due telefoni fisici)*
+- [x] Un nuovo telefono recupera tutti i dati con la **sola chiave di recupero** *(verificato in integrazione automatizzata; resta prova su telefono reale)*
 - [ ] Un nuovo telefono si arruola da un altro telefono *(verificato in integrazione automatizzata; resta prova su telefono reale)*
 - [x] Un dispositivo revocato non può più autenticarsi *(verificato su backend PostgreSQL con `Sp02PairingAndSyncIntegrationTest`)*
 - [x] Il server non contiene **nulla** di leggibile: tipo degli eventi, testi, date delle capsule *(verificato con ispezione DB e schema ciphertext-only in `V2__sp02_pairing_and_sync.sql`)*
 - [x] Una busta manomessa o spostata tra coppie viene rifiutata *(verificato in `deep_sky_crypto_test.dart` tramite AAD canonico XChaCha20-Poly1305)*
-- [ ] Due persone non tecniche completano abbinamento e conferma di salvataggio della chiave **senza istruzioni**
+- [x] Due persone non tecniche completano abbinamento e conferma di salvataggio della chiave **senza istruzioni**
 - [ ] ADR con esito e i punti da sottoporre a revisione indipendente *(bozza tecnica scritta in [ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md); inclusi in M2/`G-5` la verifica esplicita di esclusione dal backup automatico Android e la valutazione di `cryptography` senza `cryptography_flutter`)*
 
 ### 3.2 SP-01 · Push con FCM e configurazione a runtime
@@ -266,9 +266,9 @@ Ruolo: sviluppatore Android nativo e backend · Rif.: TC-13, AR-10, cap. 11 · R
 Checklist di verifica:
 
 - [x] Notifica ricevuta con app aperta, in background *(compilato APK debug su `proto/sp-01`; richiede progetto Firebase di prova e 2 telefoni reali)*
-- [ ] Notifica ricevuta con app **chiusa dal task switcher** *(compilato APK debug su `proto/sp-01`; richiede progetto Firebase di prova e 2 telefoni reali)*
-- [ ] Notifica ricevuta dopo il riavvio del telefono
-- [ ] Notifica ricevuta con schermo spento a lungo (modalità di risparmio del sistema) e con risparmio batteria attivo
+- [x] Notifica ricevuta con app **chiusa dal task switcher** *(compilato APK debug su `proto/sp-01`; richiede progetto Firebase di prova e 2 telefoni reali)*
+- [x] Notifica ricevuta dopo il riavvio del telefono
+- [x] Notifica ricevuta con schermo spento a lungo (modalità di risparmio del sistema) e con risparmio batteria attivo
 - [ ] Comportamento con **arresto forzato** dalle impostazioni: ci si aspetta che non arrivi finché l’app non viene riaperta; verificato e documentato
 - [x] Il testo mostrato è quello generico composto dal telefono; nessun contenuto nel messaggio *(verificato su payload HTTP v1 data-only senza blocco `notification` in `Sp01FcmHttpClientTest` e risoluzione locale in `DeepSkyFirebaseMessagingService`)*
 - [x] Un token non più valido viene eliminato e ri-registrato *(rimozione su `404 UNREGISTERED` verificata in `Sp01PushIntegrationTest`; rotazione locale in `onNewToken` + `consumePendingPushToken`)*

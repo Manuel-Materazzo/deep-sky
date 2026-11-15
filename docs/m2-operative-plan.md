@@ -106,7 +106,7 @@ In aggiunta alla checklist del [Piano di sviluppo](development-plan.md) cap. 6.3
 
 - [x] Tutte le PR `PR-M2-01`–`PR-M2-07` sono unite su `development` con suite locali/CI verdi (Flutter `33/33` + APK debug, Spring Boot + Testcontainers PostgreSQL 17 `15/15`, ArchUnit, `validate_content.py`, `check-licenses.py`, `docker compose config`).
 - [ ] Verifiche hardware residue da M1 (`SP-01` app chiusa/riavvio/Doze, `SP-02` usability non-tech, `SP-03` upgrade real-phone) eseguite e registrate su telefoni fisici.
-- [ ] Due telefoni Android reali completano pairing (`F-01`), recupero/nuovo dispositivo (`F-20`), scambio del gesto cifrato “ti penso” (`F-03`) via `https://deepsky.vectevo.com` con notifica generica (`S-02`).
+- [x] Due telefoni Android reali completano pairing (`F-01`), recupero/nuovo dispositivo (`F-20`), scambio del gesto cifrato “ti penso” (`F-03`) via `https://deepsky.vectevo.com` con notifica generica (`S-02`).
 - [ ] Un aggiornamento firmato offline via release GitHub riesce due volte di fila sui telefoni reali (`F-19`, `PD-06`).
 - [x] Modalità offline testata in sola lettura con disattivazione gentile delle scritture (`TC-07`, `V-08`) — *verificata nei test automatizzati (`deep_sky_e2e_flow_test.dart`, `pairing_and_sync_repository_test.dart`); resta la conferma su dispositivi reali*.
 - [ ] **Esclusione dal backup automatico di Android verificata (`AD-06`, Architettura `7.1`):** `AndroidManifest.xml` imposta `android:allowBackup="false"`, `@xml/backup_rules` e `@xml/data_extraction_rules` (applicato in `PR-M2-04`); resta la verifica su dispositivo reale che backup automatico di Google, `adb backup` e trasferimenti D2D non ripristinino chiavi, `SharedPreferences` o cache locale (recupero solo via Recovery Key `F-20` o altro telefono).
