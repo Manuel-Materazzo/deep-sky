@@ -66,7 +66,53 @@ class _HomeShellPageState extends State<HomeShellPage> {
       ),
       body: Column(
         children: <Widget>[
-          if (c.isOffline)
+          if (c.isDeviceRevoked)
+            Material(
+              key: const Key('revoked-device-banner'),
+              color: tokens.offlineBannerSurface,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Icon(
+                            Icons.link_off,
+                            size: 18,
+                            color: tokens.offlineBannerInk,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            s.revokedDeviceBanner,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: tokens.offlineBannerInk),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FilledButton.tonal(
+                        key: const Key('reset-revoked-device-button'),
+                        onPressed: c.busy ? null : c.unlinkCurrentDevice,
+                        child: Text(s.clearLocalSpaceButton),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (c.isOffline && !c.isDeviceRevoked)
             Material(
               key: const Key('offline-readonly-banner'),
               color: tokens.offlineBannerSurface,
@@ -99,7 +145,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
               index: _navIndex,
               children: <Widget>[
                 _buildHomeTab(context, c, s, tokens),
-                _buildDevicesTab(context, c),
+                _buildDevicesTab(context, c, s),
                 _buildSettingsTab(context, c, s),
               ],
             ),
@@ -138,7 +184,11 @@ class _HomeShellPageState extends State<HomeShellPage> {
     DeepSkyTokens tokens,
   ) {
     final LocalDeviceIdentity id = c.identity!;
-    final bool canWrite = !c.busy && !c.isOffline && id.recoverySavedConfirmed;
+    final bool canWrite =
+        !c.busy &&
+        !c.isOffline &&
+        !c.isDeviceRevoked &&
+        id.recoverySavedConfirmed;
 
     final String statusHeadline;
     final String? statusNote;
@@ -359,7 +409,11 @@ class _HomeShellPageState extends State<HomeShellPage> {
               ),
               FilledButton(
                 key: const Key('confirm-recovery-button'),
-                onPressed: (!c.busy && !c.isOffline && _recoveryCheckbox)
+                onPressed:
+                    (!c.busy &&
+                        !c.isOffline &&
+                        !c.isDeviceRevoked &&
+                        _recoveryCheckbox)
                     ? c.confirmRecoveryKeySaved
                     : null,
                 child: Text(s.confirmRecoveryButton),
@@ -371,9 +425,14 @@ class _HomeShellPageState extends State<HomeShellPage> {
     );
   }
 
-  Widget _buildDevicesTab(BuildContext context, DeepSkyController c) {
+  Widget _buildDevicesTab(
+    BuildContext context,
+    DeepSkyController c,
+    DeepSkyStrings s,
+  ) {
     final LocalDeviceIdentity id = c.identity!;
     final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(context);
+    final bool canMutateServer = !c.busy && !c.isOffline && !c.isDeviceRevoked;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
@@ -392,9 +451,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
                 const SizedBox(height: 12),
                 FilledButton.tonalIcon(
                   key: const Key('create-enrollment-invite-button'),
-                  onPressed: c.busy || c.isOffline
-                      ? null
-                      : c.createEnrollmentInvite,
+                  onPressed: canMutateServer ? c.createEnrollmentInvite : null,
                   icon: const Icon(Icons.devices),
                   label: const Text('Aggiungi un altro telefono'),
                 ),
@@ -405,7 +462,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
                     serverUrl: id.serverUrl,
                     sasCode: c.activeSasCode,
                     acceptedDeviceLabel: c.activeInviteStatus?.acceptedLabel,
-                    busy: c.busy || c.isOffline,
+                    busy: !canMutateServer,
                     onPoll: c.pollActiveInvite,
                     onConfirmSas: c.confirmSasAndDeliverRootKey,
                     onCancel: c.cancelActiveInvite,
@@ -457,14 +514,18 @@ class _HomeShellPageState extends State<HomeShellPage> {
                     contentPadding: EdgeInsets.zero,
                     title: Text(dev.label),
                     subtitle: Text(
-                      dev.revokedAt != null ? 'Revocato' : 'Attivo',
+                      dev.revokedAt != null
+                          ? 'Revocato'
+                          : (dev.deviceId == id.deviceId
+                                ? 'Attivo · questo telefono'
+                                : 'Attivo'),
                     ),
                     trailing:
                         (dev.deviceId != id.deviceId && dev.revokedAt == null)
                         ? TextButton(
-                            onPressed: c.busy || c.isOffline
-                                ? null
-                                : () => c.revokeDevice(dev.deviceId),
+                            onPressed: canMutateServer
+                                ? () => c.revokeDevice(dev.deviceId)
+                                : null,
                             child: const Text('Revoca'),
                           )
                         : null,
@@ -475,13 +536,76 @@ class _HomeShellPageState extends State<HomeShellPage> {
         ),
         const SizedBox(height: 12),
         OutlinedButton.icon(
+          key: const Key('unlink-device-button'),
+          onPressed: c.busy
+              ? null
+              : (c.isDeviceRevoked
+                    ? c.unlinkCurrentDevice
+                    : () => _confirmActionDialog(
+                        context: context,
+                        title: s.unlinkDialogTitle,
+                        body: c.isOffline
+                            ? s.unlinkDialogBodyOffline
+                            : s.unlinkDialogBodyOnline,
+                        cancelLabel: s.cancel,
+                        confirmLabel: s.unlinkDialogConfirm,
+                        confirmKey: const Key('confirm-unlink-device-button'),
+                        onConfirm: c.unlinkCurrentDevice,
+                      )),
+          icon: const Icon(Icons.phonelink_erase_outlined),
+          label: Text(s.unlinkThisDeviceButton),
+        ),
+        const SizedBox(height: 8),
+        TextButton.icon(
           key: const Key('unpair-couple-button'),
-          onPressed: c.busy || c.isOffline ? null : c.unpairCouple,
+          onPressed: canMutateServer
+              ? () => _confirmActionDialog(
+                  context: context,
+                  title: s.unpairDialogTitle,
+                  body: s.unpairDialogBody,
+                  cancelLabel: s.cancel,
+                  confirmLabel: s.unpairDialogConfirm,
+                  confirmKey: const Key('confirm-unpair-couple-button'),
+                  onConfirm: c.unpairCouple,
+                )
+              : null,
           icon: const Icon(Icons.link_off),
-          label: const Text('Scollega dispositivo e pulisci spazio locale'),
+          label: Text(s.unpairCoupleButton),
         ),
       ],
     );
+  }
+
+  Future<void> _confirmActionDialog({
+    required BuildContext context,
+    required String title,
+    required String body,
+    required String cancelLabel,
+    required String confirmLabel,
+    required Key confirmKey,
+    required Future<void> Function() onConfirm,
+  }) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: Text(title),
+        content: Text(body),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(cancelLabel),
+          ),
+          FilledButton(
+            key: confirmKey,
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await onConfirm();
+    }
   }
 
   Widget _buildSettingsTab(
@@ -563,7 +687,9 @@ class _HomeShellPageState extends State<HomeShellPage> {
                 const SizedBox(height: 10),
                 FilledButton.tonalIcon(
                   key: const Key('enable-push-button'),
-                  onPressed: c.busy || c.isOffline ? null : c.enableRuntimePush,
+                  onPressed: c.busy || c.isOffline || c.isDeviceRevoked
+                      ? null
+                      : c.enableRuntimePush,
                   icon: const Icon(Icons.notifications_active_outlined),
                   label: const Text('Attiva notifiche su questo telefono'),
                 ),

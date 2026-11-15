@@ -12,6 +12,14 @@ class ApiRequestException implements Exception {
   final int statusCode;
   final String message;
 
+  bool get isDeviceUnknownOrRevoked {
+    if (statusCode != 401) {
+      return false;
+    }
+    final String lower = message.toLowerCase();
+    return lower.contains('revoked') || lower.contains('unknown');
+  }
+
   @override
   String toString() => 'ApiRequestException($statusCode): $message';
 }

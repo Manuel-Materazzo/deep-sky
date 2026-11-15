@@ -504,6 +504,38 @@ class PairingAndSyncRepository {
         .revokeDevice(identity: identity, targetDeviceId: targetDeviceId);
   }
 
+  /// Unlinks ONLY the current device on the server (best-effort) and clears
+  /// local identity and encrypted offline cache (`F-20`, `S-06`).
+  ///
+  /// Leaves the couple and any other paired devices active. When [localOnly] is
+  /// true, or if the device is already unknown/revoked (`401`/`404`) or the
+  /// server is unreachable, local state is still cleared cleanly.
+  Future<void> unlinkCurrentDevice({bool localOnly = false}) async {
+    if (!localOnly) {
+      final LocalDeviceIdentity? identity = await loadIdentity();
+      if (identity != null) {
+        try {
+          await _clientFactory(
+            identity.serverUrl,
+          ).revokeDevice(identity: identity, targetDeviceId: identity.deviceId);
+        } on ClientUpgradeRequiredException {
+          rethrow;
+        } on ApiRequestException catch (ex) {
+          if (ex.statusCode != 401 && ex.statusCode != 404) {
+            rethrow;
+          }
+        } on SocketException {
+          // Offline / unreachable server: proceed with local wipe.
+        } on http.ClientException {
+          // Network error: proceed with local wipe.
+        } on TimeoutException {
+          // Timeout: proceed with local wipe.
+        }
+      }
+    }
+    await clearIdentity();
+  }
+
   Future<void> unpairCouple() async {
     final LocalDeviceIdentity identity = await _requireIdentity();
     await _clientFactory(identity.serverUrl).unpair(identity: identity);

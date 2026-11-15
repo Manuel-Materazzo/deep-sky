@@ -13,6 +13,7 @@ import 'package:deep_sky/domain/platform_capabilities.dart';
 import 'package:deep_sky/domain/push_models.dart';
 import 'package:deep_sky/domain/update/apk_update_models.dart';
 import 'package:deep_sky/platform/native_bridge.dart';
+import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
 import 'package:deep_sky/scene/asset_override_registry.dart';
 import 'package:deep_sky/scene/scene_manifest.dart';
 import 'package:deep_sky/scene/scene_state_mapper.dart';
@@ -80,6 +81,7 @@ class DeepSkyController extends ChangeNotifier {
   AppBootPhase phase = AppBootPhase.loading;
   bool busy = false;
   bool isOffline = false;
+  bool isDeviceRevoked = false;
   bool isNight = false;
   bool reduceMotion = false;
   bool petOverrideActive = false;
@@ -124,6 +126,8 @@ class DeepSkyController extends ChangeNotifier {
 
   Future<void> initialize() async {
     phase = AppBootPhase.loading;
+    isOffline = false;
+    isDeviceRevoked = false;
     errorNotice = null;
     notifyListeners();
 
@@ -211,10 +215,18 @@ class DeepSkyController extends ChangeNotifier {
           .syncEventsWithOfflineFallback();
       events = snap.events;
       isOffline = snap.isOffline;
+      if (!isOffline) {
+        isDeviceRevoked = false;
+      }
       _recomputeSceneState();
       if (!isOffline) {
         try {
           devices = await _repository.listDevices();
+        } on ApiRequestException catch (ex) {
+          if (ex.isDeviceUnknownOrRevoked) {
+            isDeviceRevoked = true;
+            errorNotice = null;
+          }
         } catch (_) {
           // Non-fatal: keep cached devices list.
         }
@@ -225,8 +237,26 @@ class DeepSkyController extends ChangeNotifier {
         minProtocolVersion: ex.minProtocolVersion,
       );
       phase = AppBootPhase.upgradeRequired;
+    } on ApiRequestException catch (ex) {
+      if (ex.isDeviceUnknownOrRevoked) {
+        isDeviceRevoked = true;
+        isOffline = false;
+        errorNotice = null;
+        await _loadCachedEventsBestEffort();
+      } else {
+        errorNotice = '$ex';
+      }
     } catch (error) {
       errorNotice = '$error';
+    }
+  }
+
+  Future<void> _loadCachedEventsBestEffort() async {
+    try {
+      events = await _repository.loadCachedEvents();
+      _recomputeSceneState();
+    } catch (_) {
+      // Keep existing in-memory events if cache cannot be loaded.
     }
   }
 
@@ -339,6 +369,16 @@ class DeepSkyController extends ChangeNotifier {
               : 'The other phone has not confirmed the SAS code yet. Confirm on the other device first, then try again.',
         );
       }
+      if (ex.isDeviceUnknownOrRevoked) {
+        await _repository.clearIdentity();
+        identity = null;
+        pendingJoin = null;
+        throw StateError(
+          languageCode == 'it'
+              ? 'Questo invito o dispositivo non è più valido. Chiedi un nuovo invito al partner.'
+              : 'This invite or device is no longer valid. Ask your partner for a new invite.',
+        );
+      }
       rethrow;
     }
     pendingJoin = null;
@@ -380,6 +420,9 @@ class DeepSkyController extends ChangeNotifier {
     }
     if (isOffline) {
       throw StateError('Modalità offline attiva: sola lettura.');
+    }
+    if (isDeviceRevoked) {
+      throw StateError(DeepSkyStrings(languageCode).revokedDeviceBanner);
     }
     final String cleanNote = note?.trim() ?? '';
     await _repository.sendEncryptedEvent(
@@ -428,6 +471,27 @@ class DeepSkyController extends ChangeNotifier {
     devices = await _repository.listDevices();
   });
 
+  /// Unlinks ONLY this device from the couple (if active) and clears local storage.
+  ///
+  /// Works even if this device is already revoked (`401`) or offline.
+  Future<void> unlinkCurrentDevice() => _runGuarded(() async {
+    final LocalDeviceIdentity? current = identity;
+    final bool skipRemote = isDeviceRevoked || isOffline;
+    if (current != null && !skipRemote) {
+      try {
+        await PushApiClient(apiClient: _createApiClient(current.serverUrl))
+            .unregisterToken(identity: current);
+      } catch (_) {}
+    }
+    try {
+      await _nativeBridge.clearRuntimePushConfig();
+    } catch (_) {}
+    await _repository.unlinkCurrentDevice(localOnly: skipRemote);
+    _resetToUnpairedState();
+    statusNotice = DeepSkyStrings(languageCode).localResetDoneNotice;
+  });
+
+  /// Dissolves the entire couple unilaterally (`S-03`) and clears local storage.
   Future<void> unpairCouple() => _runGuarded(() async {
     final LocalDeviceIdentity? current = identity;
     if (current != null) {
@@ -440,6 +504,10 @@ class DeepSkyController extends ChangeNotifier {
       await _nativeBridge.clearRuntimePushConfig();
     } catch (_) {}
     await _repository.unpairCouple();
+    _resetToUnpairedState();
+  });
+
+  void _resetToUnpairedState() {
     identity = null;
     events = const <CachedEventEntry>[];
     devices = const <DeviceSummary>[];
@@ -447,8 +515,14 @@ class DeepSkyController extends ChangeNotifier {
     activeInviteStatus = null;
     activeSasCode = null;
     pendingJoin = null;
+    pushStatus = null;
+    isOffline = false;
+    isDeviceRevoked = false;
+    sceneState = const SceneStateSnapshot(
+      slotStates: <String, String>{'window': 'calm'},
+    );
     phase = AppBootPhase.unpaired;
-  });
+  }
 
   Future<void> enableRuntimePush() => _runGuarded(() async {
     final LocalDeviceIdentity? current = identity;
@@ -597,6 +671,15 @@ class DeepSkyController extends ChangeNotifier {
     } on ApkUpdateException catch (ex) {
       errorNotice = ex.friendlyMessage;
       updateFeedback = ex.friendlyMessage;
+    } on ApiRequestException catch (ex) {
+      if (ex.isDeviceUnknownOrRevoked && phase == AppBootPhase.paired) {
+        isDeviceRevoked = true;
+        isOffline = false;
+        errorNotice = null;
+        await _loadCachedEventsBestEffort();
+      } else {
+        errorNotice = ex.toString();
+      }
     } catch (error) {
       errorNotice = error.toString();
     } finally {

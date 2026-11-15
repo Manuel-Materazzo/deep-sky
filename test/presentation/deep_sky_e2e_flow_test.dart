@@ -4,8 +4,10 @@ import 'dart:io';
 import 'package:deep_sky/data/secure_key_store.dart';
 import 'package:deep_sky/domain/crypto/recovery_key_codec.dart';
 import 'package:deep_sky/domain/platform_capabilities.dart';
+import 'package:deep_sky/platform/native_bridge.dart';
 import 'package:deep_sky/presentation/deep_sky_app.dart';
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -225,10 +227,187 @@ void main() {
       expect(find.text('Aggiornamento richiesto'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'Unlink this device leaves couple active; revoked device sees calm banner and can reset locally; unpairCouple dissolves couple',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      const MethodChannel platformChannel = MethodChannel(
+        NativeBridge.channelName,
+      );
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(platformChannel, (MethodCall call) async {
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(platformChannel, null);
+      });
+
+      Future<void> tapVisible(Finder finder) async {
+        await tester.ensureVisible(finder);
+        await tester.pumpAndSettle();
+        await tester.tap(finder);
+        await tester.pumpAndSettle();
+      }
+
+      Future<void> settleController(DeepSkyController c) async {
+        for (int i = 0; i < 40 && c.busy; i++) {
+          await tester.pump(const Duration(milliseconds: 25));
+        }
+        await tester.pumpAndSettle();
+      }
+
+      final _FakeM2Server server = _FakeM2Server();
+      final MockClient httpClient = MockClient(server.handle);
+
+      const PlatformCapabilities testCaps = PlatformCapabilities(
+        packageName: 'com.vectevo.deep_sky',
+        androidApiLevel: 35,
+        versionName: '1.0.0',
+        versionCode: 1,
+        supportsRequestInstallPackages: false,
+      );
+
+      DeepSkyController makeController(InMemorySecureKeyStore store) {
+        final DeepSkyController c = DeepSkyController(
+          keyStore: store,
+          httpClient: httpClient,
+          loadAssetString: (_) async => pilotManifestRaw,
+          loadCapabilities: () async => testCaps,
+          defaultServerUrl: 'https://couple.example.test',
+        );
+        c.reduceMotion = true;
+        return c;
+      }
+
+      final InMemorySecureKeyStore storeA = InMemorySecureKeyStore();
+      final InMemorySecureKeyStore storeB = InMemorySecureKeyStore();
+      final InMemorySecureKeyStore storeC = InMemorySecureKeyStore();
+
+      final DeepSkyController ctrlA = makeController(storeA);
+      final DeepSkyController ctrlB = makeController(storeB);
+      final DeepSkyController ctrlC = makeController(storeC);
+
+      // Pair A + B, confirm recovery on A, recover C
+      await ctrlA.initialize();
+      await ctrlA.createInitialInvite(
+        serverUrl: 'https://couple.example.test',
+        deviceLabel: 'Telefono A',
+      );
+      await ctrlB.initialize();
+      await ctrlB.acceptInvite(
+        serverUrl: 'https://couple.example.test',
+        inviteToken: server.lastInviteToken!,
+        deviceLabel: 'Telefono B',
+      );
+      await ctrlA.pollActiveInvite();
+      await ctrlA.confirmSasAndDeliverRootKey();
+      await ctrlB.completeJoinDelivery();
+      await ctrlB.confirmRecoveryKeySaved();
+      await ctrlA.confirmRecoveryKeySaved();
+
+      final String recoverySentence = RecoveryKeyCodec.toSentence(
+        ctrlA.recoverySeed!,
+      );
+      await ctrlC.initialize();
+      await ctrlC.recoverWithKey(
+        serverUrl: 'https://couple.example.test',
+        recoveryInput: recoverySentence,
+        deviceLabel: 'Telefono C',
+      );
+
+      // 1) Phone B unlinks ONLY itself via Dispositivi -> "Scollega questo dispositivo e pulisci spazio locale"
+      await tester.pumpWidget(
+        DeepSkyApp(controller: ctrlB, autoInitialize: false),
+      );
+      await tester.pumpAndSettle();
+      await tapVisible(find.text('Dispositivi'));
+      await tapVisible(find.byKey(const Key('unlink-device-button')));
+      await tapVisible(find.byKey(const Key('confirm-unlink-device-button')));
+      await settleController(ctrlB);
+
+      expect(ctrlB.errorNotice, isNull);
+      expect(ctrlB.busy, isFalse);
+      expect(ctrlB.phase, AppBootPhase.unpaired);
+      expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
+      expect(ctrlB.phase, AppBootPhase.unpaired);
+      expect(await storeB.read('deep_sky.device_identity.v1'), isNull);
+      expect(server.coupleUnpaired, isFalse);
+
+      // Phone A and Phone C remain active and can keep exchanging thoughts!
+      await ctrlA.sendThinkingOfYou(note: 'Ancora connessi');
+      await ctrlC.refreshSync();
+      expect(ctrlC.isDeviceRevoked, isFalse);
+      expect(ctrlC.events.single.payload.body['note'], 'Ancora connessi');
+
+      // 2) Phone A revokes Phone C -> Phone C gets 401 -> calm banner + 1-tap reset works
+      await ctrlA.revokeDevice(ctrlC.identity!.deviceId);
+      await ctrlC.refreshSync();
+      expect(ctrlC.isDeviceRevoked, isTrue);
+      expect(ctrlC.errorNotice, isNull);
+
+      await tester.pumpWidget(
+        DeepSkyApp(controller: ctrlC, autoInitialize: false),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('revoked-device-banner')), findsOneWidget);
+      final FilledButton revokedSend = tester.widget<FilledButton>(
+        find.byKey(const Key('send-thought-button')),
+      );
+      expect(revokedSend.onPressed, isNull);
+
+      await tapVisible(find.byKey(const Key('reset-revoked-device-button')));
+      await settleController(ctrlC);
+      expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
+      expect(ctrlC.phase, AppBootPhase.unpaired);
+      expect(await storeC.read('deep_sky.device_identity.v1'), isNull);
+
+      // 3) Re-recover Phone D, then Phone A invokes S-03 "Interrompi abbinamento per entrambi"
+      final InMemorySecureKeyStore storeD = InMemorySecureKeyStore();
+      final DeepSkyController ctrlD = makeController(storeD);
+      await ctrlD.initialize();
+      await ctrlD.recoverWithKey(
+        serverUrl: 'https://couple.example.test',
+        recoveryInput: recoverySentence,
+        deviceLabel: 'Telefono D',
+      );
+      expect(ctrlD.phase, AppBootPhase.paired);
+
+      await tester.pumpWidget(
+        DeepSkyApp(controller: ctrlA, autoInitialize: false),
+      );
+      await tester.pumpAndSettle();
+      await tapVisible(find.text('Dispositivi'));
+      await tapVisible(find.byKey(const Key('unpair-couple-button')));
+      await tapVisible(find.byKey(const Key('confirm-unpair-couple-button')));
+      await settleController(ctrlA);
+
+      expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
+      expect(server.coupleUnpaired, isTrue);
+
+      // Phone D sees the revoked/unpaired banner and can wipe local data via Dispositivi tab too
+      await ctrlD.refreshSync();
+      expect(ctrlD.isDeviceRevoked, isTrue);
+      await tester.pumpWidget(
+        DeepSkyApp(controller: ctrlD, autoInitialize: false),
+      );
+      await tester.pumpAndSettle();
+      await tapVisible(find.text('Dispositivi'));
+      await tapVisible(find.byKey(const Key('unlink-device-button')));
+      await settleController(ctrlD);
+      expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
+      expect(await storeD.read('deep_sky.device_identity.v1'), isNull);
+    },
+  );
 }
 
 class _FakeM2Server {
   bool simulateOffline = false;
+  bool coupleUnpaired = false;
   int minClientVersionCode = 1;
   int minProtocolVersion = 1;
 
@@ -288,6 +467,7 @@ class _FakeM2Server {
     }
 
     if (req.method == 'POST' && path == '/api/v1/pairing/invites') {
+      coupleUnpaired = false;
       coupleId = 'couple-1';
       inviterDeviceId = 'dev-a';
       inviterLabel = body['deviceLabel'] as String;
@@ -305,27 +485,6 @@ class _FakeM2Server {
       return _json(<String, Object?>{
         'coupleId': coupleId,
         'deviceId': inviterDeviceId,
-        'inviteToken': lastInviteToken,
-        'expiresAt': DateTime.now()
-            .toUtc()
-            .add(const Duration(minutes: 15))
-            .toIso8601String(),
-      }, status: 201);
-    }
-
-    if (req.method == 'POST' && path == '/api/v1/pairing/enrollment-invites') {
-      final String caller = req.headers['X-Device-Id']!;
-      final Map<String, Object?> creator = devices[caller]!;
-      inviterDeviceId = caller;
-      inviterLabel = creator['label'] as String;
-      acceptedDeviceId = null;
-      acceptedLabel = null;
-      acceptedAuthB64 = null;
-      acceptedKemB64 = null;
-      lastInviteToken = 'enroll-tok-${++_inviteSeq}';
-      return _json(<String, Object?>{
-        'coupleId': coupleId,
-        'deviceId': caller,
         'inviteToken': lastInviteToken,
         'expiresAt': DateTime.now()
             .toUtc()
@@ -355,6 +514,84 @@ class _FakeM2Server {
         'peerAuthPublicKeyB64': inviterAuthB64,
         'peerKemPublicKeyB64': inviterKemB64,
       });
+    }
+
+    if (req.method == 'POST' && path == '/api/v1/recovery/challenges') {
+      if (coupleUnpaired) {
+        return _json(<String, Object?>{
+          'code': 'CONFLICT',
+          'message': 'Couple has been unpaired',
+        }, status: 409);
+      }
+      lastChallengeId = 'chal-1';
+      lastChallengeNonce = base64UrlEncode(
+        List<int>.generate(32, (int i) => i + 1),
+      );
+      return _json(<String, Object?>{
+        'challengeId': lastChallengeId,
+        'coupleId': coupleId,
+        'nonceB64': lastChallengeNonce,
+        'expiresAt': DateTime.now()
+            .toUtc()
+            .add(const Duration(minutes: 5))
+            .toIso8601String(),
+      });
+    }
+
+    if (req.method == 'POST' && path == '/api/v1/recovery/complete') {
+      if (coupleUnpaired) {
+        return _json(<String, Object?>{
+          'code': 'CONFLICT',
+          'message': 'Couple has been unpaired',
+        }, status: 409);
+      }
+      final String devId = 'dev-recovered-${++_deviceSeq}';
+      devices[devId] = <String, Object?>{
+        'deviceId': devId,
+        'label': body['deviceLabel'],
+        'enrolledVia': 'RECOVERY_KEY',
+        'createdAt': DateTime.now().toUtc().toIso8601String(),
+        'revokedAt': null,
+      };
+      return _json(<String, Object?>{
+        'coupleId': coupleId,
+        'deviceId': devId,
+      }, status: 201);
+    }
+
+    // Authenticated endpoints: enforce DeviceAuthFilter semantics
+    final String? callerId = req.headers['X-Device-Id'];
+    if (callerId != null) {
+      final Map<String, Object?>? callerDev = devices[callerId];
+      if (coupleUnpaired ||
+          callerDev == null ||
+          callerDev['revokedAt'] != null) {
+        return _json(<String, Object?>{
+          'code': 'UNAUTHORIZED',
+          'message': 'Device unknown or revoked',
+        }, status: 401);
+      }
+    }
+
+    if (req.method == 'POST' && path == '/api/v1/pairing/enrollment-invites') {
+      final String caller = req.headers['X-Device-Id']!;
+      final Map<String, Object?> creator = devices[caller]!;
+      inviterDeviceId = caller;
+      inviterLabel = creator['label'] as String;
+      acceptedDeviceId = null;
+      acceptedLabel = null;
+      acceptedAuthB64 = null;
+      acceptedKemB64 = null;
+      lastInviteToken = 'enroll-tok-${++_inviteSeq}';
+      return _json(<String, Object?>{
+        'coupleId': coupleId,
+        'deviceId': caller,
+        'inviteToken': lastInviteToken,
+        'expiresAt': DateTime.now()
+            .toUtc()
+            .add(const Duration(minutes: 15))
+            .toIso8601String(),
+      }, status: 201);
     }
 
     if (req.method == 'GET' &&
@@ -419,6 +656,29 @@ class _FakeM2Server {
       return _json(devices.values.toList());
     }
 
+    if (req.method == 'POST' &&
+        path.startsWith('/api/v1/pairing/devices/') &&
+        path.endsWith('/revoke')) {
+      final String targetId = path.split('/')[5];
+      final Map<String, Object?>? target = devices[targetId];
+      if (target == null) {
+        return _json(<String, Object?>{
+          'message': 'Device not found',
+        }, status: 404);
+      }
+      target['revokedAt'] ??= DateTime.now().toUtc().toIso8601String();
+      return http.Response('', 204);
+    }
+
+    if (req.method == 'POST' && path == '/api/v1/pairing/unpair') {
+      coupleUnpaired = true;
+      final String now = DateTime.now().toUtc().toIso8601String();
+      for (final Map<String, Object?> dev in devices.values) {
+        dev['revokedAt'] ??= now;
+      }
+      return http.Response('', 204);
+    }
+
     if (req.method == 'POST' && path == '/api/v1/push/wakeup') {
       pushWakeupsDispatched++;
       lastPushLocalizationKey = body['localizationKey'] as String?;
@@ -430,35 +690,8 @@ class _FakeM2Server {
       });
     }
 
-    if (req.method == 'POST' && path == '/api/v1/recovery/challenges') {
-      lastChallengeId = 'chal-1';
-      lastChallengeNonce = base64UrlEncode(
-        List<int>.generate(32, (int i) => i + 1),
-      );
-      return _json(<String, Object?>{
-        'challengeId': lastChallengeId,
-        'coupleId': coupleId,
-        'nonceB64': lastChallengeNonce,
-        'expiresAt': DateTime.now()
-            .toUtc()
-            .add(const Duration(minutes: 5))
-            .toIso8601String(),
-      });
-    }
-
-    if (req.method == 'POST' && path == '/api/v1/recovery/complete') {
-      const String devId = 'dev-recovered';
-      devices[devId] = <String, Object?>{
-        'deviceId': devId,
-        'label': body['deviceLabel'],
-        'enrolledVia': 'RECOVERY_KEY',
-        'createdAt': DateTime.now().toUtc().toIso8601String(),
-        'revokedAt': null,
-      };
-      return _json(<String, Object?>{
-        'coupleId': coupleId,
-        'deviceId': devId,
-      }, status: 201);
+    if (req.method == 'DELETE' && path == '/api/v1/push/register') {
+      return http.Response('', 204);
     }
 
     return http.Response('not found: ${req.method} $path', 404);
