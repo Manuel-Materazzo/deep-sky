@@ -11,15 +11,47 @@ class DeepSkyStrings {
   String get devicesTab => isIt ? 'Dispositivi' : 'Devices';
   String get settingsTab => isIt ? 'Impostazioni' : 'Settings';
 
-  // Welcome & Invite (`S1-D02`, `S1-D03`, `S1-D05`)
+  // Welcome & Invite (`S1-D02`, `S1-D03`, `S1-D05`, `S1-D06`, `S1-D10`)
   String get welcomeTitle => isIt ? 'La vostra casa' : 'Your home';
   String get welcomeSubtitle => isIt
       ? 'Uno spazio intimo e privato, solo per voi due'
       : 'An intimate, private space, just for the two of you';
+  String get joinTitle => isIt ? 'Raggiungi chi ami' : 'Reach the one you love';
+  String get joinSubtitle => isIt
+      ? 'Se il tuo partner ha già acceso la casa, inquadra il suo schermo o inserisci l\'invito per aprire la porta insieme.'
+      : 'If your partner already lit your home, scan their screen or enter the invite to open the door together.';
+  String get recoverTitle =>
+      isIt ? 'Ritrova la tua stanza' : 'Find your room again';
+  String get recoverSubtitle => isIt
+      ? 'Hai cambiato telefono o reinstallato l\'app? Con le tue 24 parole segrete puoi rientrare nella vostra casa esattamente come l\'avete lasciata.'
+      : 'Changed phones or reinstalled the app? With your 24 secret words you can step back into your home just as you left it.';
+
   String get inviteTab => isIt ? 'Invita' : 'Invite';
   String get joinSpaceTab => isIt ? 'Unisciti' : 'Join';
   String get recoverSpaceTab => isIt ? 'Recupera' : 'Recover';
   String get createSpaceTab => inviteTab;
+
+  String get scanQrTitle => isIt ? 'Inquadra codice QR' : 'Scan QR code';
+  String get scanQrDescription => isIt
+      ? 'Rileva all\'istante la chiave della casa e il server senza dover scrivere nulla.'
+      : 'Detects your home invite and server right away with zero typing.';
+  String get openCameraButton => isIt ? 'Apri fotocamera' : 'Open camera';
+  String get scanQrActionLabel => isIt ? 'Scansiona QR' : 'Scan QR';
+  String get scanQrInviteHint => isIt
+      ? 'Inquadra il QR mostrato dal tuo partner'
+      : 'Point at the QR code shown on your partner\'s phone';
+  String get scanQrRecoveryHint => isIt
+      ? 'Inquadra il QR della Recovery Key'
+      : 'Point at your Recovery Key QR code';
+  String get orEnterManuallyDivider =>
+      isIt ? 'oppure manuale' : 'or enter manually';
+  String get pasteButton => isIt ? 'Incolla' : 'Paste';
+  String get cameraPermissionDeniedNotice => isIt
+      ? 'Permesso fotocamera non concesso. Puoi incollare il link o il codice qui sotto.'
+      : 'Camera permission was not granted. You can paste the link or code below.';
+  String get cameraUnavailableNotice => isIt
+      ? 'Scanner fotocamera non disponibile su questo dispositivo. Incolla il link o il codice qui sotto.'
+      : 'Camera scanner is not available on this device. Paste the link or code below.';
 
   String get preparingHomeMessage =>
       isIt ? 'Preparazione della vostra casa...' : 'Preparing your home...';
@@ -36,9 +68,6 @@ class DeepSkyStrings {
   String get qrCaption => isIt
       ? 'Inquadra con la fotocamera o invia il link'
       : 'Scan with your camera or send the link';
-  String get serverAndKeyIncludedBadge => isIt
-      ? 'Server e chiave inclusi automaticamente'
-      : 'Server and key included automatically';
   String get shareInviteLinkButton =>
       isIt ? 'Condividi link d\'invito' : 'Share invite link';
   String get shareInviteMessage => isIt

@@ -469,6 +469,30 @@ class DeepSkyController extends ChangeNotifier {
     }
   }
 
+  Future<String?> scanQrCode({
+    required String title,
+    required String hint,
+    required String cancelLabel,
+  }) async {
+    final DeepSkyStrings s = DeepSkyStrings(languageCode);
+    try {
+      final String? payload = await _nativeBridge.scanQrCode(
+        title: title,
+        hint: hint,
+        cancelLabel: cancelLabel,
+      );
+      return payload;
+    } on PlatformException catch (ex) {
+      if (ex.code == 'camera_permission_denied') {
+        errorNotice = s.cameraPermissionDeniedNotice;
+      } else {
+        errorNotice = s.cameraUnavailableNotice;
+      }
+      notifyListeners();
+      return null;
+    }
+  }
+
   Future<void> pollActiveInvite() => _runGuarded(() async {
     final CreateInviteResponse? invite = activeInvite;
     if (invite == null) {

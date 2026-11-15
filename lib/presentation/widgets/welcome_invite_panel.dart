@@ -258,22 +258,6 @@ class _WelcomeInvitePanelState extends State<WelcomeInvitePanel> {
           style: Theme.of(context).textTheme.labelSmall
               ?.copyWith(color: tokens.mutedInk),
         ),
-        const SizedBox(height: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: tokens.warmGlow.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(DeepSkyTheme.radiusFull),
-          ),
-          child: Text(
-            s.serverAndKeyIncludedBadge,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: tokens.amberGlow,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
         const SizedBox(height: DeepSkyTheme.spaceMd),
         DecoratedBox(
           decoration: BoxDecoration(

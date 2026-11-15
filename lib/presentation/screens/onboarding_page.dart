@@ -1,11 +1,13 @@
 import 'dart:async';
 
 import 'package:deep_sky/data/pairing_and_sync_repository.dart';
+import 'package:deep_sky/domain/pairing/invite_link_codec.dart';
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
 import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
 import 'package:deep_sky/presentation/theme/deep_sky_theme.dart';
 import 'package:deep_sky/presentation/widgets/welcome_invite_panel.dart';
 import 'package:deep_sky/presentation/widgets/welcome_server_drawer.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Welcome & Onboarding screen (`S1-D02-D03-D05`) following the
@@ -294,8 +296,21 @@ class _OnboardingPageState extends State<OnboardingPage> {
                       ),
                       const SizedBox(height: 12),
                       _WelcomeHeroSection(
-                        title: s.welcomeTitle,
-                        subtitle: s.welcomeSubtitle,
+                        icon: switch (_modeIndex) {
+                          1 => Icons.wb_twilight_rounded,
+                          2 => Icons.vpn_key_rounded,
+                          _ => Icons.cottage_rounded,
+                        },
+                        title: switch (_modeIndex) {
+                          1 => s.joinTitle,
+                          2 => s.recoverTitle,
+                          _ => s.welcomeTitle,
+                        },
+                        subtitle: switch (_modeIndex) {
+                          1 => s.joinSubtitle,
+                          2 => s.recoverSubtitle,
+                          _ => s.welcomeSubtitle,
+                        },
                       ),
                       const SizedBox(height: 22),
                       _WelcomeModePill(
@@ -421,6 +436,54 @@ class _OnboardingPageState extends State<OnboardingPage> {
     );
   }
 
+  Future<void> _scanJoinQr(DeepSkyController c, DeepSkyStrings s) async {
+    final String? scanned = await c.scanQrCode(
+      title: s.scanQrTitle,
+      hint: s.scanQrInviteHint,
+      cancelLabel: s.cancel,
+    );
+    if (!mounted || scanned == null || scanned.isEmpty) {
+      return;
+    }
+    _inviteTokenController.text = scanned;
+    final parsed = InviteLinkCodec.parseInviteInput(scanned);
+    if (parsed.serverUrl != null) {
+      _serverController.text = parsed.serverUrl!;
+    }
+    await c.acceptInvite(
+      serverUrl: _serverController.text,
+      inviteToken: scanned,
+      deviceLabel: _labelController.text,
+    );
+  }
+
+  Future<void> _pasteJoinToken() async {
+    final ClipboardData? clip = await Clipboard.getData(Clipboard.kTextPlain);
+    final String? text = clip?.text?.trim();
+    if (mounted && text != null && text.isNotEmpty) {
+      _inviteTokenController.text = text;
+    }
+  }
+
+  Future<void> _scanRecoveryQr(DeepSkyController c, DeepSkyStrings s) async {
+    final String? scanned = await c.scanQrCode(
+      title: s.scanQrTitle,
+      hint: s.scanQrRecoveryHint,
+      cancelLabel: s.cancel,
+    );
+    if (mounted && scanned != null && scanned.isNotEmpty) {
+      _recoveryController.text = scanned;
+    }
+  }
+
+  Future<void> _pasteRecoveryWords() async {
+    final ClipboardData? clip = await Clipboard.getData(Clipboard.kTextPlain);
+    final String? text = clip?.text?.trim();
+    if (mounted && text != null && text.isNotEmpty) {
+      _recoveryController.text = text;
+    }
+  }
+
   Widget _buildJoinSection(
     DeepSkyController c,
     DeepSkyStrings s,
@@ -431,6 +494,94 @@ class _OnboardingPageState extends State<OnboardingPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        if (pending == null) ...<Widget>[
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: tokens.surfaceHigh.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(DeepSkyTheme.radiusLg),
+              border: Border.all(
+                color: tokens.cardBorder.withValues(alpha: 0.35),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: tokens.elevatedSurface,
+                        borderRadius: BorderRadius.circular(
+                          DeepSkyTheme.radiusMd,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.qr_code_scanner_rounded,
+                        color: tokens.calmAccent,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Wrap(
+                            spacing: 8,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: <Widget>[
+                              Text(s.scanQrTitle, style: textTheme.titleMedium)
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            s.scanQrDescription,
+                            style: textTheme.bodySmall?.copyWith(
+                              color: tokens.mutedInk,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  key: const Key('scan-invite-qr-button'),
+                  onPressed: c.busy ? null : () => _scanJoinQr(c, s),
+                  icon: const Icon(Icons.photo_camera_rounded, size: 19),
+                  label: Text(s.openCameraButton),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Divider(color: tokens.cardBorder.withValues(alpha: 0.4)),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text(
+                  s.orEnterManuallyDivider.toUpperCase(),
+                  style: textTheme.labelSmall?.copyWith(
+                    color: tokens.mutedInk,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Divider(color: tokens.cardBorder.withValues(alpha: 0.4)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+        ],
         TextField(
           key: const Key('join-token-field'),
           controller: _inviteTokenController,
@@ -439,6 +590,16 @@ class _OnboardingPageState extends State<OnboardingPage> {
             hintText: s.isIt
                 ? 'Incolla il link ricevuto dal partner'
                 : 'Paste the link sent by your partner',
+            suffixIcon: IconButton(
+              key: const Key('paste-invite-button'),
+              tooltip: s.pasteButton,
+              onPressed: c.busy ? null : _pasteJoinToken,
+              icon: Icon(
+                Icons.content_paste_rounded,
+                size: 19,
+                color: tokens.mutedInk,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 14),
@@ -508,6 +669,25 @@ class _OnboardingPageState extends State<OnboardingPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            OutlinedButton.icon(
+              key: const Key('scan-recovery-qr-button'),
+              onPressed: c.busy ? null : () => _scanRecoveryQr(c, s),
+              icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+              label: Text(s.scanQrActionLabel),
+            ),
+            OutlinedButton.icon(
+              key: const Key('paste-recovery-button'),
+              onPressed: c.busy ? null : _pasteRecoveryWords,
+              icon: const Icon(Icons.content_paste_rounded, size: 18),
+              label: Text(s.pasteButton),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         TextField(
           key: const Key('recovery-words-field'),
           controller: _recoveryController,
@@ -635,8 +815,13 @@ class _WelcomeTopBar extends StatelessWidget {
 }
 
 class _WelcomeHeroSection extends StatelessWidget {
-  const _WelcomeHeroSection({required this.title, required this.subtitle});
+  const _WelcomeHeroSection({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
 
+  final IconData icon;
   final String title;
   final String subtitle;
 
@@ -667,20 +852,7 @@ class _WelcomeHeroSection extends StatelessWidget {
               ),
             ],
           ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: <Widget>[
-              Icon(Icons.cottage_rounded, size: 38, color: tokens.amberGlow),
-              Positioned(
-                bottom: 18,
-                child: Icon(
-                  Icons.favorite_rounded,
-                  size: 13,
-                  color: tokens.calmAccent,
-                ),
-              ),
-            ],
-          ),
+          child: Center(child: Icon(icon, size: 36, color: tokens.amberGlow)),
         ),
         const SizedBox(height: 16),
         Text(title, textAlign: TextAlign.center, style: textTheme.displayLarge),
@@ -724,18 +896,21 @@ class _WelcomeModePill extends StatelessWidget {
         children: <Widget>[
           _ModePillTab(
             key: const Key('welcome-tab-invite'),
+            icon: Icons.favorite_outline_rounded,
             label: inviteLabel,
             selected: selectedIndex == 0,
             onTap: () => onSelected(0),
           ),
           _ModePillTab(
             key: const Key('welcome-tab-join'),
+            icon: Icons.login_rounded,
             label: joinLabel,
             selected: selectedIndex == 1,
             onTap: () => onSelected(1),
           ),
           _ModePillTab(
             key: const Key('welcome-tab-recover'),
+            icon: Icons.sync_rounded,
             label: recoverLabel,
             selected: selectedIndex == 2,
             onTap: () => onSelected(2),
@@ -749,11 +924,13 @@ class _WelcomeModePill extends StatelessWidget {
 class _ModePillTab extends StatelessWidget {
   const _ModePillTab({
     super.key,
+    required this.icon,
     required this.label,
     required this.selected,
     required this.onTap,
   });
 
+  final IconData icon;
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -763,13 +940,16 @@ class _ModePillTab extends StatelessWidget {
     final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(context);
     final ColorScheme scheme = Theme.of(context).colorScheme;
     final TextTheme textTheme = Theme.of(context).textTheme;
+    final Color foreground = selected
+        ? scheme.onPrimaryContainer
+        : tokens.mutedInk;
 
     return Expanded(
       child: Semantics(
         button: true,
         selected: selected,
         child: Material(
-          color: selected ? tokens.surfaceHighest : Colors.transparent,
+          color: selected ? scheme.primaryContainer : Colors.transparent,
           borderRadius: BorderRadius.circular(DeepSkyTheme.radiusFull),
           child: InkWell(
             onTap: onTap,
@@ -779,14 +959,25 @@ class _ModePillTab extends StatelessWidget {
               child: Center(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelLarge?.copyWith(
-                      color: selected ? scheme.onSurface : tokens.mutedInk,
-                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Icon(icon, size: 15, color: foreground),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.labelLarge?.copyWith(
+                            color: foreground,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
