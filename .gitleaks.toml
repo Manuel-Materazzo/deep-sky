@@ -24,9 +24,32 @@ regexes = [
   '''(?i)^(change-me|placeholder|example|dev-admin-secret-change-me)''',
 ]
 
-[allowlist]
-description = "Allow documentation examples and test placeholders"
+[[allowlists]]
+description = "Allow documentation examples and env templates"
 paths = [
   '''^deploy/\.env\.example$''',
   '''^docs/''',
+]
+
+[[allowlists]]
+description = "Allow local secure-storage key identifiers (not secret values)"
+condition = "AND"
+paths = [
+  '''^lib/data/''',
+  '''^test/''',
+]
+regexTarget = "secret"
+regexes = [
+  '''^deep_sky\.[a-z0-9_.]+\.v[0-9]+$''',
+]
+
+[[allowlists]]
+description = "Allow golden test mock invite token"
+condition = "AND"
+paths = [
+  '''^test/golden/deep_sky_golden_test\.dart$''',
+]
+regexTarget = "secret"
+regexes = [
+  '''^golden_tok_[0-9a-f]+$''',
 ]

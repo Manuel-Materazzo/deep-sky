@@ -566,16 +566,15 @@ class PairingAndSyncRepository {
         : trimmed;
     final LocalDeviceIdentity updated = current.copyWith(
       deviceLabel: clean,
-      nameSetupCompleted:
-          markNameSetupCompleted ? true : current.nameSetupCompleted,
+      nameSetupCompleted: markNameSetupCompleted
+          ? true
+          : current.nameSetupCompleted,
     );
     await saveIdentity(updated);
 
     try {
-      await _clientFactory(updated.serverUrl).updateMyDeviceLabel(
-        identity: updated,
-        deviceLabel: clean,
-      );
+      await _clientFactory(updated.serverUrl)
+          .updateMyDeviceLabel(identity: updated, deviceLabel: clean);
     } on ClientUpgradeRequiredException {
       rethrow;
     } on ApiRequestException catch (ex) {

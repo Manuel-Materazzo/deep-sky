@@ -30,7 +30,8 @@ class _HomeShellPageState extends State<HomeShellPage> {
   final TextEditingController _noteController = TextEditingController();
   late final TextEditingController _deviceLabelController =
       TextEditingController(
-        text: widget.controller.identity?.deviceLabel ??
+        text:
+            widget.controller.identity?.deviceLabel ??
             widget.controller.deviceLabel,
       );
   late final TextEditingController _updateSourceController =

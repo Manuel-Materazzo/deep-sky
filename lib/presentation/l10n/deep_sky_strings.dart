@@ -243,18 +243,16 @@ class DeepSkyStrings {
   String get verificationSubtitle => isIt
       ? 'Chiedi al tuo partner di controllare se sullo schermo legge la stessa combinazione luminosa.'
       : 'Ask your partner to check if their screen shows the same luminous code.';
-  String verificationConnectedPeer(String label) => isIt
-      ? '$label vuole unirsi a voi'
-      : '$label wants to join you';
+  String verificationConnectedPeer(String label) =>
+      isIt ? '$label vuole unirsi a voi' : '$label wants to join you';
   String verificationInvitedBy(String label) =>
       isIt ? 'Invito da $label' : 'Invite from $label';
   String get sharedSasCodeLabel =>
       isIt ? 'Codice SAS condiviso' : 'Shared SAS code';
   String get verificationWaitingForPartner =>
       isIt ? 'In attesa dell\'altro telefono…' : 'Waiting for the other phone…';
-  String get verificationReadyToConfirm => isIt
-      ? 'Pronto per la tua conferma'
-      : 'Ready for your confirmation';
+  String get verificationReadyToConfirm =>
+      isIt ? 'Pronto per la tua conferma' : 'Ready for your confirmation';
   String get verificationSyncedTag => isIt ? 'Sincrono' : 'Synced';
   String get verificationConfirmInviterButton => isIt
       ? 'Il codice coincide • Completa chiavi'
@@ -295,32 +293,25 @@ class DeepSkyStrings {
       : 'Choose the name your loved one will see in the app.';
   String get spaceSetupPreviewYouFallback => isIt ? 'Tu' : 'You';
   String get spaceSetupPreviewPartnerFallback => isIt ? 'Partner' : 'Partner';
-  String get spaceSetupPreviewHomeLabel =>
-      isIt ? 'La nostra casa' : 'Our home';
-  String get spaceSetupInputLabel => isIt
-      ? 'Il tuo nome o vezzeggiativo'
-      : 'Your name or pet name';
+  String get spaceSetupPreviewHomeLabel => isIt ? 'La nostra casa' : 'Our home';
+  String get spaceSetupInputLabel =>
+      isIt ? 'Il tuo nome o vezzeggiativo' : 'Your name or pet name';
   String get spaceSetupInputVisibleHint =>
       isIt ? 'Visibile a chi ami' : 'Visible to your partner';
   String get spaceSetupInputPlaceholder =>
       isIt ? 'es. Luca, Cucciolo, Luccio...' : 'e.g. Alex, Sam, Love...';
-  String get spaceSetupClearTooltip =>
-      isIt ? 'Cancella nome' : 'Clear name';
-  String get spaceSetupSubmitButton => isIt
-      ? 'Tutto pronto, entra nella casa'
-      : 'All set, enter our home';
+  String get spaceSetupClearTooltip => isIt ? 'Cancella nome' : 'Clear name';
+  String get spaceSetupSubmitButton =>
+      isIt ? 'Tutto pronto, entra nella casa' : 'All set, enter our home';
   String get spaceSetupSkipButton => isIt
       ? 'Puoi sempre cambiarlo più tardi nelle impostazioni'
       : 'You can always change it later in settings';
-  String get settingsProfileCardTitle => isIt
-      ? 'Il tuo nome nella casa'
-      : 'Your name in your home';
+  String get settingsProfileCardTitle =>
+      isIt ? 'Il tuo nome nella casa' : 'Your name in your home';
   String get settingsProfileCardSubtitle => isIt
       ? 'È il nome che vede chi ami nei dispositivi e nei vostri momenti condivisi.'
       : 'This is the name your partner sees in devices and shared moments.';
-  String get settingsSaveNameButton =>
-      isIt ? 'Aggiorna nome' : 'Update name';
-  String get deviceNameUpdatedNotice => isIt
-      ? 'Nome aggiornato.'
-      : 'Name updated.';
+  String get settingsSaveNameButton => isIt ? 'Aggiorna nome' : 'Update name';
+  String get deviceNameUpdatedNotice =>
+      isIt ? 'Nome aggiornato.' : 'Name updated.';
 }

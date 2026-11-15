@@ -650,8 +650,8 @@ class DeepSkyController extends ChangeNotifier {
 
   /// Aborts an active SAS verification when the codes do not match (`S1-D07`).
   Future<void> cancelVerificationOnMismatch() => _runGuarded(() async {
-    final String notice =
-        DeepSkyStrings(languageCode).verificationMismatchCancelledNotice;
+    final String notice = DeepSkyStrings(languageCode)
+        .verificationMismatchCancelledNotice;
     if (pendingJoin != null) {
       await _repository.clearIdentity();
       await _repository.clearPendingInvite();

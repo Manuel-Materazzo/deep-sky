@@ -244,9 +244,7 @@ void main() {
       // Verify English + Light theme render cleanly without layout issues too.
       ctrlA.setLanguageCode('en');
       tester.platformDispatcher.platformBrightnessTestValue = Brightness.light;
-      addTearDown(
-        tester.platformDispatcher.clearPlatformBrightnessTestValue,
-      );
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
       await tester.pumpAndSettle();
       expect(
         tester.widget<Text>(find.byKey(const Key('preview-user-tag'))).data,
@@ -325,8 +323,7 @@ class _MiniPairingServer {
   final Map<String, Map<String, Object?>> _devices =
       <String, Map<String, Object?>>{};
   final Map<String, String> deviceLabels = <String, String>{};
-  final Map<String, _MiniInviteRecord> _invites =
-      <String, _MiniInviteRecord>{};
+  final Map<String, _MiniInviteRecord> _invites = <String, _MiniInviteRecord>{};
   final Map<String, Map<String, Object?>> _keyDeliveries =
       <String, Map<String, Object?>>{};
 

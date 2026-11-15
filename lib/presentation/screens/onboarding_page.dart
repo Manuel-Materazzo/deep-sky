@@ -517,7 +517,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                             spacing: 8,
                             crossAxisAlignment: WrapCrossAlignment.center,
                             children: <Widget>[
-                              Text(s.scanQrTitle, style: textTheme.titleMedium)
+                              Text(s.scanQrTitle, style: textTheme.titleMedium),
                             ],
                           ),
                           const SizedBox(height: 4),
