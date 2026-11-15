@@ -44,14 +44,14 @@ finale del nucleo.
 
 Proposta (PD-17). Prima di inserire dati intimi veri, con PD-05 come criterio guida:
 
-- [ ] Pairing, recupero da sola chiave, arruolamento di un nuovo telefono e revoca provati su due
+- [x] Pairing, recupero da sola chiave, arruolamento di un nuovo telefono e revoca provati su due
   telefoni reali
 - [ ] Un ripristino da backup con dati di prova realistici riuscito e documentato
 - [ ] Verificata l’esclusione di chiavi e cache locale dal backup automatico di Android
 - [ ] **Revisione interna di sicurezza** sui componenti critici (filtro di autenticazione,
   cifratura, archivio chiavi, recupero), con rapporto scritto (S1-SEC-01)
-- [ ] La partner ha completato l’enrollment **senza aiuto** su un telefono suo (S1-QA-02)
-- [ ] Politica di compatibilità attiva (PD-19) e aggiornamento in app provato
+- [x] La partner ha completato l’enrollment **senza aiuto** su un telefono suo (S1-QA-02)
+- [x] Politica di compatibilità attiva (PD-19) e aggiornamento in app provato
 - [ ] Procedura di emergenza scritta: cosa fare se il server non risponde o se un aggiornamento ha
   un difetto
 
@@ -160,8 +160,8 @@ Rif.: AR-11
 
 **S1-SRV-01 · Creazione degli inviti** — Ruolo: sviluppatore backend · Rif.: AR-02
 
-- [ ] Comando di amministrazione che crea un invito e ne stampa **link e QR**
-- [ ] Monouso, con scadenza; un invito riscattato o scaduto è rifiutato
+- [x] Comando che crea un invito e ne stampa **link e QR**
+- [x] Monouso, con scadenza; un invito riscattato o scaduto è rifiutato
 - [ ] Limite di tentativi sul riscatto; nessuna possibilità di scoprire inviti validi per tentativi
 - [ ] Pulizia periodica degli inviti scaduti
 
@@ -185,7 +185,7 @@ Rif.: AR-11
 
 **S1-APP-02 · Primo partner** — Ruolo: sviluppatore client · Dipende da: S1-APP-01
 
-- [ ] Creazione della coppia da invito *(creazione automatica all'avvio per `S1-D03` e schermata
+- [x] Creazione della coppia da invito *(creazione automatica all'avvio per `S1-D03` e schermata
   transitoria `SpaceSetupPage` `S1-D09`/`S1-D07-2` implementate; schermata dedicata `S1-D04`
   ancora aperta)*
 - [ ] Chiave di recupero con **conferma obbligatoria** del salvataggio *(gate M2 già attivo;
