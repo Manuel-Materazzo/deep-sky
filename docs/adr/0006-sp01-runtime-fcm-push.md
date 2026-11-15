@@ -1,8 +1,8 @@
 # ADR-0006: Runtime-Configured FCM Push Notifications (`SP-01`)
 
-- **Status:** Proposed (foreground/background verified in M1; task-switcher-closed, reboot & Doze matrix carried into early M2 before freezing `AR-10`)
-- **Date:** 2026-11-14
-- **Reference IDs:** `S-02`, `TC-04`, `AD-04`, `SP-01`
+- **Status:** Accepted (`AR-10` frozen; verified on real Android hardware across foreground, background, task-switcher-closed, reboot, and Doze)
+- **Date:** 2026-11-15 (proposed 2026-11-14)
+- **Reference IDs:** `S-02`, `TC-04`, `AD-04`, `AR-10`, `SP-01`
 
 ## Context
 
@@ -24,4 +24,4 @@ The prototype on branch `proto/sp-01` implements the architecture documented in 
 ## Consequences
 
 - **Verified in M1 (`G-1` closure):** Automated tests (`Sp01FcmHttpClientTest`, `Sp01PushIntegrationTest`, `ArchitectureTest`, `11/11` Flutter tests, debug APK build) plus promoter verification of foreground and background notification delivery (`docs/m0-m1-operative-plan.md`).
-- **Remaining physical matrix transitioned into early M2 (`AR-10` freeze gate):** Execute the 2-device checks for task-switcher swipe-dismissed state, post-reboot, long screen-off Doze / Battery Saver, and Settings Force Stop (tracked in `docs/m2-operative-plan.md`). Activate Plan B (`PushProvider` -> UnifiedPush / dedicated build) if task-switcher-closed delivery proves unreliable on target devices.
+- **Verified in M2 on physical hardware (`AR-10` frozen, 2026-11-15):** Real-device end-to-end verification completed across foreground, background, task-switcher swipe-dismissed state, post-reboot, and Doze / Battery Saver; runtime `DeepSkyApplication.onCreate()` initialization via `ensureInitializedFromStorage()` delivers localized generic wakeup notifications reliably without `google-services.json`, so Plan B (`PushProvider` -> UnifiedPush / dedicated build) is **not** activated (`AR-10` closed with runtime FCM). As expected under Android OS rules, explicit Settings *Force Stop* suspends delivery until the user reopens the app.
