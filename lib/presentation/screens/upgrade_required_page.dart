@@ -98,20 +98,40 @@ class _UpgradeRequiredPageState extends State<UpgradeRequiredPage> {
                             },
                     ),
                     const SizedBox(height: 12),
-                    TextField(
-                      controller: _sourceController,
-                      decoration: InputDecoration(
-                        labelText: s.updateSourceFieldLabel,
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _keyController,
-                      decoration: InputDecoration(
-                        labelText: s.updatePublicKeyFieldLabel,
-                        border: const OutlineInputBorder(),
-                      ),
+                    ExpansionTile(
+                      key: const Key('upgrade-advanced-update-options-tile'),
+                      tilePadding: EdgeInsets.zero,
+                      childrenPadding: const EdgeInsets.only(top: 8, bottom: 8),
+                      title: Text(s.advancedUpdateOptionsLabel),
+                      children: <Widget>[
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(s.allowCustomUpdateAnchorLabel),
+                          subtitle: Text(s.allowCustomUpdateAnchorHint),
+                          value: c.allowCustomUpdateTrustAnchor,
+                          onChanged: c.busy
+                              ? null
+                              : c.setAllowCustomUpdateTrustAnchor,
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _sourceController,
+                          enabled: c.allowCustomUpdateTrustAnchor && !c.busy,
+                          decoration: InputDecoration(
+                            labelText: s.updateSourceFieldLabel,
+                            border: const OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _keyController,
+                          enabled: c.allowCustomUpdateTrustAnchor && !c.busy,
+                          decoration: InputDecoration(
+                            labelText: s.updatePublicKeyFieldLabel,
+                            border: const OutlineInputBorder(),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     FilledButton.icon(

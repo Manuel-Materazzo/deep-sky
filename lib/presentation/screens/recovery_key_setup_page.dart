@@ -1,8 +1,10 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:deep_sky/domain/crypto/recovery_key_codec.dart';
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
 import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
 import 'package:deep_sky/presentation/theme/deep_sky_theme.dart';
-import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -19,6 +21,18 @@ class RecoveryKeySetupPage extends StatefulWidget {
 class _RecoveryKeySetupPageState extends State<RecoveryKeySetupPage> {
   bool _showQrView = false;
   bool _confirmedSaved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(widget.controller.setSecureScreen(true));
+  }
+
+  @override
+  void dispose() {
+    unawaited(widget.controller.setSecureScreen(false));
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -163,9 +177,7 @@ class _RecoveryKeySetupPageState extends State<RecoveryKeySetupPage> {
                       OutlinedButton.icon(
                         key: const Key('copy-recovery-words-button'),
                         onPressed: () async {
-                          await Clipboard.setData(
-                            ClipboardData(text: sentence),
-                          );
+                          await c.copySensitiveText(sentence);
                           if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(s.recoveryCopiedNotice)),
@@ -183,9 +195,7 @@ class _RecoveryKeySetupPageState extends State<RecoveryKeySetupPage> {
                                 '${s.recoverySetupAppBarTitle} (Deep Sky):\n$sentence',
                           );
                           if (!launched && context.mounted) {
-                            await Clipboard.setData(
-                              ClipboardData(text: sentence),
-                            );
+                            await c.copySensitiveText(sentence);
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(content: Text(s.recoveryCopiedNotice)),

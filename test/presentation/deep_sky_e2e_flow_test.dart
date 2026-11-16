@@ -589,11 +589,8 @@ class _FakeM2Server {
       }, status: 201);
     }
 
-    final RegExpMatch? acceptMatch = RegExp(
-      r'^/api/v1/pairing/invites/([^/]+)/accept$',
-    ).firstMatch(path);
-    if (req.method == 'POST' && acceptMatch != null) {
-      final String token = acceptMatch.group(1)!;
+    if (req.method == 'POST' && path == '/api/v1/pairing/invites/accept') {
+      final String token = body['inviteToken'] as String;
       final _FakeInviteRecord? invite = _invites[token];
       final _FakeCouple? couple = invite == null
           ? null
@@ -739,11 +736,8 @@ class _FakeM2Server {
       }, status: 201);
     }
 
-    final RegExpMatch? statusMatch = RegExp(
-      r'^/api/v1/pairing/invites/([^/]+)/status$',
-    ).firstMatch(path);
-    if (req.method == 'GET' && statusMatch != null) {
-      final _FakeInviteRecord? invite = _invites[statusMatch.group(1)!];
+    if (req.method == 'POST' && path == '/api/v1/pairing/invites/status') {
+      final _FakeInviteRecord? invite = _invites[body['inviteToken'] as String];
       if (invite == null) {
         return _json(<String, Object?>{
           'message': 'Invite not found',
@@ -804,7 +798,12 @@ class _FakeM2Server {
     }
 
     if (req.method == 'GET' && path == '/api/v1/sync/envelopes') {
-      return _json(callerCouple!.envelopes);
+      final List<Map<String, Object?>> items = callerCouple!.envelopes;
+      return _json(<String, Object?>{
+        'items': items,
+        'nextAfterSeq': items.isEmpty ? 0 : items.last['seq'],
+        'hasMore': false,
+      });
     }
 
     if (req.method == 'GET' && path == '/api/v1/pairing/devices') {

@@ -91,7 +91,93 @@ void main() {
   });
 
   testWidgets(
-    'Deep link pre-fills Join tab and custom server URL (S1-APP-01)',
+    'Deep link pre-fills Join tab without silently switching server; custom server requires blocking confirmation (S1-APP-01, CA-06)',
+    (WidgetTester tester) async {
+      final List<Uri> acceptRequests = <Uri>[];
+      final DeepSkyController controller = DeepSkyController(
+        keyStore: InMemorySecureKeyStore(),
+        httpClient: MockClient((http.Request req) async {
+          if (req.url.path == '/api/v1/system/compatibility') {
+            return http.Response(
+              jsonEncode(<String, Object?>{
+                'minClientVersionCode': 1,
+                'minProtocolVersion': 1,
+              }),
+              200,
+            );
+          }
+          if (req.url.path == '/api/v1/pairing/invites/accept') {
+            acceptRequests.add(req.url);
+            return http.Response(
+              jsonEncode(<String, Object?>{
+                'coupleId': 'c-custom',
+                'deviceId': 'd-custom',
+                'peerDeviceId': 'd-peer',
+                'peerLabel': 'Peer',
+                'peerAuthPublicKeyB64': base64UrlEncode(List<int>.filled(32, 1)),
+                'peerKemPublicKeyB64': base64UrlEncode(List<int>.filled(32, 2)),
+              }),
+              200,
+              headers: const <String, String>{'Content-Type': 'application/json'},
+            );
+          }
+          return http.Response('{}', 404);
+        }),
+        loadAssetString: (_) async => pilotManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://deepsky.vectevo.com',
+      );
+      controller.reduceMotion = true;
+      await controller.initialize();
+
+      await tester.pumpWidget(DeepSkyApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      controller.handleIncomingDeepLink(
+        'https://deepsky.vectevo.com/join#server=https%3A%2F%2Fcasa.example.test&token=tok-deep-42',
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.onboardingTabIndex, 1);
+      // Must NOT silently switch activeServerUrl before confirmation (CA-06)
+      expect(controller.activeServerUrl, 'https://deepsky.vectevo.com');
+      final TextField joinField = tester.widget<TextField>(
+        find.byKey(const Key('join-token-field')),
+      );
+      expect(joinField.controller?.text, contains('tok-deep-42'));
+
+      // Tapping Join shows blocking confirmation naming custom host; rejecting keeps official server
+      await tester.ensureVisible(find.byKey(const Key('accept-invite-button')));
+      await tester.tap(find.byKey(const Key('accept-invite-button')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('custom-server-confirm-dialog')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('casa.example.test'), findsWidgets);
+
+      await tester.tap(find.byKey(const Key('custom-server-reject-button')));
+      await tester.pumpAndSettle();
+      expect(controller.activeServerUrl, 'https://deepsky.vectevo.com');
+      expect(acceptRequests, isEmpty);
+
+      // Confirming switches server and completes acceptInvite
+      await tester.ensureVisible(find.byKey(const Key('accept-invite-button')));
+      await tester.tap(find.byKey(const Key('accept-invite-button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('custom-server-confirm-button')));
+      await tester.pumpAndSettle();
+      expect(controller.activeServerUrl, 'https://casa.example.test');
+      expect(acceptRequests, hasLength(1));
+      expect(
+        acceptRequests.first.toString(),
+        'https://casa.example.test/api/v1/pairing/invites/accept',
+      );
+    },
+  );
+
+  testWidgets(
+    'Rejects insecure http:// non-local server in invite link (CA-06)',
     (WidgetTester tester) async {
       final DeepSkyController controller = DeepSkyController(
         keyStore: InMemorySecureKeyStore(),
@@ -115,16 +201,12 @@ void main() {
       await tester.pumpAndSettle();
 
       controller.handleIncomingDeepLink(
-        'https://deepsky.vectevo.com/join#server=https%3A%2F%2Fcasa.example.test&token=tok-deep-42',
+        'deepsky://pair#server=http%3A%2F%2Fevil.example.com&token=tok-evil',
       );
       await tester.pumpAndSettle();
 
-      expect(controller.onboardingTabIndex, 1);
-      expect(controller.activeServerUrl, 'https://casa.example.test');
-      final TextField joinField = tester.widget<TextField>(
-        find.byKey(const Key('join-token-field')),
-      );
-      expect(joinField.controller?.text, contains('tok-deep-42'));
+      expect(controller.activeServerUrl, 'https://deepsky.vectevo.com');
+      expect(controller.errorNotice, contains('HTTPS'));
     },
   );
 
@@ -248,7 +330,10 @@ void main() {
           );
         }
         if (req.url.path == '/api/v1/sync/envelopes') {
-          return http.Response('[]', 200);
+          return http.Response(
+            '{"items":[],"nextAfterSeq":0,"hasMore":false}',
+            200,
+          );
         }
         if (req.url.path == '/api/v1/pairing/devices') {
           return http.Response(
@@ -382,7 +467,10 @@ void main() {
           );
         }
         if (req.url.path == '/api/v1/sync/envelopes') {
-          return http.Response('[]', 200);
+          return http.Response(
+            '{"items":[],"nextAfterSeq":0,"hasMore":false}',
+            200,
+          );
         }
         if (req.url.path == '/api/v1/pairing/devices') {
           return http.Response('[]', 200);

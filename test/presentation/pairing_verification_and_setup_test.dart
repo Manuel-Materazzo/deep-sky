@@ -98,10 +98,9 @@ void main() {
       expect(find.byKey(const Key('code-verification-page')), findsOneWidget);
       expect(find.byKey(const Key('inviter-sas-code')), findsOneWidget);
       expect(find.bySemanticsLabel('SAS $expectedSas'), findsOneWidget);
-
-      await tapVisible(tester, find.byKey(const Key('copy-sas-button')));
-      expect(copiedClipboard, expectedSas);
-      expect(find.text('Copiato!'), findsOneWidget);
+      // CA-10: SAS code must not be copyable to clipboard
+      expect(find.byKey(const Key('copy-sas-button')), findsNothing);
+      expect(copiedClipboard, isNull);
 
       // Mismatch button opens confirmation dialog and then resets with a calm notice & fresh invite.
       await tapVisible(tester, find.byKey(const Key('mismatch-sas-button')));
@@ -606,11 +605,8 @@ class _MiniPairingServer {
       }, status: 201);
     }
 
-    final RegExpMatch? acceptMatch = RegExp(
-      r'^/api/v1/pairing/invites/([^/]+)/accept$',
-    ).firstMatch(path);
-    if (req.method == 'POST' && acceptMatch != null) {
-      final _MiniInviteRecord invite = _invites[acceptMatch.group(1)!]!;
+    if (req.method == 'POST' && path == '/api/v1/pairing/invites/accept') {
+      final _MiniInviteRecord invite = _invites[body['inviteToken'] as String]!;
       _counter += 1;
       final String joinerId = 'dev-$_counter';
       final String label = body['deviceLabel'] as String? ?? 'Device';
@@ -636,12 +632,9 @@ class _MiniPairingServer {
       });
     }
 
-    final RegExpMatch? statusMatch = RegExp(
-      r'^/api/v1/pairing/invites/([^/]+)/status$',
-    ).firstMatch(path);
-    if (req.method == 'GET' && statusMatch != null) {
+    if (req.method == 'POST' && path == '/api/v1/pairing/invites/status') {
       statusPollCount += 1;
-      final _MiniInviteRecord invite = _invites[statusMatch.group(1)!]!;
+      final _MiniInviteRecord invite = _invites[body['inviteToken'] as String]!;
       return _json(<String, Object?>{
         'accepted': invite.acceptedDeviceId != null,
         'acceptedDeviceId': invite.acceptedDeviceId,
@@ -691,7 +684,11 @@ class _MiniPairingServer {
     }
 
     if (req.method == 'GET' && path == '/api/v1/sync/envelopes') {
-      return _json(<Object?>[]);
+      return _json(<String, Object?>{
+        'items': const <Object?>[],
+        'nextAfterSeq': 0,
+        'hasMore': false,
+      });
     }
 
     return _json(<String, Object?>{

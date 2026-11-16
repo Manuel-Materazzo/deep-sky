@@ -128,6 +128,17 @@ class DeepSkyStrings {
   String get serverSyncNote => isIt
       ? 'Il link d\'invito e il QR code si sincronizzeranno in automatico.'
       : 'Your invite link and QR code will update automatically.';
+  String get customServerConfirmTitle => isIt
+      ? 'Conferma server personalizzato'
+      : 'Confirm custom server';
+  String customServerConfirmBody(String host, String fullUrl) => isIt
+      ? 'Questo invito punta a un server diverso da quello ufficiale Deep Sky:\n\n$host\n($fullUrl)\n\nI metadati di abbinamento e i pacchetti cifrati passeranno da questo server. Vuoi continuare?'
+      : 'This invite points to a server other than the official Deep Sky server:\n\n$host\n($fullUrl)\n\nPairing metadata and encrypted envelopes will go through this server. Do you want to continue?';
+  String get customServerConfirmAction =>
+      isIt ? 'Usa questo server' : 'Use this server';
+  String get customServerInsecureError => isIt
+      ? 'Per sicurezza i server esterni devono usare HTTPS. HTTP è consentito solo per indirizzi locali o privati.'
+      : 'For safety, external servers must use HTTPS. HTTP is only allowed for local or private addresses.';
   String get welcomeFooterNote => isIt
       ? 'Crittografia punto a punto • Solo per voi due'
       : 'End-to-end encrypted • Just for the two of you';
@@ -442,6 +453,15 @@ class DeepSkyStrings {
       : 'Release source (owner/repo or URL)';
   String get updatePublicKeyFieldLabel =>
       isIt ? 'Chiave pubblica Ed25519 (base64)' : 'Ed25519 public key (base64)';
+  String get advancedUpdateOptionsLabel => isIt
+      ? 'Opzioni avanzate sviluppatore'
+      : 'Advanced developer options';
+  String get allowCustomUpdateAnchorLabel => isIt
+      ? 'Consenti sorgente o chiave personalizzata'
+      : 'Allow custom update source or trust key';
+  String get allowCustomUpdateAnchorHint => isIt
+      ? 'Usa solo per test locali o fork fidati.'
+      : 'Use only for local testing or trusted forks.';
   String updateDownloadProgress(int percent) => isIt
       ? 'Scaricamento aggiornamento… $percent%'
       : 'Downloading update… $percent%';

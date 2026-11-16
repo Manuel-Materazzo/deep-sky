@@ -5,7 +5,6 @@ import 'package:deep_sky/presentation/deep_sky_controller.dart';
 import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
 import 'package:deep_sky/presentation/theme/deep_sky_theme.dart';
 import 'package:deep_sky/presentation/widgets/invite_verification_section.dart';
-import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -36,6 +35,7 @@ class _WelcomeInvitePanelState extends State<WelcomeInvitePanel> {
   void initState() {
     super.initState();
     widget.controller.addListener(_syncAutoPollTimer);
+    unawaited(widget.controller.setSecureScreen(true));
     _expiryTicker = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) {
         _syncAutoPollTimer();
@@ -57,6 +57,7 @@ class _WelcomeInvitePanelState extends State<WelcomeInvitePanel> {
 
   @override
   void dispose() {
+    unawaited(widget.controller.setSecureScreen(false));
     widget.controller.removeListener(_syncAutoPollTimer);
     _copiedResetTimer?.cancel();
     _expiryTicker?.cancel();
@@ -100,7 +101,7 @@ class _WelcomeInvitePanelState extends State<WelcomeInvitePanel> {
   }
 
   Future<void> _copyInviteLink(String inviteUri) async {
-    await Clipboard.setData(ClipboardData(text: inviteUri));
+    await widget.controller.copySensitiveText(inviteUri);
     _copiedResetTimer?.cancel();
     if (!mounted) {
       return;

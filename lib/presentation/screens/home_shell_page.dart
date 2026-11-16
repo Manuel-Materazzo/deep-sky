@@ -481,6 +481,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
                     autoPollInterval: c.inviteAutoPollInterval,
                     onConfirmSas: c.confirmSasAndDeliverRootKey,
                     onCancel: c.cancelActiveInvite,
+                    onSecureScreenChanged: c.setSecureScreen,
                     tokenLabelPrefix: 'Invito nuovo telefono',
                     waitingStatusLabel: s.waitingForNewDeviceAutoDetect,
                     pollButtonLabel: s.checkPartnerJoinedButton,
@@ -868,20 +869,44 @@ class _HomeShellPageState extends State<HomeShellPage> {
                         },
                 ),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _updateSourceController,
-                  decoration: InputDecoration(
-                    labelText: s.updateSourceFieldLabel,
-                    border: const OutlineInputBorder(),
+                ExpansionTile(
+                  key: const Key('advanced-update-options-tile'),
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(top: 8, bottom: 8),
+                  title: Text(
+                    s.advancedUpdateOptionsLabel,
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _updateKeyController,
-                  decoration: InputDecoration(
-                    labelText: s.updatePublicKeyFieldLabel,
-                    border: const OutlineInputBorder(),
-                  ),
+                  children: <Widget>[
+                    SwitchListTile(
+                      key: const Key('allow-custom-update-anchor-switch'),
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(s.allowCustomUpdateAnchorLabel),
+                      subtitle: Text(s.allowCustomUpdateAnchorHint),
+                      value: c.allowCustomUpdateTrustAnchor,
+                      onChanged: c.busy
+                          ? null
+                          : c.setAllowCustomUpdateTrustAnchor,
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _updateSourceController,
+                      enabled: c.allowCustomUpdateTrustAnchor && !c.busy,
+                      decoration: InputDecoration(
+                        labelText: s.updateSourceFieldLabel,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _updateKeyController,
+                      enabled: c.allowCustomUpdateTrustAnchor && !c.busy,
+                      decoration: InputDecoration(
+                        labelText: s.updatePublicKeyFieldLabel,
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 10),
                 FilledButton.tonalIcon(

@@ -138,6 +138,7 @@ class DeepSkyController extends ChangeNotifier {
   String? pushFeedback;
   bool pushFeedbackIsError = false;
   UpdateChannel updateChannel = UpdateChannel.stable;
+  bool allowCustomUpdateTrustAnchor = false;
   ApkReleaseManifest? availableUpdate;
   double? updateDownloadProgress;
   String? updateFeedback;
@@ -235,10 +236,9 @@ class DeepSkyController extends ChangeNotifier {
   }
 
   /// Parses an incoming invite deep-link (`https://.../join#...` or `deepsky://pair#...`)
-  /// and pre-fills the Join flow without persisting raw tokens to backend logs (`S1-APP-01`).
+  /// and pre-fills the Join flow without switching [activeServerUrl] until confirmed (`S1-APP-01`, `CA-06`).
   void handleIncomingDeepLink(String rawUri) {
-    final ({String? serverUrl, String inviteToken}) parsed =
-        InviteLinkCodec.parseInviteInput(rawUri);
+    final parsed = InviteLinkCodec.parseInviteInputChecked(rawUri);
     if (parsed.inviteToken.isEmpty) {
       return;
     }
@@ -246,11 +246,10 @@ class DeepSkyController extends ChangeNotifier {
       return;
     }
     pendingDeepLinkInvite = rawUri.trim();
-    if (parsed.serverUrl != null) {
-      activeServerUrl = parsed.serverUrl!;
-    }
     onboardingTabIndex = 1;
-    errorNotice = null;
+    errorNotice = parsed.rejectedServerError != null
+        ? DeepSkyStrings(languageCode).customServerInsecureError
+        : null;
     notifyListeners();
   }
 
@@ -596,7 +595,7 @@ class DeepSkyController extends ChangeNotifier {
       subject: 'Deep Sky',
     );
     if (!launched) {
-      await Clipboard.setData(ClipboardData(text: uri));
+      await copySensitiveText(uri);
       statusNotice = copiedFallbackNotice;
       notifyListeners();
     }
@@ -742,8 +741,23 @@ class DeepSkyController extends ChangeNotifier {
     required String inviteToken,
     required String deviceLabel,
   }) => _runGuarded(() async {
-    final parsed = InviteLinkCodec.parseInviteInput(inviteToken);
-    final String resolvedServer = (parsed.serverUrl ?? serverUrl).trim();
+    final parsed = InviteLinkCodec.parseInviteInputChecked(inviteToken);
+    if (parsed.rejectedServerError != null) {
+      throw _CalmUserException(
+        DeepSkyStrings(languageCode).customServerInsecureError,
+      );
+    }
+    final String rawServer = (parsed.serverUrl ?? serverUrl).trim();
+    final String resolvedServer;
+    try {
+      resolvedServer = InviteLinkCodec.normalizeServerUrl(rawServer);
+    } on FormatException catch (ex) {
+      throw _CalmUserException(
+        ex.message.contains('HTTPS')
+            ? DeepSkyStrings(languageCode).customServerInsecureError
+            : DeepSkyStrings(languageCode).invalidServerAddress,
+      );
+    }
     activeServerUrl = resolvedServer;
     final String cleanLabel = deviceLabel.trim().isEmpty
         ? DeepSkyStrings(languageCode).defaultDeviceLabel
@@ -1185,13 +1199,39 @@ class DeepSkyController extends ChangeNotifier {
   Future<bool> shareText({required String text, String? subject}) =>
       _nativeBridge.shareText(text: text, subject: subject);
 
+  Future<void> setSecureScreen(bool enabled) =>
+      _nativeBridge.setSecureScreen(enabled);
+
+  Future<void> copySensitiveText(
+    String text, {
+    int clearAfterSeconds = 45,
+  }) => _nativeBridge.copySensitiveText(
+    text,
+    clearAfterSeconds: clearAfterSeconds,
+  );
+
+  void setAllowCustomUpdateTrustAnchor(bool enabled) {
+    if (allowCustomUpdateTrustAnchor == enabled) {
+      return;
+    }
+    allowCustomUpdateTrustAnchor = enabled;
+    availableUpdate = null;
+    updateFeedback = null;
+    notifyListeners();
+  }
+
   Future<void> checkForUpdates({
     required String source,
     required String trustedKeyB64,
     bool force = true,
   }) => _runGuarded(() async {
     updateFeedback = null;
-    final String keyToUse = trustedKeyB64.trim().isNotEmpty
+    final String effectiveSource =
+        (allowCustomUpdateTrustAnchor && source.trim().isNotEmpty)
+        ? source.trim()
+        : defaultUpdateSource;
+    final String keyToUse =
+        (allowCustomUpdateTrustAnchor && trustedKeyB64.trim().isNotEmpty)
         ? trustedKeyB64.trim()
         : trustedUpdatePublicKeyB64.trim();
     if (keyToUse.isEmpty) {
@@ -1204,7 +1244,7 @@ class DeepSkyController extends ChangeNotifier {
     final Uri sourceBaseUri;
     try {
       sourceBaseUri = await _updateService.resolveChannelBaseUri(
-        sourceInput: source,
+        sourceInput: effectiveSource,
         channel: updateChannel,
       );
     } on FormatException catch (ex) {
@@ -1275,8 +1315,12 @@ class DeepSkyController extends ChangeNotifier {
         updateDownloadProgress = 0.0;
         notifyListeners();
         try {
+          final String effectiveSource =
+              (allowCustomUpdateTrustAnchor && source.trim().isNotEmpty)
+              ? source.trim()
+              : defaultUpdateSource;
           final Uri sourceBaseUri = await _updateService.resolveChannelBaseUri(
-            sourceInput: source,
+            sourceInput: effectiveSource,
             channel: updateChannel,
           );
           final file = await _updateService.downloadAndVerifyApk(
@@ -1333,6 +1377,11 @@ class DeepSkyController extends ChangeNotifier {
       return;
     }
     deviceLabel = trimmed;
+    notifyListeners();
+  }
+
+  void setErrorNotice(String message) {
+    errorNotice = message;
     notifyListeners();
   }
 

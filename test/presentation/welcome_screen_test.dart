@@ -311,7 +311,12 @@ void main() {
           );
         }
         if (req.method == 'POST' &&
-            req.url.path == '/api/v1/pairing/invites/tok_qr_joined/accept') {
+            req.url.path == '/api/v1/pairing/invites/accept') {
+          final Map<String, Object?> body =
+              jsonDecode(req.body) as Map<String, Object?>;
+          if (body['inviteToken'] != 'tok_qr_joined') {
+            return http.Response('{}', 409);
+          }
           acceptRequests.add(req.url);
           return http.Response(
             jsonEncode(<String, Object?>{
@@ -378,17 +383,26 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('Permesso fotocamera'), findsOneWidget);
 
-      // Valid QR scan parses server + token and transitions to SAS verification
+      // Valid QR scan for custom server shows blocking confirmation naming host (CA-06)
       scanMode = 'invite';
       await tester.ensureVisible(
         find.byKey(const Key('scan-invite-qr-button')),
       );
       await tester.tap(find.byKey(const Key('scan-invite-qr-button')));
       await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('custom-server-confirm-dialog')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('192.168.1.99:8080'), findsWidgets);
+      expect(acceptRequests, isEmpty);
+
+      await tester.tap(find.byKey(const Key('custom-server-confirm-button')));
+      await tester.pumpAndSettle();
       expect(acceptRequests, hasLength(1));
       expect(
         acceptRequests.first.toString(),
-        'http://192.168.1.99:8080/api/v1/pairing/invites/tok_qr_joined/accept',
+        'http://192.168.1.99:8080/api/v1/pairing/invites/accept',
       );
       expect(find.byKey(const Key('joiner-sas-code')), findsOneWidget);
     },

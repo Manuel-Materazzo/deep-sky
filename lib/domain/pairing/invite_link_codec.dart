@@ -47,9 +47,17 @@ class InviteLinkCodec {
   static ({String? serverUrl, String inviteToken}) parseInviteInput(
     String rawInput,
   ) {
+    final checked = parseInviteInputChecked(rawInput);
+    return (serverUrl: checked.serverUrl, inviteToken: checked.inviteToken);
+  }
+
+  /// Same as [parseInviteInput], but also reports when a `server=` parameter
+  /// or origin was rejected (for example non-local plain `http://` URLs).
+  static ({String? serverUrl, String inviteToken, String? rejectedServerError})
+  parseInviteInputChecked(String rawInput) {
     final String trimmed = rawInput.trim();
     if (trimmed.isEmpty) {
-      return (serverUrl: null, inviteToken: '');
+      return (serverUrl: null, inviteToken: '', rejectedServerError: null);
     }
 
     final Uri? uri = _tryParseLink(trimmed);
@@ -60,34 +68,48 @@ class InviteLinkCodec {
         );
         final String? fragToken = fragParams['token']?.trim();
         if (fragToken != null && fragToken.isNotEmpty) {
-          final String? fragServer = _cleanOptionalServer(fragParams['server']);
-          return (serverUrl: fragServer, inviteToken: fragToken);
+          final serverRes = _cleanOptionalServerChecked(fragParams['server']);
+          return (
+            serverUrl: serverRes.serverUrl,
+            inviteToken: fragToken,
+            rejectedServerError: serverRes.error,
+          );
         }
       }
 
       final String? queryToken = uri.queryParameters['token']?.trim();
       if (queryToken != null && queryToken.isNotEmpty) {
-        final String? queryServer = _cleanOptionalServer(
+        final serverRes = _cleanOptionalServerChecked(
           uri.queryParameters['server'],
         );
-        return (serverUrl: queryServer, inviteToken: queryToken);
+        return (
+          serverUrl: serverRes.serverUrl,
+          inviteToken: queryToken,
+          rejectedServerError: serverRes.error,
+        );
       }
 
       if (uri.pathSegments.length >= 2 && uri.pathSegments.first == 'c') {
         final String pathToken = uri.pathSegments[1].trim();
         if (pathToken.isNotEmpty) {
           final String origin = '${uri.scheme}://${uri.authority}';
-          return (serverUrl: origin, inviteToken: pathToken);
+          final serverRes = _cleanOptionalServerChecked(origin);
+          return (
+            serverUrl: serverRes.serverUrl,
+            inviteToken: pathToken,
+            rejectedServerError: serverRes.error,
+          );
         }
       }
     }
 
-    return (serverUrl: null, inviteToken: trimmed);
+    return (serverUrl: null, inviteToken: trimmed, rejectedServerError: null);
   }
 
   /// Normalizes user-entered server addresses (e.g., `casa.mioserver.it` or `192.168.1.100:8080`).
   ///
-  /// Throws [FormatException] when empty or malformed.
+  /// Requires `https` for non-local/non-private addresses.
+  /// Throws [FormatException] when empty, malformed, or insecure HTTP on a public host.
   static String normalizeServerUrl(String rawInput) {
     final String trimmed = _trimTrailingSlashes(rawInput.trim());
     if (trimmed.isEmpty) {
@@ -111,7 +133,30 @@ class InviteLinkCodec {
         (parsed.scheme != 'http' && parsed.scheme != 'https')) {
       throw const FormatException('Invalid server URL.');
     }
+    if (parsed.scheme == 'http' && !_isLocalOrPrivateHost(parsed.host)) {
+      throw const FormatException(
+        'HTTPS is required for non-local server addresses.',
+      );
+    }
     return _trimTrailingSlashes(parsed.toString());
+  }
+
+  /// Returns whether [serverUrl] matches [defaultServerUrl] (the official server).
+  static bool isOfficialServer(
+    String serverUrl, {
+    String defaultServerUrl = officialServerUrl,
+  }) {
+    try {
+      final String normalizedCandidate = normalizeServerUrl(
+        serverUrl,
+      ).toLowerCase();
+      final String normalizedDefault = normalizeServerUrl(
+        defaultServerUrl,
+      ).toLowerCase();
+      return normalizedCandidate == normalizedDefault;
+    } on FormatException {
+      return false;
+    }
   }
 
   /// Extracts a compact host label (e.g. `deepsky.vectevo.com` or `192.168.1.100:8080`).
@@ -149,14 +194,16 @@ class InviteLinkCodec {
     }
   }
 
-  static String? _cleanOptionalServer(String? rawServer) {
+  static ({String? serverUrl, String? error}) _cleanOptionalServerChecked(
+    String? rawServer,
+  ) {
     if (rawServer == null || rawServer.trim().isEmpty) {
-      return null;
+      return (serverUrl: null, error: null);
     }
     try {
-      return normalizeServerUrl(rawServer);
-    } on FormatException {
-      return null;
+      return (serverUrl: normalizeServerUrl(rawServer), error: null);
+    } on FormatException catch (ex) {
+      return (serverUrl: null, error: ex.message);
     }
   }
 
@@ -166,7 +213,11 @@ class InviteLinkCodec {
 
   static bool _isLocalOrPrivateHost(String host) {
     final String lower = host.toLowerCase();
-    if (lower == 'localhost' || lower == '127.0.0.1' || lower == '10.0.2.2') {
+    if (lower == 'localhost' ||
+        lower == '127.0.0.1' ||
+        lower == '10.0.2.2' ||
+        lower == '::1' ||
+        lower == '[::1]') {
       return true;
     }
     if (lower.startsWith('192.168.') || lower.startsWith('10.')) {

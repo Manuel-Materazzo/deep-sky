@@ -22,6 +22,7 @@ class InviteVerificationSection extends StatefulWidget {
     this.autoPollInterval = const Duration(seconds: 3),
     required this.onConfirmSas,
     this.onCancel,
+    this.onSecureScreenChanged,
     this.tokenLabelPrefix = 'Codice invito',
     this.waitingStatusLabel,
     this.pollButtonLabel = 'Controlla ora',
@@ -42,6 +43,7 @@ class InviteVerificationSection extends StatefulWidget {
   final Duration autoPollInterval;
   final VoidCallback onConfirmSas;
   final VoidCallback? onCancel;
+  final Future<void> Function(bool enabled)? onSecureScreenChanged;
   final String tokenLabelPrefix;
   final String? waitingStatusLabel;
   final String pollButtonLabel;
@@ -62,6 +64,10 @@ class _InviteVerificationSectionState extends State<InviteVerificationSection> {
   @override
   void initState() {
     super.initState();
+    final fn = widget.onSecureScreenChanged;
+    if (fn != null) {
+      unawaited(fn(true));
+    }
     _syncAutoPollTimer();
   }
 
@@ -78,6 +84,10 @@ class _InviteVerificationSectionState extends State<InviteVerificationSection> {
 
   @override
   void dispose() {
+    final fn = widget.onSecureScreenChanged;
+    if (fn != null) {
+      unawaited(fn(false));
+    }
     _autoPollTimer?.cancel();
     super.dispose();
   }

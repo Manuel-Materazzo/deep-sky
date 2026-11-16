@@ -98,6 +98,35 @@ void main() {
           () => InviteLinkCodec.normalizeServerUrl('   '),
           throwsFormatException,
         );
+        expect(
+          () => InviteLinkCodec.normalizeServerUrl('http://evil.example.com'),
+          throwsFormatException,
+        );
+        expect(
+          InviteLinkCodec.normalizeServerUrl('http://172.16.10.4:8080/'),
+          'http://172.16.10.4:8080',
+        );
+      },
+    );
+
+    test(
+      'parseInviteInputChecked rejects insecure http:// non-local server in link',
+      () {
+        final checked = InviteLinkCodec.parseInviteInputChecked(
+          'deepsky://pair#server=http%3A%2F%2Fevil.example&token=tok_evil',
+        );
+        expect(checked.serverUrl, isNull);
+        expect(checked.inviteToken, 'tok_evil');
+        expect(checked.rejectedServerError, isNotNull);
+
+        expect(
+          InviteLinkCodec.isOfficialServer('https://deepsky.vectevo.com/'),
+          isTrue,
+        );
+        expect(
+          InviteLinkCodec.isOfficialServer('https://casa.mioserver.it'),
+          isFalse,
+        );
       },
     );
 

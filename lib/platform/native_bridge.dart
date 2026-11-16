@@ -226,4 +226,43 @@ class NativeBridge {
       return null;
     }
   }
+
+  /// Enables or disables `FLAG_SECURE` on the host Android window (`CA-10`).
+  Future<void> setSecureScreen(bool enabled) async {
+    try {
+      await _channel.invokeMethod<void>(
+        'setSecureScreen',
+        <String, Object?>{'enabled': enabled},
+      );
+    } on MissingPluginException {
+      // Desktop / headless widget tests run without Android platform channels.
+    } on PlatformException {
+      // Best-effort window protection.
+    }
+  }
+
+  /// Copies [text] marked as sensitive (`EXTRA_IS_SENSITIVE`) and clears it
+  /// from the Android clipboard after [clearAfterSeconds] (`CA-10`).
+  Future<void> copySensitiveText(
+    String text, {
+    int clearAfterSeconds = 45,
+  }) async {
+    try {
+      final bool? handled = await _channel.invokeMethod<bool>(
+        'copySensitiveText',
+        <String, Object?>{
+          'text': text,
+          'clearAfterSeconds': clearAfterSeconds,
+        },
+      );
+      if (handled == true) {
+        return;
+      }
+    } on MissingPluginException {
+      // Fall back to standard Clipboard in headless tests / non-Android hosts.
+    } on PlatformException {
+      // Fall back to standard Clipboard if native helper fails.
+    }
+    await Clipboard.setData(ClipboardData(text: text));
+  }
 }

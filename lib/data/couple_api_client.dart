@@ -116,6 +116,18 @@ class DeviceSummary {
   final DateTime? revokedAt;
 }
 
+class EnvelopePage {
+  const EnvelopePage({
+    required this.items,
+    required this.nextAfterSeq,
+    required this.hasMore,
+  });
+
+  final List<EncryptedEnvelope> items;
+  final int nextAfterSeq;
+  final bool hasMore;
+}
+
 class RecoveryChallengeResponse {
   const RecoveryChallengeResponse({
     required this.challengeId,
@@ -194,8 +206,9 @@ class CoupleApiClient {
     required Uint8List deviceKemPublicKey,
   }) async {
     final Map<String, Object?> json = await _postJson(
-      '/api/v1/pairing/invites/$inviteToken/accept',
+      '/api/v1/pairing/invites/accept',
       <String, Object?>{
+        'inviteToken': inviteToken,
         'deviceLabel': deviceLabel,
         'deviceAuthPublicKeyB64': base64UrlEncode(deviceAuthPublicKey),
         'deviceKemPublicKeyB64': base64UrlEncode(deviceKemPublicKey),
@@ -216,9 +229,10 @@ class CoupleApiClient {
     required String inviteToken,
   }) async {
     final Object? raw = await _signedRequest(
-      method: 'GET',
-      pathWithQuery: '/api/v1/pairing/invites/$inviteToken/status',
+      method: 'POST',
+      pathWithQuery: '/api/v1/pairing/invites/status',
       identity: identity,
+      body: <String, Object?>{'inviteToken': inviteToken},
     );
     final Map<String, Object?> json = raw! as Map<String, Object?>;
     final bool accepted = json['accepted'] as bool;
@@ -391,20 +405,59 @@ class CoupleApiClient {
     return EncryptedEnvelope.fromJson(raw! as Map<String, Object?>);
   }
 
-  Future<List<EncryptedEnvelope>> listEnvelopes({
+  Future<EnvelopePage> listEnvelopesPage({
     required LocalDeviceIdentity identity,
     int afterSeq = 0,
+    int limit = 100,
   }) async {
     final Object? raw = await _signedRequest(
       method: 'GET',
-      pathWithQuery: '/api/v1/sync/envelopes?afterSeq=$afterSeq',
+      pathWithQuery: '/api/v1/sync/envelopes?afterSeq=$afterSeq&limit=$limit',
       identity: identity,
     );
-    final List<Object?> items = raw! as List<Object?>;
-    return items
+    if (raw is List<Object?>) {
+      final List<EncryptedEnvelope> items = raw
+          .cast<Map<String, Object?>>()
+          .map(EncryptedEnvelope.fromJson)
+          .toList(growable: false);
+      return EnvelopePage(
+        items: items,
+        nextAfterSeq: items.isEmpty ? afterSeq : (items.last.seq ?? afterSeq),
+        hasMore: false,
+      );
+    }
+    final Map<String, Object?> page = raw! as Map<String, Object?>;
+    final List<Object?> rawItems = page['items'] as List<Object?>? ?? const <Object?>[];
+    final List<EncryptedEnvelope> items = rawItems
         .cast<Map<String, Object?>>()
         .map(EncryptedEnvelope.fromJson)
         .toList(growable: false);
+    final int nextSeq = (page['nextAfterSeq'] as int?) ??
+        (items.isEmpty ? afterSeq : (items.last.seq ?? afterSeq));
+    final bool hasMore = page['hasMore'] as bool? ?? false;
+    return EnvelopePage(items: items, nextAfterSeq: nextSeq, hasMore: hasMore);
+  }
+
+  Future<List<EncryptedEnvelope>> listEnvelopes({
+    required LocalDeviceIdentity identity,
+    int afterSeq = 0,
+    int limit = 100,
+  }) async {
+    final List<EncryptedEnvelope> all = <EncryptedEnvelope>[];
+    int cursor = afterSeq;
+    while (true) {
+      final EnvelopePage page = await listEnvelopesPage(
+        identity: identity,
+        afterSeq: cursor,
+        limit: limit,
+      );
+      all.addAll(page.items);
+      if (!page.hasMore || page.nextAfterSeq <= cursor) {
+        break;
+      }
+      cursor = page.nextAfterSeq;
+    }
+    return all;
   }
 
   Future<Map<String, Object?>> fetchVisibilityAudit({

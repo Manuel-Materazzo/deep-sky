@@ -414,10 +414,8 @@ class _FakeServer {
       });
     }
 
-    if (method == 'POST' &&
-        path.startsWith('/api/v1/pairing/invites/') &&
-        path.endsWith('/accept')) {
-      final String token = path.split('/')[5];
+    if (method == 'POST' && path == '/api/v1/pairing/invites/accept') {
+      final String token = bodyJson['inviteToken']! as String;
       final Map<String, Object?> inv = invites[token]!;
       final String coupleId = inv['coupleId']! as String;
       final String creatorId = inv['creatorDeviceId']! as String;
@@ -553,10 +551,8 @@ class _FakeServer {
       });
     }
 
-    if (method == 'GET' &&
-        path.startsWith('/api/v1/pairing/invites/') &&
-        path.endsWith('/status')) {
-      final String token = path.split('/')[5];
+    if (method == 'POST' && path == '/api/v1/pairing/invites/status') {
+      final String token = bodyJson['inviteToken']! as String;
       final Map<String, Object?> inv = invites[token]!;
       final String? accId = inv['acceptedDeviceId'] as String?;
       if (accId == null) {
@@ -617,13 +613,26 @@ class _FakeServer {
     if (method == 'GET' && path == '/api/v1/sync/envelopes') {
       final int afterSeq =
           int.tryParse(req.url.queryParameters['afterSeq'] ?? '0') ?? 0;
-      final List<Map<String, Object?>> list = envelopes
+      final int limit =
+          int.tryParse(req.url.queryParameters['limit'] ?? '100') ?? 100;
+      final List<Map<String, Object?>> matching = envelopes
           .where(
             (Map<String, Object?> e) =>
                 e['coupleId'] == coupleId && (e['seq']! as int) > afterSeq,
           )
           .toList();
-      return _json(200, list);
+      final bool hasMore = matching.length > limit;
+      final List<Map<String, Object?>> page = hasMore
+          ? matching.sublist(0, limit)
+          : matching;
+      final int nextAfterSeq = page.isEmpty
+          ? afterSeq
+          : page.last['seq']! as int;
+      return _json(200, <String, Object?>{
+        'items': page,
+        'nextAfterSeq': nextAfterSeq,
+        'hasMore': hasMore,
+      });
     }
 
     return _json(404, <String, Object?>{'message': 'Not found: $method $path'});

@@ -75,7 +75,6 @@ class _OnboardingPageState extends State<OnboardingPage> {
       return;
     }
     _inviteTokenController.text = rawDeepLink;
-    _serverController.text = widget.controller.activeServerUrl;
     if (notifyUi && mounted) {
       setState(() => _modeIndex = 1);
     } else {
@@ -451,13 +450,70 @@ class _OnboardingPageState extends State<OnboardingPage> {
       return;
     }
     _inviteTokenController.text = scanned;
-    final parsed = InviteLinkCodec.parseInviteInput(scanned);
-    if (parsed.serverUrl != null) {
-      _serverController.text = parsed.serverUrl!;
+    await _confirmAndAcceptInvite(c, s, scanned);
+  }
+
+  Future<void> _confirmAndAcceptInvite(
+    DeepSkyController c,
+    DeepSkyStrings s,
+    String rawInput,
+  ) async {
+    final parsed = InviteLinkCodec.parseInviteInputChecked(rawInput);
+    if (parsed.rejectedServerError != null) {
+      c.setErrorNotice(s.customServerInsecureError);
+      return;
     }
+    final String rawTargetServer = (parsed.serverUrl ?? _serverController.text)
+        .trim();
+    final String normalizedTarget;
+    try {
+      normalizedTarget = InviteLinkCodec.normalizeServerUrl(rawTargetServer);
+    } on FormatException catch (ex) {
+      c.setErrorNotice(
+        ex.message.contains('HTTPS')
+            ? s.customServerInsecureError
+            : s.invalidServerAddress,
+      );
+      return;
+    }
+
+    if (!InviteLinkCodec.isOfficialServer(
+      normalizedTarget,
+      defaultServerUrl: c.defaultServerUrl,
+    )) {
+      final String host = InviteLinkCodec.displayHost(normalizedTarget);
+      final bool? confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext dialogContext) {
+          return AlertDialog(
+            key: const Key('custom-server-confirm-dialog'),
+            title: Text(s.customServerConfirmTitle),
+            content: Text(s.customServerConfirmBody(host, normalizedTarget)),
+            actions: <Widget>[
+              TextButton(
+                key: const Key('custom-server-reject-button'),
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: Text(s.cancel),
+              ),
+              FilledButton(
+                key: const Key('custom-server-confirm-button'),
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: Text(s.customServerConfirmAction),
+              ),
+            ],
+          );
+        },
+      );
+      if (!mounted || confirmed != true) {
+        return;
+      }
+      _serverController.text = normalizedTarget;
+    }
+
     await c.acceptInvite(
-      serverUrl: _serverController.text,
-      inviteToken: scanned,
+      serverUrl: normalizedTarget,
+      inviteToken: rawInput,
       deviceLabel: c.deviceLabel,
     );
   }
@@ -613,10 +669,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
             key: const Key('accept-invite-button'),
             onPressed: c.busy
                 ? null
-                : () => c.acceptInvite(
-                    serverUrl: _serverController.text,
-                    inviteToken: _inviteTokenController.text,
-                    deviceLabel: c.deviceLabel,
+                : () => _confirmAndAcceptInvite(
+                    c,
+                    s,
+                    _inviteTokenController.text,
                   ),
             icon: const Icon(Icons.link_rounded),
             label: Text(s.isIt ? 'Unisciti con invito' : 'Join with invite'),
