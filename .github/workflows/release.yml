@@ -24,7 +24,7 @@ jobs:
       image: ${{ steps.meta.outputs.image }}
       digest: ${{ steps.push.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
@@ -69,7 +69,7 @@ jobs:
     outputs:
       unsigned_sha256: ${{ steps.bundle.outputs.unsigned_sha256 }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Java for Android Gradle
         uses: actions/setup-java@v5
