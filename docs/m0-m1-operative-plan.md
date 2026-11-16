@@ -125,9 +125,9 @@ non necessario
 
 **INF-05 · Backup** — Ruolo: release e infrastruttura · Rif.: TC-11, 12.5 dell’Architettura · Dipende da: INF-04
 
-- [ ] Gli script esistenti coprono dump del database, volume dei blob e volume dei pacchetti nella stessa finestra *(bozza e checklist in `docs/backup-restore.md`)*
-- [ ] I backup sono cifrati e hanno una retention definita
-- [ ] **Ripristino provato** su una macchina di prova e procedura documentata
+- [x] Gli script esistenti coprono dump del database, volume dei blob e volume dei pacchetti nella stessa finestra *(bozza e checklist in `docs/backup-restore.md`)*
+- [x] I backup sono cifrati e hanno una retention definita
+- [x] **Ripristino provato** su una macchina di prova e procedura documentata
 
 **INF-06 · Log** — Ruolo: release e infrastruttura · Rif.: S-07, 15 dell’Architettura · Dipende da: INF-04
 
@@ -225,7 +225,7 @@ non necessario
 - [x] La CI produce un APK di prova non firmato, firmato in locale con lo script
 - [x] Chiavi di firma custodite e ripristino provato
 - [x] Repository protetto, modelli e board attivi
-- [ ] Backup e ripristino provati sulla VM
+- [x] Backup e ripristino provati sulla VM
 
 ## 3. Milestone M1, Prototipi di verifica
 
@@ -252,7 +252,7 @@ Checklist di verifica:
 - [x] Il server non contiene **nulla** di leggibile: tipo degli eventi, testi, date delle capsule *(verificato con ispezione DB e schema ciphertext-only in `V2__sp02_pairing_and_sync.sql`)*
 - [x] Una busta manomessa o spostata tra coppie viene rifiutata *(verificato in `deep_sky_crypto_test.dart` tramite AAD canonico XChaCha20-Poly1305)*
 - [x] Due persone non tecniche completano abbinamento e conferma di salvataggio della chiave **senza istruzioni**
-- [ ] ADR con esito e i punti da sottoporre a revisione indipendente *(bozza tecnica scritta in [ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md); inclusi in M2/`G-5` la verifica esplicita di esclusione dal backup automatico Android e la valutazione di `cryptography` senza `cryptography_flutter`)*
+- [x] ADR con esito e i punti da sottoporre a revisione indipendente *(bozza tecnica scritta in [ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md); inclusi in M2/`G-5` la verifica esplicita di esclusione dal backup automatico Android e la valutazione di `cryptography` senza `cryptography_flutter`)*
 
 ### 3.2 SP-01 · Push con FCM e configurazione a runtime
 
