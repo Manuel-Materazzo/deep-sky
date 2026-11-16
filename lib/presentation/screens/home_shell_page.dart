@@ -420,6 +420,17 @@ class _HomeShellPageState extends State<HomeShellPage> {
                   ),
                 ],
               ),
+              if (c.pushFeedback != null) ...<Widget>[
+                const SizedBox(height: 8),
+                Text(
+                  c.pushFeedback!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: c.pushFeedbackIsError
+                        ? Theme.of(context).colorScheme.error
+                        : tokens.calmAccent,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -759,6 +770,19 @@ class _HomeShellPageState extends State<HomeShellPage> {
                       ? s.settingsPushActiveCount(push.receivedCount)
                       : s.settingsPushInactive,
                 ),
+                if (push != null) ...<Widget>[
+                  const SizedBox(height: 4),
+                  Text(
+                    push.hasNotificationPermission
+                        ? s.settingsPushPermissionGranted
+                        : s.settingsPushPermissionMissing,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: push.hasNotificationPermission
+                          ? DeepSkyTheme.tokensOf(context).mutedInk
+                          : Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 FilledButton.tonalIcon(
                   key: const Key('enable-push-button'),
@@ -768,6 +792,29 @@ class _HomeShellPageState extends State<HomeShellPage> {
                   icon: const Icon(Icons.notifications_active_outlined),
                   label: Text(s.settingsPushEnableButton),
                 ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  key: const Key('open-notification-settings-button'),
+                  onPressed: c.busy ? null : c.openNotificationSettings,
+                  icon: const Icon(Icons.settings_applications_outlined),
+                  label: Text(s.settingsOpenNotificationSettingsButton),
+                ),
+                if (c.busy) ...<Widget>[
+                  const SizedBox(height: 8),
+                  const LinearProgressIndicator(),
+                ],
+                if (c.pushFeedback != null) ...<Widget>[
+                  const SizedBox(height: 8),
+                  Text(
+                    c.pushFeedback!,
+                    key: const Key('push-feedback-text'),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: c.pushFeedbackIsError
+                          ? Theme.of(context).colorScheme.error
+                          : DeepSkyTheme.tokensOf(context).calmAccent,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

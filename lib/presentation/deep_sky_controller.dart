@@ -131,6 +131,8 @@ class DeepSkyController extends ChangeNotifier {
   NativePushStatus? pushStatus;
   bool pushSupportedOnServer = false;
   bool pushPromptDismissed = false;
+  String? pushFeedback;
+  bool pushFeedbackIsError = false;
   UpdateChannel updateChannel = UpdateChannel.stable;
   ApkReleaseManifest? availableUpdate;
   double? updateDownloadProgress;
@@ -978,6 +980,8 @@ class DeepSkyController extends ChangeNotifier {
     pendingJoin = null;
     _lastKnownPeerLabel = null;
     pushStatus = null;
+    pushFeedback = null;
+    pushFeedbackIsError = false;
     isOffline = false;
     isDeviceRevoked = false;
     autoInviteAttempted = false;
@@ -994,25 +998,91 @@ class DeepSkyController extends ChangeNotifier {
     if (current == null) {
       return;
     }
-    final PushApiClient pushApi = PushApiClient(
-      apiClient: _createApiClient(current.serverUrl),
-    );
-    final RuntimeFirebaseConfig config = await pushApi.fetchRuntimeConfig();
-    if (!config.enabled || !config.isComplete) {
-      throw StateError(
-        'Le notifiche push runtime non sono attive su questo server.',
+    final DeepSkyStrings s = DeepSkyStrings(languageCode);
+    pushFeedback = null;
+    pushFeedbackIsError = false;
+    try {
+      final PushApiClient pushApi = PushApiClient(
+        apiClient: _createApiClient(current.serverUrl),
       );
+      final RuntimeFirebaseConfig config = await pushApi
+          .fetchRuntimeConfig()
+          .timeout(const Duration(seconds: 15));
+      if (!config.enabled || !config.isComplete) {
+        throw _CalmUserException(s.pushServerDisabledError);
+      }
+      final bool granted = await _nativeBridge.requestNotificationPermission();
+      await _refreshNativePushStatusBestEffort();
+      if (!granted) {
+        throw _CalmUserException(s.pushPermissionDeniedError);
+      }
+      final String fcmToken = await _nativeBridge.configureRuntimePush(config);
+      await pushApi
+          .registerToken(identity: current, fcmToken: fcmToken)
+          .timeout(const Duration(seconds: 15));
+      await _refreshNativePushStatusBestEffort();
+      pushPromptDismissed = true;
+      await _keyStore.write(_pushPromptDismissedStorageKey, 'true');
+      final String okMessage = languageCode == 'it'
+          ? 'Notifiche discrete attivate su questo dispositivo.'
+          : 'Quiet notifications enabled on this device.';
+      pushFeedback = okMessage;
+      pushFeedbackIsError = false;
+      statusNotice = okMessage;
+    } on _CalmUserException catch (ex) {
+      pushFeedback = ex.message;
+      pushFeedbackIsError = true;
+      rethrow;
+    } on PlatformException catch (ex) {
+      await _refreshNativePushStatusBestEffort();
+      final String msg = switch (ex.code) {
+        'gms_unavailable' => s.pushGmsUnavailableError,
+        'fcm_token_timeout' => s.pushTimeoutError,
+        _ => s.pushTokenFailedError(
+          (ex.message?.trim().isNotEmpty ?? false)
+              ? ex.message!.trim()
+              : ex.code,
+        ),
+      };
+      pushFeedback = msg;
+      pushFeedbackIsError = true;
+      throw _CalmUserException(msg);
+    } on TimeoutException {
+      await _refreshNativePushStatusBestEffort();
+      final String msg = s.pushTimeoutError;
+      pushFeedback = msg;
+      pushFeedbackIsError = true;
+      throw _CalmUserException(msg);
+    } catch (ex) {
+      await _refreshNativePushStatusBestEffort();
+      final String msg = s.pushTokenFailedError(ex.toString());
+      pushFeedback = msg;
+      pushFeedbackIsError = true;
+      throw _CalmUserException(msg);
     }
-    await _nativeBridge.requestNotificationPermission();
-    final String fcmToken = await _nativeBridge.configureRuntimePush(config);
-    await pushApi.registerToken(identity: current, fcmToken: fcmToken);
-    pushStatus = await _nativeBridge.getPushStatus();
-    pushPromptDismissed = true;
-    await _keyStore.write(_pushPromptDismissedStorageKey, 'true');
-    statusNotice = languageCode == 'it'
-        ? 'Notifiche discrete attivate su questo dispositivo.'
-        : 'Quiet notifications enabled on this device.';
   });
+
+  Future<void> _refreshNativePushStatusBestEffort() async {
+    if (!_canQueryNativeChannels) {
+      return;
+    }
+    try {
+      pushStatus = await _nativeBridge.getPushStatus();
+    } catch (_) {
+      // Ignore on unsupported hosts or transient channel errors.
+    }
+  }
+
+  Future<void> refreshPushStatus() async {
+    if (!_canQueryNativeChannels || phase != AppBootPhase.paired) {
+      return;
+    }
+    await _refreshNativePushStatusBestEffort();
+    notifyListeners();
+  }
+
+  Future<bool> openNotificationSettings() =>
+      _nativeBridge.openNotificationSettings();
 
   Future<void> dismissPushPrompt() async {
     pushPromptDismissed = true;

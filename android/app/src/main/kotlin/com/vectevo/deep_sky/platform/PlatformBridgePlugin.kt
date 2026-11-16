@@ -64,7 +64,8 @@ class PlatformBridgePlugin(
         if (requestCode != REQ_POST_NOTIFICATIONS) {
             return false
         }
-        val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+        val granted = (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) &&
+            pushCoordinator.hasNotificationPermission()
         pendingPermissionResult?.success(granted)
         pendingPermissionResult = null
         return true
@@ -105,6 +106,7 @@ class PlatformBridgePlugin(
                 result.success(null)
             }
             "requestNotificationPermission" -> handleRequestNotificationPermission(result)
+            "openNotificationSettings" -> result.success(pushCoordinator.openNotificationSettings(activity))
             "shareText" -> handleShareText(call, result)
             "scanQrCode" -> handleScanQrCode(call, result)
             "consumePendingDeepLink" -> {
@@ -137,8 +139,16 @@ class PlatformBridgePlugin(
     }
 
     private fun handleRequestNotificationPermission(result: MethodChannel.Result) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || pushCoordinator.hasNotificationPermission()) {
-            result.success(true)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            result.success(pushCoordinator.hasNotificationPermission())
+            return
+        }
+        val runtimeGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (runtimeGranted) {
+            result.success(pushCoordinator.hasNotificationPermission())
             return
         }
         val hostActivity = activity

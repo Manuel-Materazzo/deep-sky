@@ -42,5 +42,14 @@ void main() {
           (_) {},
         );
     expect(received, <String>['deepsky://pair#token=hot-456']);
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (MethodCall call) async {
+          if (call.method == 'openNotificationSettings') {
+            return true;
+          }
+          return null;
+        });
+    expect(await bridge.openNotificationSettings(), isTrue);
   });
 }

@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:deep_sky/data/apk_update_service.dart';
 import 'package:deep_sky/data/secure_key_store.dart';
@@ -9,8 +8,10 @@ import 'package:deep_sky/domain/crypto/e2ee_models.dart';
 import 'package:deep_sky/domain/crypto/recovery_key_codec.dart';
 import 'package:deep_sky/domain/platform_capabilities.dart';
 import 'package:deep_sky/domain/update/apk_update_models.dart';
+import 'package:deep_sky/platform/native_bridge.dart';
 import 'package:deep_sky/presentation/deep_sky_app.dart';
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -329,6 +330,139 @@ void main() {
       expect(find.text('Revocare questo dispositivo?'), findsOneWidget);
       await tapVisible(tester, find.byKey(const Key('confirm-revoke-dev-b')));
       expect(revokedDevice, 'dev-b');
+    },
+  );
+
+  testWidgets(
+    'Settings push card surfaces native diagnostics and opens notification settings when needed',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final InMemorySecureKeyStore store = InMemorySecureKeyStore();
+      final DeepSkyCrypto crypto = DeepSkyCrypto();
+      final authKp = await crypto.generateDeviceAuthKeyPair();
+      final kemKp = await crypto.generateDeviceKemKeyPair();
+      final Uint8List seed = Uint8List.fromList(
+        List<int>.generate(32, (i) => i + 3),
+      );
+      final LocalDeviceIdentity initialId = LocalDeviceIdentity(
+        serverUrl: 'https://couple.example.test',
+        coupleId: 'couple-1',
+        deviceId: 'dev-a',
+        deviceLabel: 'Luca',
+        authPrivateKeySeed: Uint8List.fromList(
+          await authKp.extractPrivateKeyBytes(),
+        ),
+        authPublicKey: Uint8List.fromList(
+          (await authKp.extractPublicKey()).bytes,
+        ),
+        kemPrivateKey: Uint8List.fromList(await kemKp.extractPrivateKeyBytes()),
+        kemPublicKey: Uint8List.fromList(
+          (await kemKp.extractPublicKey()).bytes,
+        ),
+        recoverySeed: seed,
+        pairingCompleted: true,
+        nameSetupCompleted: true,
+        recoverySavedConfirmed: true,
+      );
+      await store.write(
+        'deep_sky.device_identity.v1',
+        jsonEncode(initialId.toJson()),
+      );
+
+      final MockClient mockHttp = MockClient((http.Request req) async {
+        if (req.url.path == '/api/v1/system/compatibility') {
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'minClientVersionCode': 1,
+              'minProtocolVersion': 1,
+            }),
+            200,
+          );
+        }
+        if (req.url.path == '/api/v1/sync/envelopes') {
+          return http.Response('[]', 200);
+        }
+        if (req.url.path == '/api/v1/pairing/devices') {
+          return http.Response('[]', 200);
+        }
+        if (req.url.path == '/api/v1/push/config') {
+          return http.Response(
+            jsonEncode(<String, Object?>{
+              'enabled': true,
+              'projectId': 'ds-test',
+              'apiKey': 'test-key',
+              'appId': '1:1:android:abc',
+              'senderId': '1',
+            }),
+            200,
+          );
+        }
+        return http.Response('not found', 404);
+      });
+
+      const MethodChannel channel = MethodChannel('test.push/xiaomi');
+      bool openedSettings = false;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall call) async {
+            switch (call.method) {
+              case 'getPushStatus':
+                return <String, Object?>{
+                  'configured': false,
+                  'firebaseInitialized': false,
+                  'projectId': '',
+                  'appId': '',
+                  'lastKnownToken': '',
+                  'pendingToken': '',
+                  'lastWakeupKey': '',
+                  'lastWakeupEpochMs': 0,
+                  'receivedCount': 0,
+                  'hasNotificationPermission': true,
+                };
+              case 'consumePendingPushToken':
+                return '';
+              case 'requestNotificationPermission':
+                return true;
+              case 'configureRuntimePush':
+                throw PlatformException(
+                  code: 'gms_unavailable',
+                  message: 'Play Services restricted',
+                );
+              case 'openNotificationSettings':
+                openedSettings = true;
+                return true;
+            }
+            return null;
+          });
+      addTearDown(
+        () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(channel, null),
+      );
+
+      final DeepSkyController controller = DeepSkyController(
+        keyStore: store,
+        httpClient: mockHttp,
+        nativeBridge: const NativeBridge(channel),
+        loadAssetString: (_) async => pilotManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+      );
+      controller.reduceMotion = true;
+      await tester.pumpWidget(DeepSkyApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      await tapVisible(tester, find.text('Impostazioni'));
+      expect(find.text('Permesso di sistema: consentito'), findsOneWidget);
+      await tapVisible(tester, find.byKey(const Key('enable-push-button')));
+      expect(find.byKey(const Key('push-feedback-text')), findsOneWidget);
+      expect(find.textContaining('Google Play Services'), findsOneWidget);
+
+      await tapVisible(
+        tester,
+        find.byKey(const Key('open-notification-settings-button')),
+      );
+      expect(openedSettings, isTrue);
     },
   );
 }

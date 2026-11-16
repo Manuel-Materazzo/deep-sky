@@ -19,7 +19,7 @@ class DeepSkyApp extends StatefulWidget {
   State<DeepSkyApp> createState() => _DeepSkyAppState();
 }
 
-class _DeepSkyAppState extends State<DeepSkyApp> {
+class _DeepSkyAppState extends State<DeepSkyApp> with WidgetsBindingObserver {
   DeepSkyController? _ownedController;
 
   DeepSkyController get _controller =>
@@ -28,8 +28,16 @@ class _DeepSkyAppState extends State<DeepSkyApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (widget.autoInitialize) {
       _controller.initialize();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _controller.refreshPushStatus();
     }
   }
 
@@ -43,6 +51,7 @@ class _DeepSkyAppState extends State<DeepSkyApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ownedController?.dispose();
     super.dispose();
   }

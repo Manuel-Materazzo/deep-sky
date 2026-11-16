@@ -407,6 +407,28 @@ class DeepSkyStrings {
   String get settingsPushEnableButton => isIt
       ? 'Attiva notifiche su questo telefono'
       : 'Enable notifications on this phone';
+  String get settingsOpenNotificationSettingsButton =>
+      isIt ? 'Apri impostazioni notifiche' : 'Open notification settings';
+  String get settingsPushPermissionGranted =>
+      isIt ? 'Permesso di sistema: consentito' : 'System permission: allowed';
+  String get settingsPushPermissionMissing => isIt
+      ? 'Permesso di sistema: disattivato nelle impostazioni del telefono'
+      : 'System permission: disabled in phone settings';
+  String get pushServerDisabledError => isIt
+      ? 'Le notifiche push non risultano attive su questo server.'
+      : 'Push notifications are not enabled on this server.';
+  String get pushPermissionDeniedError => isIt
+      ? 'Il telefono blocca ancora le notifiche per Deep Sky. Apri le impostazioni per consentirle.'
+      : 'Phone notification permission is still blocked. Open settings to allow it.';
+  String get pushGmsUnavailableError => isIt
+      ? 'Google Play Services non è disponibile o è limitato su questo telefono: le notifiche push richiedono Play Services attivi.'
+      : 'Google Play Services is unavailable or restricted on this phone: push notifications require active Play Services.';
+  String get pushTimeoutError => isIt
+      ? 'Tempo scaduto durante la registrazione push con Google Play Services. Controlla rete o risparmio energetico e riprova.'
+      : 'Timed out registering push notifications with Google Play Services. Check network or battery restrictions and try again.';
+  String pushTokenFailedError(String detail) => isIt
+      ? 'Impossibile attivare le notifiche su questo telefono ($detail).'
+      : 'Unable to enable notifications on this phone ($detail).';
   String get settingsUpdatesTitle => isIt
       ? 'Aggiornamenti app (APK firmato offline)'
       : 'App updates (offline-signed APK)';

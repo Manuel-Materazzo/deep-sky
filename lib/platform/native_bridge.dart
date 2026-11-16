@@ -82,10 +82,9 @@ class NativeBridge {
 
   /// Initializes Android FirebaseApp at runtime and returns the active FCM token (SP-01).
   Future<String> configureRuntimePush(RuntimeFirebaseConfig config) async {
-    final String? token = await _channel.invokeMethod<String>(
-      'configureRuntimePush',
-      config.toChannelArgs(),
-    );
+    final String? token = await _channel
+        .invokeMethod<String>('configureRuntimePush', config.toChannelArgs())
+        .timeout(const Duration(seconds: 20));
     if (token == null || token.isEmpty) {
       throw PlatformException(
         code: 'null_reply',
@@ -126,10 +125,24 @@ class NativeBridge {
 
   /// Requests Android 13+ POST_NOTIFICATIONS runtime permission when needed.
   Future<bool> requestNotificationPermission() async {
-    final bool? granted = await _channel.invokeMethod<bool>(
-      'requestNotificationPermission',
-    );
+    final bool? granted = await _channel
+        .invokeMethod<bool>('requestNotificationPermission')
+        .timeout(const Duration(seconds: 25));
     return granted ?? false;
+  }
+
+  /// Opens the Android system notification settings screen for Deep Sky.
+  Future<bool> openNotificationSettings() async {
+    try {
+      final bool? opened = await _channel.invokeMethod<bool>(
+        'openNotificationSettings',
+      );
+      return opened ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
   }
 
   /// Opens the native Android share sheet with [text] and optional [subject].
