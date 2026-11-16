@@ -54,38 +54,6 @@ class _RecoveryKeySetupPageState extends State<RecoveryKeySetupPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: tokens.surfaceLow,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Icon(
-                            Icons.vpn_key_outlined,
-                            size: 16,
-                            color: tokens.calmAccent,
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              s.recoverySetupBadge,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: tokens.calmAccent,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 14),
                   Text(
                     s.recoverySetupHeadline,

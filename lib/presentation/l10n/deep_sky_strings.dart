@@ -33,7 +33,7 @@ class DeepSkyStrings {
 
   String get scanQrTitle => isIt ? 'Inquadra codice QR' : 'Scan QR code';
   String get scanQrDescription => isIt
-      ? 'Rileva all\'istante la chiave della casa e il server senza dover scrivere nulla.'
+      ? 'Rileva la chiave della casa e il server senza dover scrivere nulla.'
       : 'Detects your home invite and server right away with zero typing.';
   String get openCameraButton => isIt ? 'Apri fotocamera' : 'Open camera';
   String get scanQrActionLabel => isIt ? 'Scansiona QR' : 'Scan QR';
@@ -111,8 +111,8 @@ class DeepSkyStrings {
   String get customizeServerAction => isIt ? 'Personalizza' : 'Customize';
   String get closeDrawerAction => isIt ? 'Chiudi' : 'Close';
   String get serverDrawerDescription => isIt
-      ? 'La vostra casa risiede al sicuro sul cloud ufficiale. Se desiderate ospitarla sul vostro server personale o IP privato, inseritelo qui sotto.'
-      : 'Your home lives safely on the official cloud. If you prefer to host it on your personal server or private IP, enter it below.';
+      ? 'La vostra casa risiede al sicuro sul cloud ufficiale. Se volete usarne un altro, inserite l\'indirizzo qui sotto.'
+      : 'Your home is safe on the official cloud. If you prefer to host it somewhere else, enter the address below.';
   String get customServerFieldLabel => isIt
       ? 'Indirizzo IP o Dominio dedicato'
       : 'Dedicated domain or IP address';
@@ -150,7 +150,7 @@ class DeepSkyStrings {
   String get helpPointPrivacyTitle =>
       isIt ? 'Cifratura end-to-end' : 'End-to-end encryption';
   String get helpPointPrivacyBody => isIt
-      ? 'Le chiavi restano sui vostri telefoni: nemmeno chi gestisce il server può leggere i vostri ricordi.'
+      ? 'Le chiavi restano sui vostri telefoni: nessuno può leggere i vostri ricordi.'
       : 'Keys stay on your phones: not even the server operator can read your memories.';
 
   String get preferencesTooltip =>
@@ -246,8 +246,8 @@ class DeepSkyStrings {
   String get verificationHeadline =>
       isIt ? 'Conferma con l\'altro telefono' : 'Confirm with the other phone';
   String get verificationSubtitle => isIt
-      ? 'Chiedi al tuo partner di controllare se sullo schermo legge la stessa combinazione luminosa.'
-      : 'Ask your partner to check if their screen shows the same luminous code.';
+      ? 'Chiedi al tuo partner di controllare se sullo schermo legge la stessa combinazione.'
+      : 'Ask your partner to check if their screen shows the same code.';
   String verificationConnectedPeer(String label) =>
       isIt ? '$label vuole unirsi a voi' : '$label wants to join you';
   String verificationInvitedBy(String label) =>
@@ -288,8 +288,6 @@ class DeepSkyStrings {
   // Space & Name Setup (`S1-D07-2` / `S1-D09`)
   String get spaceSetupAppBarTitle =>
       isIt ? 'Il vostro spazio' : 'Our Space Setup';
-  String get spaceSetupBadge =>
-      isIt ? 'Fase finale di accoglienza' : 'Final welcome step';
   String get spaceSetupHeadline => isIt
       ? 'Come vi chiamate nei vostri momenti?'
       : 'How should your partner see you?';
@@ -323,8 +321,6 @@ class DeepSkyStrings {
   // Recovery Key Setup (`S1-D04` / `S1-APP-02`)
   String get recoverySetupAppBarTitle =>
       isIt ? 'Chiave di recupero' : 'Recovery Key';
-  String get recoverySetupBadge =>
-      isIt ? 'Custodia privata della stanza' : 'Private room safekeeping';
   String get recoverySetupHeadline => isIt
       ? 'Conserva la tua chiave di recupero'
       : 'Save your recovery key safely';
@@ -350,7 +346,7 @@ class DeepSkyStrings {
   String get recoverSectionHeadline =>
       isIt ? 'Ritrova la tua stanza' : 'Find your room again';
   String get recoverSectionSubtitle => isIt
-      ? 'Inserisci le 24 parole della chiave di recupero nell\'ordine esatto, oppure inquadra il QR salvato in precedenza.'
+      ? 'Inserisci le 24 parole di recupero nell\'ordine esatto, oppure inquadra il QR di recupero.'
       : 'Enter the 24 recovery words in exact order, or scan your saved recovery QR code.';
   String get recoverFieldPlaceholder => isIt
       ? 'Scrivi o incolla qui le tue 24 parole (es. abandon ability ...)'

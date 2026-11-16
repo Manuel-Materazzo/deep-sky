@@ -143,38 +143,6 @@ class _SpaceSetupPageState extends State<SpaceSetupPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: <Widget>[
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: tokens.surfaceHigh,
-                                  borderRadius: BorderRadius.circular(
-                                    DeepSkyTheme.radiusFull,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: <Widget>[
-                                    Icon(
-                                      Icons.auto_awesome_rounded,
-                                      size: 14,
-                                      color: tokens.warmGlow,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      s.spaceSetupBadge.toUpperCase(),
-                                      style: textTheme.labelSmall?.copyWith(
-                                        color: tokens.blushPetal,
-                                        letterSpacing: 0.9,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
                             const SizedBox(height: 12),
                             Text(
                               s.spaceSetupHeadline,
