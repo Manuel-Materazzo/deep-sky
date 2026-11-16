@@ -168,9 +168,7 @@ Rif.: AR-11
 - [ ] Un link d’invito apre l’app se installata, la pagina di installazione se non lo è *(
   intent-filter `autoVerify` in `AndroidManifest.xml` + `MainActivity`/`PlatformBridgePlugin` e
   fallback JS in `/join` implementati; da verificare live su dominio e telefono reale)*
-- [ ] **Il segreto dell’invito non passa per il server**: proposta di metterlo nel frammento
-  dell’indirizzo; da verificare che l’app lo riceva e che non finisca nei log *(parsing `#token=`
-  client-side e parsing nativo pronti; verifica con log di produzione in attesa del deploy)*
+- [ ] **Token d’invito fuori da path URL e log**: l’invito resta nel frammento (`#token=`) su web/app e viaggia nel body JSON su `POST /api/v1/pairing/invites/accept` e `/status` (il server riceve il token grezzo per verificarne l’hash SHA-256, ma non finisce nei log di Caddy o Spring; da verificare con log di produzione al deploy)
 - [x] Alternativa funzionante: inserimento manuale del codice
 
 **S1-SRV-01 · Creazione degli inviti** — Ruolo: sviluppatore backend · Rif.: AR-02

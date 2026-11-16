@@ -31,6 +31,11 @@ All configuration is supplied via environment variables (or Docker secrets mappe
 | `SPRING_DATASOURCE_PASSWORD` | PostgreSQL password (or injected via `/run/secrets/db_password`) |
 | `JAVA_TOOL_OPTIONS` | JVM heap/memory flags (e.g. `-XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError`) |
 
+## Reverse Proxy & Rate-Limiting (`CA-12`)
+
+- The Spring Boot API sets `server.forward-headers-strategy: native` so Tomcat's `RemoteIpValve` resolves `request.getRemoteAddr()` from `X-Forwarded-For` **only** when the direct TCP connection comes from a trusted private/loopback proxy (`internal-proxies`), ignoring forged `X-Forwarded-For` headers from untrusted peers.
+- In `deploy/docker-compose.yml`, only Caddy (`proxy`) publishes ports `80`/`443`, while `api` listens exclusively on the Docker `internal` network. Self-hosters must **not** expose `api:8080` directly to untrusted networks or disable proxy header sanitization.
+
 ## Startup Validation Behavior (`SRV-03`)
 
 - In `prod` profile, `DEEPSKY_DOMAIN` cannot be `localhost` or blank, and `DEEPSKY_ADMIN_SECRET` must be at least 24 characters and must not equal the dev placeholder.

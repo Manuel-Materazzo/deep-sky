@@ -52,7 +52,7 @@ stateDiagram-v2
 | Entità / Azione | TTL / Limite | Comportamento |
 | :--- | :--- | :--- |
 | `POST /api/v1/pairing/invites` | TTL `15m`; `20 req/60s` per IP | Crea `couple` + primo `device` + token monouso hashato |
-| `POST /api/v1/pairing/invites/{token}/accept` | Rate limit stretto `5 req/60s` per IP (`INVITE_REDEEM`) | Validazione monouso anti-enumerazione: mancante/scaduto/già usato/couple sciolta rispondono uniformemente **`409 CONFLICT`**. Invia `wakeup.pairing_request` (`S-02`, nessun nome/testo) al dispositivo approvatore |
+| `POST /api/v1/pairing/invites/accept` | Rate limit stretto `5 req/60s` per IP (`INVITE_REDEEM`) | Validazione monouso atomica anti-enumerazione con token nel body JSON: mancante/scaduto/già usato/couple sciolta rispondono uniformemente **`409 CONFLICT`**. Invia `wakeup.pairing_request` (`S-02`, nessun nome/testo) al dispositivo approvatore |
 | `POST /api/v1/pairing/enrollment-invites` | TTL `15m` | Generato da un dispositivo già attivo nella coppia per arruolare un secondo telefono personale (`F-20`) |
 | `PairingCleanupService` | Scheduler `PT5M` | Elimina inviti scaduti (`expiresAt < now - 15m`), challenge scadute (`1h`), nonce scaduti, e revoca automaticamente dispositivi `INVITE_JOIN`/`ENROLLMENT` rimasti senza `KeyDeliveryEntity` dopo `30m` (`S1-SRV-02`) |
 
