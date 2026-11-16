@@ -29,22 +29,74 @@ class _WelcomeInvitePanelState extends State<WelcomeInvitePanel> {
   bool _copied = false;
   Timer? _copiedResetTimer;
   Timer? _expiryTicker;
+  Timer? _autoPollTimer;
+  String? _polledInviteToken;
 
   @override
   void initState() {
     super.initState();
+    widget.controller.addListener(_syncAutoPollTimer);
     _expiryTicker = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) {
+        _syncAutoPollTimer();
         setState(() {});
       }
     });
+    _syncAutoPollTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant WelcomeInvitePanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_syncAutoPollTimer);
+      widget.controller.addListener(_syncAutoPollTimer);
+    }
+    _syncAutoPollTimer();
   }
 
   @override
   void dispose() {
+    widget.controller.removeListener(_syncAutoPollTimer);
     _copiedResetTimer?.cancel();
     _expiryTicker?.cancel();
+    _autoPollTimer?.cancel();
     super.dispose();
+  }
+
+  void _syncAutoPollTimer() {
+    final DeepSkyController c = widget.controller;
+    final CreateInviteResponse? invite = c.activeInvite;
+    final bool shouldPoll =
+        invite != null &&
+        c.activeSasCode == null &&
+        c.phase == AppBootPhase.waiting &&
+        invite.expiresAt.toUtc().isAfter(DateTime.now().toUtc());
+
+    if (!shouldPoll) {
+      _autoPollTimer?.cancel();
+      _autoPollTimer = null;
+      _polledInviteToken = null;
+      return;
+    }
+
+    if (_autoPollTimer != null && _polledInviteToken == invite.inviteToken) {
+      return;
+    }
+
+    _autoPollTimer?.cancel();
+    _polledInviteToken = invite.inviteToken;
+    _autoPollTimer = Timer.periodic(c.inviteAutoPollInterval, (_) {
+      if (!mounted) {
+        return;
+      }
+      if (!invite.expiresAt.toUtc().isAfter(DateTime.now().toUtc())) {
+        _syncAutoPollTimer();
+        setState(() {});
+        return;
+      }
+      unawaited(c.pollActiveInviteSilently());
+    });
   }
 
   Future<void> _copyInviteLink(String inviteUri) async {

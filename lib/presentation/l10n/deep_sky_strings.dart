@@ -91,8 +91,13 @@ class DeepSkyStrings {
   String get inviteExpiredMessage => isIt
       ? 'Questo invito è scaduto per sicurezza.'
       : 'This invite expired for your safety.';
-  String get checkPartnerJoinedButton =>
-      isIt ? 'Verifica se si è unito' : 'Check if partner joined';
+  String get checkPartnerJoinedButton => isIt ? 'Controlla ora' : 'Check now';
+  String get waitingForNewDeviceAutoDetect => isIt
+      ? 'In attesa del nuovo telefono · Rilevamento automatico'
+      : 'Waiting for new phone · Detecting automatically';
+  String get enrollmentInviteReadyNotice => isIt
+      ? 'Invito pronto: scansionalo o inseriscilo dal nuovo telefono. Il collegamento verrà rilevato automaticamente.'
+      : 'Invite ready: scan or enter it on the new phone. Connection will be detected automatically.';
   String get regenerateInviteButton => isIt ? 'Rigenera' : 'Regenerate';
   String get generateNewInviteButton =>
       isIt ? 'Genera nuovo invito' : 'Generate new invite';

@@ -44,6 +44,7 @@ class DeepSkyController extends ChangeNotifier {
     this.defaultUpdateSource = 'Manuel-Materazzo/deep-sky',
     this.trustedUpdatePublicKeyB64 =
         'MCowBQYDK2VwAyEAHDblTk6u65qfWgGXDDULNtIsR9JrXd1u4Pc6y7+Z+WM=',
+    this.inviteAutoPollInterval = const Duration(seconds: 3),
   }) : _hasCustomNativeBridge = nativeBridge != null,
        _nativeBridge = nativeBridge ?? const NativeBridge(),
        _httpClient = httpClient ?? http.Client(),
@@ -85,6 +86,7 @@ class DeepSkyController extends ChangeNotifier {
   final String defaultServerUrl;
   final String defaultUpdateSource;
   final String trustedUpdatePublicKeyB64;
+  final Duration inviteAutoPollInterval;
 
   late final SecureKeyStore _keyStore;
   late final DeepSkyCrypto _crypto;
@@ -112,6 +114,8 @@ class DeepSkyController extends ChangeNotifier {
   String? activeSasCode;
   PendingJoinSession? pendingJoin;
   String? _lastKnownPeerLabel;
+  bool _autoPollInFlight = false;
+  String? _suppressedAutoPollToken;
   List<CachedEventEntry> events = const <CachedEventEntry>[];
   List<DeviceSummary> devices = const <DeviceSummary>[];
   SceneManifest? sceneManifest;
@@ -500,6 +504,7 @@ class DeepSkyController extends ChangeNotifier {
     activeServerUrl = cleanServer;
     this.deviceLabel = cleanLabel;
     identity = result.identity;
+    _suppressedAutoPollToken = null;
     activeInvite = result.invite;
     activeInviteStatus = null;
     activeSasCode = null;
@@ -507,6 +512,7 @@ class DeepSkyController extends ChangeNotifier {
   });
 
   Future<void> regenerateInitialInvite() => _runGuarded(() async {
+    _suppressedAutoPollToken = null;
     final LocalDeviceIdentity? current = identity;
     if (current != null &&
         current.hasCoupleRoot &&
@@ -546,6 +552,7 @@ class DeepSkyController extends ChangeNotifier {
       await _repository.clearIdentity();
       await _repository.clearPendingInvite();
       identity = null;
+      _suppressedAutoPollToken = null;
       activeInvite = null;
       activeInviteStatus = null;
       activeSasCode = null;
@@ -566,6 +573,7 @@ class DeepSkyController extends ChangeNotifier {
       deviceLabel: cleanLabel,
     );
     identity = result.identity;
+    _suppressedAutoPollToken = null;
     activeInvite = result.invite;
     activeInviteStatus = null;
     activeSasCode = null;
@@ -623,6 +631,7 @@ class DeepSkyController extends ChangeNotifier {
     if (invite == null) {
       return;
     }
+    _suppressedAutoPollToken = null;
     final result = await _repository.checkInviteAndSas(invite.inviteToken);
     activeInviteStatus = result.status;
     activeSasCode = result.sasCode;
@@ -636,6 +645,72 @@ class DeepSkyController extends ChangeNotifier {
           : 'No device has joined yet. Try again after it enters the code.';
     }
   });
+
+  /// Silently checks whether the active invite was accepted so the inviting
+  /// device advances automatically to SAS verification without manual polling.
+  Future<void> pollActiveInviteSilently() async {
+    if (busy || _autoPollInFlight) {
+      return;
+    }
+    final CreateInviteResponse? invite = activeInvite;
+    final LocalDeviceIdentity? currentIdentity = identity;
+    if (invite == null ||
+        activeSasCode != null ||
+        currentIdentity == null ||
+        !currentIdentity.hasCoupleRoot ||
+        phase == AppBootPhase.unpaired ||
+        phase == AppBootPhase.upgradeRequired ||
+        isDeviceRevoked) {
+      return;
+    }
+    if (invite.inviteToken == _suppressedAutoPollToken) {
+      return;
+    }
+    if (!invite.expiresAt.toUtc().isAfter(DateTime.now().toUtc())) {
+      notifyListeners();
+      return;
+    }
+
+    _autoPollInFlight = true;
+    final String polledToken = invite.inviteToken;
+    try {
+      final result = await _repository.checkInviteAndSas(polledToken);
+      if (activeInvite?.inviteToken != polledToken ||
+          activeSasCode != null ||
+          phase == AppBootPhase.upgradeRequired ||
+          isDeviceRevoked) {
+        return;
+      }
+      if (result.status.accepted && result.sasCode != null) {
+        activeInviteStatus = result.status;
+        activeSasCode = result.sasCode;
+        errorNotice = null;
+        statusNotice = languageCode == 'it'
+            ? 'Dispositivo collegato! Confronta il codice SAS e conferma.'
+            : 'Device connected! Compare the SAS code and confirm.';
+        notifyListeners();
+      }
+    } on ClientUpgradeRequiredException catch (ex) {
+      compatibilityPolicy = CompatibilityPolicy(
+        minClientVersionCode: ex.minClientVersionCode,
+        minProtocolVersion: ex.minProtocolVersion,
+      );
+      phase = AppBootPhase.upgradeRequired;
+      notifyListeners();
+    } on ApiRequestException catch (ex) {
+      if (ex.isDeviceUnknownOrRevoked && phase == AppBootPhase.paired) {
+        isDeviceRevoked = true;
+        isOffline = false;
+        errorNotice = null;
+        await _loadCachedEventsBestEffort();
+        notifyListeners();
+      }
+    } catch (_) {
+      // Transient network errors are ignored during silent background polling.
+    } finally {
+      _autoPollInFlight = false;
+    }
+  }
 
   Future<void> confirmSasAndDeliverRootKey() => _runGuarded(() async {
     final InviteStatusResponse? status = activeInviteStatus;
@@ -651,6 +726,7 @@ class DeepSkyController extends ChangeNotifier {
       targetKemPublicKey: status.acceptedKemPublicKey!,
     );
     identity = identity?.copyWith(pairingCompleted: true);
+    _suppressedAutoPollToken = null;
     activeInvite = null;
     activeInviteStatus = null;
     activeSasCode = null;
@@ -722,6 +798,7 @@ class DeepSkyController extends ChangeNotifier {
     identity = null;
     pendingJoin = null;
     _lastKnownPeerLabel = null;
+    _suppressedAutoPollToken = null;
     activeInvite = null;
     activeInviteStatus = null;
     activeSasCode = null;
@@ -731,6 +808,7 @@ class DeepSkyController extends ChangeNotifier {
   });
 
   void returnToInviteScreen() {
+    _suppressedAutoPollToken = activeInvite?.inviteToken;
     activeSasCode = null;
     activeInviteStatus = null;
     statusNotice = null;
@@ -781,12 +859,14 @@ class DeepSkyController extends ChangeNotifier {
         deviceLabel: cleanLabel,
       );
       identity = result.identity;
+      _suppressedAutoPollToken = null;
       activeInvite = result.invite;
       phase = AppBootPhase.waiting;
       statusNotice = notice;
       return;
     }
 
+    _suppressedAutoPollToken = null;
     activeInvite = null;
     activeInviteStatus = null;
     activeSasCode = null;
@@ -912,15 +992,15 @@ class DeepSkyController extends ChangeNotifier {
   });
 
   Future<void> createEnrollmentInvite() => _runGuarded(() async {
+    _suppressedAutoPollToken = null;
     activeInvite = await _repository.createEnrollmentInvite();
     activeInviteStatus = null;
     activeSasCode = null;
-    statusNotice = languageCode == 'it'
-        ? 'Invito pronto: inseriscilo dal nuovo telefono e poi premi Verifica.'
-        : 'Invite ready: enter it on the new phone and then tap Verify.';
+    statusNotice = DeepSkyStrings(languageCode).enrollmentInviteReadyNotice;
   });
 
   void cancelActiveInvite() {
+    _suppressedAutoPollToken = null;
     activeInvite = null;
     activeInviteStatus = null;
     activeSasCode = null;
@@ -974,6 +1054,7 @@ class DeepSkyController extends ChangeNotifier {
     identity = null;
     events = const <CachedEventEntry>[];
     devices = const <DeviceSummary>[];
+    _suppressedAutoPollToken = null;
     activeInvite = null;
     activeInviteStatus = null;
     activeSasCode = null;

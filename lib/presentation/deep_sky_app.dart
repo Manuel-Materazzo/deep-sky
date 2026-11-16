@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
 import 'package:deep_sky/presentation/screens/code_verification_page.dart';
 import 'package:deep_sky/presentation/screens/home_shell_page.dart';
@@ -38,6 +40,7 @@ class _DeepSkyAppState extends State<DeepSkyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _controller.refreshPushStatus();
+      unawaited(_controller.pollActiveInviteSilently());
     }
   }
 

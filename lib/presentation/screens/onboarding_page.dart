@@ -644,8 +644,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 const SizedBox(height: 6),
                 Text(
                   s.isIt
-                      ? 'Chiedi a ${pending.peerLabel} di premere "Verifica" e poi "Il codice coincide" prima di completare qui.'
-                      : 'Ask ${pending.peerLabel} to verify and confirm the matching code before completing here.',
+                      ? 'Chiedi a ${pending.peerLabel} di confermare che il codice coincide prima di completare qui.'
+                      : 'Ask ${pending.peerLabel} to confirm the matching code before completing here.',
                   style: textTheme.bodySmall?.copyWith(color: tokens.mutedInk),
                 ),
               ],
