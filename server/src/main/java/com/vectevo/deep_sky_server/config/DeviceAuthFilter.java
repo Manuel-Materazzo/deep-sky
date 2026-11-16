@@ -31,7 +31,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class DeviceAuthFilter extends OncePerRequestFilter {
 
 	private static final long MAX_CLOCK_SKEW_SECONDS = 300;
-	private static final int MAX_BODY_BYTES = 2 * 1024 * 1024;
+	private static final int MAX_BODY_BYTES = 1024 * 1024;
+	private static final String UNIFORM_AUTH_FAILURE = "Device unknown, revoked, or invalid signature";
 
 	private final DeviceAuthLookup deviceAuthLookup;
 
@@ -51,10 +52,7 @@ public class DeviceAuthFilter extends OncePerRequestFilter {
 			return true;
 		}
 		if (HttpMethod.POST.matches(method)) {
-			if ("/api/v1/pairing/invites".equals(path)) {
-				return true;
-			}
-			if (path.startsWith("/api/v1/pairing/invites/") && path.endsWith("/accept")) {
+			if ("/api/v1/pairing/invites".equals(path) || "/api/v1/pairing/invites/accept".equals(path)) {
 				return true;
 			}
 			if ("/api/v1/recovery/challenges".equals(path) || "/api/v1/recovery/complete".equals(path)) {
@@ -102,23 +100,23 @@ public class DeviceAuthFilter extends OncePerRequestFilter {
 			return;
 		}
 
-		byte[] bodyBytes = request.getInputStream().readNBytes(MAX_BODY_BYTES + 1);
-		if (bodyBytes.length > MAX_BODY_BYTES) {
-			response.setStatus(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
+		final byte[] signatureBytes;
+		try {
+			signatureBytes = Ed25519SignatureVerifier.decodeBase64Url(signatureHeader, 64, "X-Signature");
+		} catch (IllegalArgumentException ex) {
+			rejectUnauthorized(response, UNIFORM_AUTH_FAILURE);
 			return;
 		}
 
 		DeviceAuthLookup.ActiveDeviceKey deviceKey = deviceAuthLookup.findActiveDevice(deviceId).orElse(null);
 		if (deviceKey == null) {
-			rejectUnauthorized(response, "Device unknown or revoked");
+			rejectUnauthorized(response, UNIFORM_AUTH_FAILURE);
 			return;
 		}
 
-		final byte[] signatureBytes;
-		try {
-			signatureBytes = Ed25519SignatureVerifier.decodeBase64Url(signatureHeader, 64, "X-Signature");
-		} catch (IllegalArgumentException ex) {
-			rejectUnauthorized(response, "Malformed X-Signature");
+		byte[] bodyBytes = request.getInputStream().readNBytes(MAX_BODY_BYTES + 1);
+		if (bodyBytes.length > MAX_BODY_BYTES) {
+			response.setStatus(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE);
 			return;
 		}
 
@@ -134,7 +132,7 @@ public class DeviceAuthFilter extends OncePerRequestFilter {
 				bodyHashHex);
 
 		if (!Ed25519SignatureVerifier.verify(deviceKey.authPublicKey(), canonical, signatureBytes)) {
-			rejectUnauthorized(response, "Invalid device signature");
+			rejectUnauthorized(response, UNIFORM_AUTH_FAILURE);
 			return;
 		}
 
@@ -144,11 +142,17 @@ public class DeviceAuthFilter extends OncePerRequestFilter {
 			return;
 		}
 
-		DevicePrincipal principal = new DevicePrincipal(deviceKey.coupleId(), deviceKey.deviceId());
+		List<SimpleGrantedAuthority> authorities = deviceKey.approved()
+				? List.of(
+						new SimpleGrantedAuthority("ROLE_DEVICE"),
+						new SimpleGrantedAuthority("ROLE_APPROVED_DEVICE"))
+				: List.of(new SimpleGrantedAuthority("ROLE_DEVICE"));
+		DevicePrincipal principal = new DevicePrincipal(
+				deviceKey.coupleId(), deviceKey.deviceId(), deviceKey.approved());
 		UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
 				principal,
 				null,
-				List.of(new SimpleGrantedAuthority("ROLE_DEVICE")));
+				authorities);
 		SecurityContextHolder.getContext().setAuthentication(auth);
 
 		filterChain.doFilter(new CachedBodyHttpServletRequest(request, bodyBytes), response);

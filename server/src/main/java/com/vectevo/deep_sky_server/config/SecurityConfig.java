@@ -1,9 +1,12 @@
 package com.vectevo.deep_sky_server.config;
 
 import com.vectevo.deep_sky_server.pairing.DeviceAuthLookup;
+import jakarta.servlet.http.HttpServletResponse;
+import java.time.Instant;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -33,11 +36,24 @@ public class SecurityConfig {
 						.requestMatchers("/actuator/info").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/v1/system/compatibility", "/api/v1/push/config")
 						.permitAll()
-						.requestMatchers(HttpMethod.POST, "/api/v1/pairing/invites").permitAll()
-						.requestMatchers(HttpMethod.POST, "/api/v1/pairing/invites/*/accept").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/v1/pairing/invites", "/api/v1/pairing/invites/accept")
+						.permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/recovery/challenges", "/api/v1/recovery/complete")
 						.permitAll()
-						.anyRequest().authenticated())
+						.requestMatchers(HttpMethod.GET, "/api/v1/pairing/key-deliveries/me")
+						.hasRole("DEVICE")
+						.requestMatchers(HttpMethod.PATCH, "/api/v1/pairing/devices/me")
+						.hasRole("DEVICE")
+						.requestMatchers(HttpMethod.POST, "/api/v1/pairing/invites/status")
+						.hasRole("DEVICE")
+						.anyRequest().hasRole("APPROVED_DEVICE"))
+				.exceptionHandling(ex -> ex.accessDeniedHandler((request, response, accessDeniedException) -> {
+					response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+					response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+					response.getWriter().write(
+							"{\"code\":\"FORBIDDEN\",\"message\":\"Device approval required\",\"timestamp\":\""
+									+ Instant.now() + "\"}");
+				}))
 				.addFilterBefore(deviceAuthFilter, UsernamePasswordAuthenticationFilter.class)
 				.addFilterBefore(compatibilityFilter, DeviceAuthFilter.class)
 				.addFilterBefore(rateLimitFilter, ClientCompatibilityFilter.class)

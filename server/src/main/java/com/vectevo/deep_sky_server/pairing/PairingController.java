@@ -37,9 +37,12 @@ public class PairingController {
 			@NotBlank String recoveryAuthPublicKeyB64) {}
 
 	public record AcceptInviteRequest(
+			@NotBlank String inviteToken,
 			@NotBlank String deviceLabel,
 			@NotBlank String deviceAuthPublicKeyB64,
 			@NotBlank String deviceKemPublicKeyB64) {}
+
+	public record InviteStatusRequest(@NotBlank String inviteToken) {}
 
 	public record KeyDeliveryRequest(
 			@NotNull UUID toDeviceId,
@@ -58,22 +61,21 @@ public class PairingController {
 				req.recoveryAuthPublicKeyB64());
 	}
 
-	@PostMapping("/invites/{token}/accept")
+	@PostMapping("/invites/accept")
 	public PairingService.AcceptInviteResult acceptInvite(
-			@PathVariable String token,
 			@Valid @RequestBody AcceptInviteRequest req) {
 		return pairingService.acceptInvite(
-				token,
+				req.inviteToken(),
 				req.deviceLabel(),
 				req.deviceAuthPublicKeyB64(),
 				req.deviceKemPublicKeyB64());
 	}
 
-	@GetMapping("/invites/{token}/status")
+	@PostMapping("/invites/status")
 	public PairingService.InviteStatusResult getInviteStatus(
 			@AuthenticationPrincipal DevicePrincipal principal,
-			@PathVariable String token) {
-		return pairingService.getInviteStatus(principal, token);
+			@Valid @RequestBody InviteStatusRequest req) {
+		return pairingService.getInviteStatus(principal, req.inviteToken());
 	}
 
 	@PostMapping("/enrollment-invites")
@@ -120,11 +122,5 @@ public class PairingController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void unpairCouple(@AuthenticationPrincipal DevicePrincipal principal) {
 		pairingService.unpairCouple(principal);
-	}
-
-	@GetMapping("/visibility")
-	public PairingService.PairingVisibilityAudit getVisibilityAudit(
-			@AuthenticationPrincipal DevicePrincipal principal) {
-		return pairingService.getVisibilityAudit(principal);
 	}
 }

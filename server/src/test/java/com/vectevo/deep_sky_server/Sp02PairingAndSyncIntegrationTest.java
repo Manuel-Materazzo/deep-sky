@@ -16,9 +16,15 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.Signature;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -99,10 +105,11 @@ class Sp02PairingAndSyncIntegrationTest {
 
 		// 2. Device B accepts invite
 		String acceptBody = objectMapper.writeValueAsString(new AcceptInviteBody(
+				inviteToken,
 				"Pixel B",
 				rawEd25519B64(devBAuthKp),
 				b64(devBKemPub)));
-		MvcResult acceptRes = mockMvc.perform(post("/api/v1/pairing/invites/" + inviteToken + "/accept")
+		MvcResult acceptRes = mockMvc.perform(post("/api/v1/pairing/invites/accept")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(acceptBody))
 				.andExpect(status().isOk())
@@ -112,13 +119,68 @@ class Sp02PairingAndSyncIntegrationTest {
 		String devBId = acceptJson.get("deviceId").asText();
 
 		// Re-accepting same invite must be rejected
-		mockMvc.perform(post("/api/v1/pairing/invites/" + inviteToken + "/accept")
+		mockMvc.perform(post("/api/v1/pairing/invites/accept")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(acceptBody))
 				.andExpect(status().isConflict());
 
-		// 3. Device A checks invite status & uploads wrapped recovery key delivery
-		mockMvc.perform(signed(get("/api/v1/pairing/invites/" + inviteToken + "/status"), devAId, devAAuthKp, ""))
+		// 2b. Unapproved Device B is restricted before key delivery (CA-03)
+		String unapprovedEnvBody = objectMapper.writeValueAsString(
+				new UploadEnvBody(UUID.randomUUID().toString(), "EVENT", 1, b64(new byte[24]), b64(new byte[32])));
+		String unapprovedDeliveryBody = objectMapper.writeValueAsString(
+				new KeyDeliveryBody(devAId, b64(new byte[24]), b64(new byte[32])));
+		mockMvc.perform(signed(post("/api/v1/pairing/enrollment-invites"), devBId, devBAuthKp, ""))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(signed(
+						post("/api/v1/pairing/key-deliveries")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(unapprovedDeliveryBody),
+						devBId, devBAuthKp, unapprovedDeliveryBody))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(signed(get("/api/v1/pairing/devices"), devBId, devBAuthKp, ""))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(signed(post("/api/v1/pairing/devices/" + devAId + "/revoke"), devBId, devBAuthKp, ""))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(signed(post("/api/v1/pairing/unpair"), devBId, devBAuthKp, ""))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(signed(get("/api/v1/pairing/visibility"), devBId, devBAuthKp, ""))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(signed(
+						post("/api/v1/sync/envelopes")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(unapprovedEnvBody),
+						devBId, devBAuthKp, unapprovedEnvBody))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), devBId, devBAuthKp, ""))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(signed(get("/api/v1/sync/visibility"), devBId, devBAuthKp, ""))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(signed(
+						post("/api/v1/push/register")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content("{\"fcmToken\":\"tok\",\"platform\":\"android\"}"),
+						devBId, devBAuthKp, "{\"fcmToken\":\"tok\",\"platform\":\"android\"}"))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(signed(post("/api/v1/push/wakeup"), devBId, devBAuthKp, ""))
+				.andExpect(status().isForbidden());
+		// Allowed unapproved endpoints: key-deliveries/me (404 until uploaded), devices/me, invites/status
+		mockMvc.perform(signed(get("/api/v1/pairing/key-deliveries/me"), devBId, devBAuthKp, ""))
+				.andExpect(status().isNotFound());
+		String statusReqBody = objectMapper.writeValueAsString(new InviteStatusBody(inviteToken));
+		mockMvc.perform(signed(
+						post("/api/v1/pairing/invites/status")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(statusReqBody),
+						devBId, devBAuthKp, statusReqBody))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.accepted").value(true));
+
+		// 3. Device A checks invite status & uploads wrapped recovery key delivery (approving Device B)
+		mockMvc.perform(signed(
+						post("/api/v1/pairing/invites/status")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(statusReqBody),
+						devAId, devAAuthKp, statusReqBody))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.accepted").value(true))
 				.andExpect(jsonPath("$.acceptedDeviceId").value(devBId));
@@ -184,7 +246,8 @@ class Sp02PairingAndSyncIntegrationTest {
 		long ts = Instant.now().getEpochSecond();
 		mockMvc.perform(signedWithNonce(get("/api/v1/sync/envelopes?afterSeq=0"), devBId, devBAuthKp, "", ts, replayNonce))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$[0].envelopeId").value(envId));
+				.andExpect(jsonPath("$.items[0].envelopeId").value(envId))
+				.andExpect(jsonPath("$.hasMore").value(false));
 		mockMvc.perform(signedWithNonce(get("/api/v1/sync/envelopes?afterSeq=0"), devBId, devBAuthKp, "", ts, replayNonce))
 				.andExpect(status().isUnauthorized());
 
@@ -228,7 +291,7 @@ class Sp02PairingAndSyncIntegrationTest {
 		// Recovered device fetches historical envelopes
 		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), devRId, devRAuthKp, ""))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$[0].envelopeId").value(envId));
+				.andExpect(jsonPath("$.items[0].envelopeId").value(envId));
 
 		// Reusing recovery challenge fails
 		mockMvc.perform(post("/api/v1/recovery/complete")
@@ -259,7 +322,7 @@ class Sp02PairingAndSyncIntegrationTest {
 				.andExpect(status().isUnauthorized());
 		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), devAId, devAAuthKp, ""))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$[0].envelopeId").value(envId));
+				.andExpect(jsonPath("$.items[0].envelopeId").value(envId));
 
 		// 9. Server visibility audit (SP02-07)
 		MvcResult pairAudit = mockMvc.perform(signed(get("/api/v1/pairing/visibility"), devAId, devAAuthKp, ""))
@@ -331,14 +394,19 @@ class Sp02PairingAndSyncIntegrationTest {
 		// Couple B cannot see Couple A's envelopes, devices, invite status, revoke Couple A, or deliver keys to Couple A
 		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), devBId, devBKp, ""))
 				.andExpect(status().isOk())
-				.andExpect(jsonPath("$").isEmpty());
+				.andExpect(jsonPath("$.items").isEmpty());
 
 		MvcResult devBDevices = mockMvc.perform(signed(get("/api/v1/pairing/devices"), devBId, devBKp, ""))
 				.andExpect(status().isOk())
 				.andReturn();
 		assertThat(devBDevices.getResponse().getContentAsString()).doesNotContain(devAId);
 
-		mockMvc.perform(signed(get("/api/v1/pairing/invites/" + inviteAToken + "/status"), devBId, devBKp, ""))
+		String crossStatusBody = objectMapper.writeValueAsString(new InviteStatusBody(inviteAToken));
+		mockMvc.perform(signed(
+						post("/api/v1/pairing/invites/status")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(crossStatusBody),
+						devBId, devBKp, crossStatusBody))
 				.andExpect(status().isNotFound());
 
 		mockMvc.perform(signed(post("/api/v1/pairing/devices/" + devAId + "/revoke"), devBId, devBKp, ""))
@@ -376,17 +444,25 @@ class Sp02PairingAndSyncIntegrationTest {
 		int purged = cleanupService.purgeExpiredNonces(Instant.now());
 		assertThat(purged).isGreaterThanOrEqualTo(1);
 
-		// 5. Public recovery rate-limit returns 429 after 10 calls from the same IP
+		// 5. Public recovery rate-limit returns 429 after 10 calls from the same IP (ignores forged X-Forwarded-For)
 		String challengePayload = objectMapper.writeValueAsString(new ChallengeBody(rawEd25519B64(recAKp)));
 		for (int i = 0; i < 10; i++) {
 			mockMvc.perform(post("/api/v1/recovery/challenges")
-							.header("X-Forwarded-For", "203.0.113.77")
+							.with(r -> {
+								r.setRemoteAddr("203.0.113.77");
+								return r;
+							})
+							.header("X-Forwarded-For", "192.0.2." + (10 + i))
 							.contentType(MediaType.APPLICATION_JSON)
 							.content(challengePayload))
 					.andExpect(status().isOk());
 		}
 		mockMvc.perform(post("/api/v1/recovery/challenges")
-						.header("X-Forwarded-For", "203.0.113.77")
+						.with(r -> {
+							r.setRemoteAddr("203.0.113.77");
+							return r;
+						})
+						.header("X-Forwarded-For", "192.0.2.99")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(challengePayload))
 				.andExpect(status().isTooManyRequests())
@@ -402,9 +478,12 @@ class Sp02PairingAndSyncIntegrationTest {
 				.get("inviteToken").asText();
 		KeyPair staleDevKp = generateEd25519();
 		String staleAcceptBody = objectMapper.writeValueAsString(new AcceptInviteBody(
-				"Unapproved Tablet", rawEd25519B64(staleDevKp), b64(randomBytes32())));
-		MvcResult staleAcceptRes = mockMvc.perform(post("/api/v1/pairing/invites/" + extraEnrollToken + "/accept")
-						.header("X-Forwarded-For", "198.51.100.44")
+				extraEnrollToken, "Unapproved Tablet", rawEd25519B64(staleDevKp), b64(randomBytes32())));
+		MvcResult staleAcceptRes = mockMvc.perform(post("/api/v1/pairing/invites/accept")
+						.with(r -> {
+							r.setRemoteAddr("198.51.100.44");
+							return r;
+						})
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(staleAcceptBody))
 				.andExpect(status().isOk())
@@ -416,16 +495,26 @@ class Sp02PairingAndSyncIntegrationTest {
 		// and the 6th redeem attempt from the same IP is rate-limited (5/window).
 		for (int i = 0; i < 4; i++) {
 			String tok = (i % 2 == 0) ? "unknown-token-" + i : extraEnrollToken;
-			mockMvc.perform(post("/api/v1/pairing/invites/" + tok + "/accept")
-							.header("X-Forwarded-For", "198.51.100.44")
+			String retryBody = objectMapper.writeValueAsString(new AcceptInviteBody(
+					tok, "Unapproved Tablet", rawEd25519B64(staleDevKp), b64(randomBytes32())));
+			mockMvc.perform(post("/api/v1/pairing/invites/accept")
+							.with(r -> {
+								r.setRemoteAddr("198.51.100.44");
+								return r;
+							})
 							.contentType(MediaType.APPLICATION_JSON)
-							.content(staleAcceptBody))
+							.content(retryBody))
 					.andExpect(status().isConflict());
 		}
-		mockMvc.perform(post("/api/v1/pairing/invites/extra-attempt/accept")
-						.header("X-Forwarded-For", "198.51.100.44")
+		String extraAttemptBody = objectMapper.writeValueAsString(new AcceptInviteBody(
+				"extra-attempt", "Unapproved Tablet", rawEd25519B64(staleDevKp), b64(randomBytes32())));
+		mockMvc.perform(post("/api/v1/pairing/invites/accept")
+						.with(r -> {
+							r.setRemoteAddr("198.51.100.44");
+							return r;
+						})
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(staleAcceptBody))
+						.content(extraAttemptBody))
 				.andExpect(status().isTooManyRequests())
 				.andExpect(jsonPath("$.code").value("RATE_LIMITED"));
 
@@ -441,6 +530,68 @@ class Sp02PairingAndSyncIntegrationTest {
 		// Expired invites purge removes past-expiry invites cleanly.
 		int purgedInvites = cleanupService.purgeExpiredInvites(Instant.now().plusSeconds(3600));
 		assertThat(purgedInvites).isGreaterThanOrEqualTo(1);
+	}
+
+	@Test
+	void concurrentInviteAcceptIsAtomicallySingleUse() throws Exception {
+		KeyPair recKp = generateEd25519();
+		KeyPair devAKp = generateEd25519();
+		MvcResult inviteRes = mockMvc.perform(post("/api/v1/pairing/invites")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(new CreateInviteBody(
+								"Creator",
+								rawEd25519B64(devAKp),
+								b64(randomBytes32()),
+								rawEd25519B64(recKp)))))
+				.andExpect(status().isCreated())
+				.andReturn();
+		JsonNode inviteJson = objectMapper.readTree(inviteRes.getResponse().getContentAsString());
+		String devAId = inviteJson.get("deviceId").asText();
+		String inviteToken = inviteJson.get("inviteToken").asText();
+
+		int threads = 2;
+		CountDownLatch ready = new CountDownLatch(threads);
+		CountDownLatch go = new CountDownLatch(1);
+		ExecutorService pool = Executors.newFixedThreadPool(threads);
+		List<Future<Integer>> futures = new ArrayList<>();
+		for (int i = 0; i < threads; i++) {
+			final int idx = i;
+			futures.add(pool.submit(() -> {
+				KeyPair kp = generateEd25519();
+				String body = objectMapper.writeValueAsString(new AcceptInviteBody(
+						inviteToken,
+						"Racer-" + idx,
+						rawEd25519B64(kp),
+						b64(randomBytes32())));
+				ready.countDown();
+				go.await();
+				return mockMvc.perform(post("/api/v1/pairing/invites/accept")
+								.with(r -> {
+									r.setRemoteAddr("198.51.100." + (10 + idx));
+									return r;
+								})
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(body))
+						.andReturn()
+						.getResponse()
+						.getStatus();
+			}));
+		}
+		ready.await();
+		go.countDown();
+		List<Integer> statuses = new ArrayList<>();
+		for (Future<Integer> future : futures) {
+			statuses.add(future.get());
+		}
+		pool.shutdown();
+
+		assertThat(statuses).containsExactlyInAnyOrder(200, 409);
+
+		MvcResult devListRes = mockMvc.perform(signed(get("/api/v1/pairing/devices"), devAId, devAKp, ""))
+				.andExpect(status().isOk())
+				.andReturn();
+		JsonNode devices = objectMapper.readTree(devListRes.getResponse().getContentAsString());
+		assertThat(devices.size()).isEqualTo(2);
 	}
 
 	private MockHttpServletRequestBuilder signed(
@@ -517,9 +668,12 @@ class Sp02PairingAndSyncIntegrationTest {
 			String recoveryAuthPublicKeyB64) {}
 
 	private record AcceptInviteBody(
+			String inviteToken,
 			String deviceLabel,
 			String deviceAuthPublicKeyB64,
 			String deviceKemPublicKeyB64) {}
+
+	private record InviteStatusBody(String inviteToken) {}
 
 	private record KeyDeliveryBody(String toDeviceId, String nonceB64, String ciphertextB64) {}
 

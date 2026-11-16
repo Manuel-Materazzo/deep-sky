@@ -12,8 +12,7 @@ interface DeviceRepository extends JpaRepository<DeviceEntity, UUID> {
 
 	@Query("SELECT d FROM DeviceEntity d "
 			+ "WHERE d.revokedAt IS NULL "
-			+ "AND d.enrolledVia IN ('INVITE_JOIN', 'ENROLLMENT') "
-			+ "AND d.createdAt < :cutoff "
-			+ "AND NOT EXISTS (SELECT 1 FROM KeyDeliveryEntity k WHERE k.toDeviceId = d.id)")
+			+ "AND d.approvedAt IS NULL "
+			+ "AND d.createdAt < :cutoff")
 	List<DeviceEntity> findStaleUnapprovedDevices(@Param("cutoff") Instant cutoff);
 }

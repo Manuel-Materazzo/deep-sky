@@ -57,7 +57,7 @@ public class PublicEndpointRateLimitFilter extends OncePerRequestFilter {
 			return null;
 		}
 		String path = request.getRequestURI();
-		if (path.startsWith("/api/v1/pairing/invites/") && path.endsWith("/accept")) {
+		if ("/api/v1/pairing/invites/accept".equals(path)) {
 			return PublicEndpointRateLimiter.RouteGroup.INVITE_REDEEM;
 		}
 		if ("/api/v1/pairing/invites".equals(path)) {
@@ -70,11 +70,7 @@ public class PublicEndpointRateLimitFilter extends OncePerRequestFilter {
 	}
 
 	private static String extractClientIp(HttpServletRequest request) {
-		String forwarded = request.getHeader("X-Forwarded-For");
-		if (forwarded != null && !forwarded.isBlank()) {
-			int comma = forwarded.indexOf(',');
-			return (comma > 0 ? forwarded.substring(0, comma) : forwarded).trim();
-		}
-		return request.getRemoteAddr();
+		String remoteAddr = request.getRemoteAddr();
+		return (remoteAddr == null || remoteAddr.isBlank()) ? "unknown" : remoteAddr.trim();
 	}
 }

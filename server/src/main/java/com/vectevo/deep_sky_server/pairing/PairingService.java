@@ -3,6 +3,7 @@ package com.vectevo.deep_sky_server.pairing;
 import com.vectevo.deep_sky_server.push.PushService;
 import com.vectevo.deep_sky_server.shared.DevicePrincipal;
 import com.vectevo.deep_sky_server.shared.Ed25519SignatureVerifier;
+import com.vectevo.deep_sky_server.shared.PartnerWakeupRequestedEvent;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -11,6 +12,8 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,21 +32,25 @@ public class PairingService {
 	private final KeyDeliveryRepository keyDeliveryRepository;
 	private final RecoveryChallengeRepository challengeRepository;
 	private final PushService pushService;
+	private final ApplicationEventPublisher eventPublisher;
 	private final SecureRandom secureRandom = new SecureRandom();
 
+	@Autowired
 	public PairingService(
 			CoupleRepository coupleRepository,
 			DeviceRepository deviceRepository,
 			PairingInviteRepository inviteRepository,
 			KeyDeliveryRepository keyDeliveryRepository,
 			RecoveryChallengeRepository challengeRepository,
-			PushService pushService) {
+			PushService pushService,
+			ApplicationEventPublisher eventPublisher) {
 		this.coupleRepository = coupleRepository;
 		this.deviceRepository = deviceRepository;
 		this.inviteRepository = inviteRepository;
 		this.keyDeliveryRepository = keyDeliveryRepository;
 		this.challengeRepository = challengeRepository;
 		this.pushService = pushService;
+		this.eventPublisher = eventPublisher;
 	}
 
 	public record CreateInviteResult(UUID coupleId, UUID deviceId, String inviteToken, Instant expiresAt) {}
@@ -151,6 +158,7 @@ public class PairingService {
 		device.setKemPublicKey(kemPub);
 		device.setEnrolledVia("INVITE_INIT");
 		device.setCreatedAt(now);
+		device.setApprovedAt(now);
 		deviceRepository.save(device);
 
 		String rawToken = generateToken();
@@ -190,11 +198,11 @@ public class PairingService {
 		byte[] authPub = Ed25519SignatureVerifier.decodeBase64Url(deviceAuthPublicKeyB64, 32, "deviceAuthPublicKeyB64");
 		byte[] kemPub = Ed25519SignatureVerifier.decodeBase64Url(deviceKemPublicKeyB64, 32, "deviceKemPublicKeyB64");
 
-		PairingInviteEntity invite = inviteRepository.findByTokenHash(hashToken(rawToken))
+		PairingInviteEntity invite = inviteRepository.findByTokenHashForUpdate(hashToken(rawToken))
 				.orElseThrow(() -> new IllegalStateException("Invite is invalid, expired, or already used"));
 
 		Instant now = Instant.now();
-		if (invite.getExpiresAt().isBefore(now) || invite.getAcceptedAt() != null) {
+		if (!invite.getExpiresAt().isAfter(now) || invite.getAcceptedAt() != null) {
 			throw new IllegalStateException("Invite is invalid, expired, or already used");
 		}
 		CoupleEntity couple = coupleRepository.findById(invite.getCoupleId())
@@ -218,14 +226,16 @@ public class PairingService {
 		newDevice.setKemPublicKey(kemPub);
 		newDevice.setEnrolledVia("INITIAL_PAIRING".equals(invite.getInviteKind()) ? "INVITE_JOIN" : "ENROLLMENT");
 		newDevice.setCreatedAt(now);
+		newDevice.setApprovedAt(null);
 		deviceRepository.save(newDevice);
 
 		invite.setAcceptedAt(now);
 		invite.setAcceptedDeviceId(newDeviceId);
 		inviteRepository.save(invite);
 
-		// Notify the approving/inviting device with a generic data-only wakeup (`S-02`, `S1-SRV-02`).
-		pushService.dispatchPartnerWakeup(invite.getCoupleId(), newDeviceId, "wakeup.pairing_request");
+		// Notify the approving/inviting device after commit with a generic data-only wakeup (`S-02`, `S1-SRV-02`, `CA-07`).
+		eventPublisher.publishEvent(new PartnerWakeupRequestedEvent(
+				invite.getCoupleId(), newDeviceId, "wakeup.pairing_request"));
 
 		return new AcceptInviteResult(
 				invite.getCoupleId(),
@@ -273,6 +283,12 @@ public class PairingService {
 			throw new IllegalArgumentException("Wrapped key ciphertext too short");
 		}
 
+		Instant now = Instant.now();
+		if (target.getApprovedAt() == null) {
+			target.setApprovedAt(now);
+			deviceRepository.save(target);
+		}
+
 		KeyDeliveryEntity entity = new KeyDeliveryEntity();
 		entity.setId(UUID.randomUUID());
 		entity.setCoupleId(principal.coupleId());
@@ -280,7 +296,7 @@ public class PairingService {
 		entity.setToDeviceId(toDeviceId);
 		entity.setNonce(nonce);
 		entity.setCiphertext(ciphertext);
-		entity.setCreatedAt(Instant.now());
+		entity.setCreatedAt(now);
 		keyDeliveryRepository.save(entity);
 	}
 
@@ -391,13 +407,13 @@ public class PairingService {
 			String newDeviceAuthPublicKeyB64,
 			String newDeviceKemPublicKeyB64,
 			String recoverySignatureB64) {
-		RecoveryChallengeEntity challenge = challengeRepository.findById(challengeId)
+		RecoveryChallengeEntity challenge = challengeRepository.findByIdForUpdate(challengeId)
 				.orElseThrow(() -> new NoSuchElementException("Recovery challenge not found"));
 		Instant now = Instant.now();
 		if (challenge.getUsedAt() != null) {
 			throw new IllegalStateException("Recovery challenge already used");
 		}
-		if (challenge.getExpiresAt().isBefore(now)) {
+		if (!challenge.getExpiresAt().isAfter(now)) {
 			throw new IllegalStateException("Recovery challenge expired");
 		}
 
@@ -439,6 +455,7 @@ public class PairingService {
 		newDevice.setKemPublicKey(kemPub);
 		newDevice.setEnrolledVia("RECOVERY_KEY");
 		newDevice.setCreatedAt(now);
+		newDevice.setApprovedAt(now);
 		deviceRepository.save(newDevice);
 
 		return new RecoveryCompleteResult(couple.getId(), newDeviceId);
