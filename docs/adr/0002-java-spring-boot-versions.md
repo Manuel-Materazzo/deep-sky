@@ -28,5 +28,5 @@ We standardize on:
 - Initial AMD64 baseline (`SRV-02`, measured locally with `deploy/docker-compose.yml` under `prod` profile + Docker secrets):
   - Runtime image size (`eclipse-temurin:25-jre-alpine`): `291,504,306` bytes (~278 MiB)
   - Startup to healthy (`api` + `db`): <= 15s (`api` healthy within 15s)
-  - Idle memory (`docker stats --no-stream`): `220.9 MiB / 512 MiB` (`api`), `72.68 MiB / 256 MiB` (`db`)
+  - Idle memory (`docker stats --no-stream`): `220.9 MiB / 512 MiB` (`api`), `72.68 MiB / 256 MiB` (`db`) — limits as of this baseline; the current defaults are `API_MEM_LIMIT=512M` / `DB_MEM_LIMIT=384M` per [ADR-0009](0009-sp05-backend-footprint.md)
 - ARM64 OCI VM footprint and load benchmarks will be measured explicitly in `SP-05`.

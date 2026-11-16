@@ -32,7 +32,7 @@
 | **TC-10** | **Aggiornamenti integrati dalla v1**, a due livelli: pacchetti di contenuti e APK da **release GitHub** | Deciso |
 | **TC-11** | Backup: estensione degli script esistenti sulla VM OCI | Deciso |
 | **TC-12** | Sviluppo a **fette verticali** (grafica, codice e asset insieme) con rilasci frequenti | Deciso |
-| **TC-13** | Push con **FCM** e credenziali Firebase fornite a runtime dal server | Proposta, da validare con SP-01 |
+| **TC-13** | Push con **FCM** e credenziali Firebase fornite a runtime dal server | Validata da SP-01 su hardware reale (ADR-0006) |
 
 ## 3. Stack e motivazioni
 
@@ -176,7 +176,7 @@ Tabella aggiornata all’uscita della milestone **M1 (`G-1`)**; per le contromis
 
 | Rischio | Impatto | Mitigazione | Stato post-M1 (`G-1`) |
 | :-- | :-- | :-- | :-- |
-| Inizializzazione runtime di FCM non affidabile a processo chiuso | Push non consegnati | SP-01; interfaccia `PushProvider` (AR-10) per eventuale passaggio a UnifiedPush / build dedicata | **Aperto (parzialmente mitigato):** ad app aperta e in background verificato su `proto/sp-01` (`ADR-0006`); verifiche a task switcher chiuso, riavvio e Doze riportate in testa a M2 prima di congelare AR-10 |
+| Inizializzazione runtime di FCM non affidabile a processo chiuso | Push non consegnati | SP-01; interfaccia `PushProvider` (AR-10) per eventuale passaggio a UnifiedPush / build dedicata | **Mitigato:** consegna verificata su hardware reale ad app aperta, in background, a task switcher chiuso, dopo riavvio e in Doze (`ADR-0006`, AR-10 congelata); Piano B non attivato |
 | Errori nella cifratura end-to-end o nel recupero | Perdita di dati o falsa promessa di privacy | Librerie mature (`cryptography`, `bip39_mnemonic`), SP-02, revisione indipendente (`G-5`) | **In mitigazione:** protocollo implementato e testato (`ADR-0005`); verifiche su telefoni fisici / utenti non tecnici e rotazione post-revoca pianificate tra M2 e `G-5` |
 | Perdita della chiave di firma dell’APK | Impossibile aggiornare, reinstallazione e perdita delle chiavi locali | Custodia e backup cifrato offline (`PD-10`, `docs/key-custody.md`), chiave di recupero obbligatoria, guard pre-sessione su `PackageInstaller` | **Mitigato:** flusso offline documentato (`M0`); guard certificati pre-installazione validato in `proto/sp-03` (`ADR-0008`); resta il controllo su dispositivo fisico del flusso di upgrade firmato |
 | Verifica degli sviluppatori Android estesa all’Italia | APK ufficiale pubblico bloccato o ostacolato | D-14, nome pacchetto `com.vectevo.deep_sky` (`PD-07`) e chiave stabili, monitoraggio delle regole | **Monitorato:** dogfooding compatibile con fascia limitata (`<= 20` dispositivi); da rivalutare prima di aperture pubbliche |

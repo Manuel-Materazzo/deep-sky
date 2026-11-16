@@ -20,7 +20,7 @@ Under `com.vectevo.deep_sky_server`, code is organized into explicit top-level m
 - `push` — `PushProvider` abstraction and runtime Firebase configuration delivery (`TC-13`)
 - `content` — Versioned content pack distribution endpoints
 
-Module boundaries are enforced automatically in CI via ArchUnit (`ArchitectureTest`): domain modules (`pairing`, `sync`, `blob`, `push`, `content`) must not access internal classes of sibling domain modules directly, and no module may depend on `config` web controllers.
+Module boundaries are enforced automatically in CI via ArchUnit (`ArchitectureTest`) with three rules: top-level modules must be free of dependency cycles; `pairing`, `sync`, `blob`, `push`, `content` and `shared` must not depend on `config`; `shared` must not depend on any domain module. Direct access between sibling domain modules is not yet forbidden by a rule (only cycles are); a stricter sibling-isolation rule is a follow-up.
 
 ## Alternatives Considered
 

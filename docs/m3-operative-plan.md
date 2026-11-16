@@ -54,6 +54,12 @@ Proposta (PD-17). Prima di inserire dati intimi veri, con PD-05 come criterio gu
 - [x] Politica di compatibilità attiva (PD-19) e aggiornamento in app provato
 - [ ] Procedura di emergenza scritta: cosa fare se il server non risponde o se un aggiornamento ha
   un difetto
+- [ ] **Rotazione delle chiavi dopo la revoca** di un dispositivo implementata e provata (S1-SEC-02,
+  ADR-0005, G5-05)
+- [ ] Footprint del server misurato sulla VM ARM di produzione (S1-INF-02, ADR-0009)
+- [ ] **Rischio accettato e scritto:** esportazione completa, cancellazione definitiva e riattivazione
+  consensuale (F-17, S-04, D-15) restano in **M5**; fino ad allora l’interruzione della coppia (S-03)
+  è solo una chiusura logica (`unpaired_at`) e il promotore lo sa prima di inserire dati veri
 
 **Nota sul ritorno indietro.** Android non permette di installare una versione con numero inferiore
 a quella presente. Il “rollback” di un aggiornamento difettoso è quindi una **nuova release con
@@ -255,7 +261,38 @@ codice
 - [ ] Filtro di autenticazione, cifratura, archivio chiavi, recupero, arruolamento e revoca
   esaminati
 - [ ] Rapporto scritto con rilievi e decisioni; i rilievi alti sono chiusi prima di G-3a
-- [ ] Elenco dei punti da passare alla revisione indipendente (G-5)
+- [ ] Blocco del recupero per tentativi ripetuti: oltre al limite per IP già presente, valutato un
+  blocco **per coppia** (ADR-0005, G5-03) e annotata la decisione
+- [ ] Verificato che la rotazione chiavi dopo revoca (S1-SEC-02) sia coperta dal rapporto
+- [ ] Elenco dei punti da passare alla revisione indipendente (G-5), incluso G5-09 (libreria
+  crittografica Dart pura contro backend nativo): **rinviato di proposito** a G-5, la dipendenza non
+  cambia in M3 (ADR-0010)
+
+**S1-SEC-02 · Rotazione delle chiavi dopo la revoca** — Ruolo: architetto, sviluppatore client e
+backend, revisore di sicurezza · Rif.: S-06, AD-01, G5-05, ADR-0005 · Dipende da: S1-APP-05
+
+Oggi la revoca blocca il dispositivo sul server, ma le chiavi di canale restano quelle dell’epoca
+`keyEpoch = 1`: un telefono rubato che le possiede già potrebbe ancora decifrare contenuti futuri
+che riuscisse a ottenere.
+
+- [ ] Progetto scritto: quando si incrementa `keyEpoch`, chi genera la nuova chiave, come raggiunge
+  il dispositivo superstite (consegna cifrata X25519), cosa succede se il superstite è offline o se
+  resta un solo telefono (recupero con chiave di recupero)
+- [ ] Aggiornamento del formato (nuova epoca nelle buste e negli snapshot) con **versione e
+  migrazione** (PD-19); le buste delle epoche precedenti restano leggibili
+- [ ] Il dispositivo revocato non può decifrare nulla di ciò che è scritto dopo la rotazione (test
+  automatico)
+- [ ] Provato su due telefoni reali: revoca, rotazione, il telefono superstite continua a funzionare
+- [ ] Interazione con la chiave di recupero chiarita: la seed originale resta valida o va
+  rigenerata? Se cambia l’esperienza dell’utente, designer e promotore approvano i testi (S-06)
+- [ ] Rivista da chi non l’ha scritta (S1-SEC-01); ADR di esito, con un nuovo ADR che sostituisce
+  la parte interessata di ADR-0005
+
+**S1-INF-02 · Footprint su VM ARM** — Ruolo: release e infrastruttura · Rif.: TC-02, TC-03, ADR-0009
+
+- [ ] Compose di produzione (profilo Balanced) misurato sulla VM ARM: avvio, memoria a riposo e
+  sotto carico, assenza di OOM
+- [ ] Requisiti minimi di self-hosting aggiornati con le misure reali
 
 **S1-QA-01 · Prove di punta a punta** — Ruolo: QA
 
@@ -275,6 +312,8 @@ codice
 
 - [x] Cosa fare se il server non risponde, se un aggiornamento è difettoso (nuova release con numero
   più alto), se si perde un telefono o la chiave *(`docs/emergency-procedure.md`)*
+- [ ] Notifiche ferme dopo “Termina” / Force Stop da Impostazioni: la consegna riprende alla
+  riapertura dell’app (ADR-0006); riportato nella procedura e nella guida per la partner
 
 **S1-REL-01 · Prima release sul campo** — Ruolo: release e infrastruttura
 
@@ -295,7 +334,7 @@ In sintesi; il dettaglio si scrive a ogni sprint con la stessa struttura del cap
 
 | Sprint                               | Design (una fetta avanti)                                                   | Contratto e server                               | App                                                                       | Domande da fare sul campo                                                    |
 |:-------------------------------------|:----------------------------------------------------------------------------|:-------------------------------------------------|:--------------------------------------------------------------------------|:-----------------------------------------------------------------------------|
-| **S3-2 Home e scena**                | Design system completo, livelli della scena, manifest, stati giorno e notte | Pacchetto di contenuti v1, firma e distribuzione | Home vera, scena a livelli, aree di tocco, cielo dall’ora del dispositivo | La casa sembra un posto in cui tornare volentieri? Ci sono elementi inutili? |
+| **S3-2 Home e scena**                | Design system completo, livelli della scena, manifest, stati giorno e notte | Pacchetto di contenuti v1, firma e distribuzione | Home vera, scena a livelli, aree di tocco, cielo dall’ora del dispositivo; soglie ADR-0007 sul telefono meno recente: 95% dei frame entro 16,7 ms, RSS di picco ≤ 180 MB | La casa sembra un posto in cui tornare volentieri? Ci sono elementi inutili? |
 | **S3-3 Thinking of you e notifiche** | Gesto, testi delle notifiche, canale e impostazioni                         | Evento cifrato, push generico, regole di quiete  | Invio, ricezione, tocco sulla notifica                                    | Il gesto sembra naturale? Crea senso di dovere?                              |
 | **S3-4 Mood**                        | Selezione, nota facoltativa, storico                                        | Evento e stato derivato                          | Scelta e visualizzazione                                                  | Lo usate? È sempre facoltativo, davvero?                                     |
 | **S3-5 Countdown**                   | Lista, dettaglio, todo, immagini, commenti                                  | Eventi e blob cifrati                            | Countdown e notifiche locali                                              | Aiuta la vicinanza? Cosa manca?                                              |
@@ -357,6 +396,8 @@ manca a entrambi.
 | Chiave di recupero non capita o persa          | Dati irrecuperabili                   | Conferma obbligatoria, test di comprensione, DD-12                                    |
 | Aggiornamento difettoso                        | Telefono della partner inutilizzabile | Procedura di emergenza, nuova release con numero più alto, anteprima prima di stabile |
 | Sovrapposizione tra prove sul campo e sviluppo | Colli di bottiglia sulla supervisione | Sprint senza attesa, difetti nel backlog, revisione settimanale breve                 |
+| Revoca senza rotazione delle chiavi | Telefono rubato che decifra contenuti futuri | S1-SEC-02, G-3a |
+| Dati veri prima di esportazione e cancellazione (M5) | Nessuna uscita completa dei dati in caso di scioglimento | Rischio accettato in G-3a; backup, `unpaired_at`, F-17/D-15 in M5 |
 | Prova della partner vissuta come test          | Disagio                               | Consenso, tono leggero, nessun aiuto ma nessun giudizio, prova breve                  |
 
 ## 11. Decisioni aperte

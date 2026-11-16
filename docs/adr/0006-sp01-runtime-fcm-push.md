@@ -2,11 +2,11 @@
 
 - **Status:** Accepted (`AR-10` frozen; verified on real Android hardware across foreground, background, task-switcher-closed, reboot, and Doze)
 - **Date:** 2026-11-15 (proposed 2026-11-14)
-- **Reference IDs:** `S-02`, `TC-04`, `AD-04`, `AR-10`, `SP-01`
+- **Reference IDs:** `S-02`, `TC-13`, `AD-04`, `AR-10`, `SP-01`
 
 ## Context
 
-The public Android repository and distributed APKs must contain no Firebase credentials (`TC-04`, `AD-04`), meaning `google-services.json` and the `com.google.gms.google-services` Gradle plugin cannot be used. Furthermore, wakeup notifications must carry zero couple content (`S-02`) and still display localized text when the app was dismissed from the Android task switcher or after device reboot.
+The public Android repository and distributed APKs must contain no Firebase credentials (`TC-13`, `AD-04`), meaning `google-services.json` and the `com.google.gms.google-services` Gradle plugin cannot be used. Furthermore, wakeup notifications must carry zero couple content (`S-02`) and still display localized text when the app was dismissed from the Android task switcher or after device reboot.
 
 ## Decision
 

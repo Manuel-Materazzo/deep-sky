@@ -2,24 +2,24 @@
 
 - **Status:** Accepted (verified on real Android hardware; `PD-05` non-technical walkthrough and `G-5` independent review remain tracked before real couple data)
 - **Date:** 2026-11-15 (baseline 2026-11-14)
-- **Reference IDs:** `S-01`, `S-03`, `S-04`, `S-05`, `S-06`, `F-01`, `F-02`, `AD-01`, `AD-02`, `AD-03`, `SP-02`
+- **Reference IDs:** `S-01`, `S-03`, `S-06`, `F-01`, `F-02`, `AD-01`, `AD-02`, `AD-03`, `SP-02`
 
 ## Context
 
-Deep Sky must establish end-to-end encrypted communication between two partner devices (`P-01`, `S-01`), support enrollment of an additional device without leaking long-term secrets to the server, enable full couple-key recovery using only a user-held Recovery Key when no other device is available, and support immediate revocation of lost or compromised devices (`S-06`), all while ensuring the server stores zero readable couple content (`S-01`, `S-03`).
+Deep Sky must establish end-to-end encrypted communication between two partner devices (`S-01`), support enrollment of an additional device without leaking long-term secrets to the server, enable full couple-key recovery using only a user-held Recovery Key when no other device is available, and support immediate revocation of lost or compromised devices (`S-06`), all while ensuring the server stores zero readable couple content (`S-01`); unilateral unpairing is handled by `S-03`.
 
 ## Decision
 
 The prototype (branch `proto/sp-02`, since merged into `development`) implements and validates the protocol specified in `docs/sp-02-e2ee-protocol.md` (available on branch `proto/sp-02`; not present on `development`):
 
 - **Cryptographic Primitives:** X25519 (ECDH pairing & ephemeral wrapping), Ed25519 (per-device HTTP request authentication `AD-02` & recovery proof), HKDF-SHA256 (key derivation), XChaCha20-Poly1305 AEAD (`package:cryptography` `2.9.0`), BIP-39 24-word mnemonic + checksummed `deepsky-rk:v1:` QR (`bip39_mnemonic` `4.1.0`).
-- **Key Hierarchy:** A random 256-bit `recoverySeed` (the Recovery Key) is generated at couple creation. The couple root key and per-channel keys (`timeline`, `capsules`, `profile`, `scene`, `countdowns`) derive from it via HKDF-SHA256 (salt `deep-sky:salt:v1`, info `deep-sky:couple-root:v1` and `deep-sky:<label>:v1|epoch=<keyEpoch>`). The seed reaches a partner device through a pairwise X25519 SAS-verified delivery (HKDF salt `coupleId`, info `deep-sky:pairing-wrap:v1`, AAD `deep-sky:key-delivery:v1|coupleId|from|to`). The Recovery Key itself (24-word BIP-39 / QR) is the user-held recovery path.
-- **Canonical AAD (`S-05`):** Every `EncryptedEnvelope` authenticates `deep-sky:envelope:v1|coupleId=…|envelopeId=…|senderDeviceId=…|channel=…|keyEpoch=…` (the format version is the `v1` prefix; the key generation is called `keyEpoch` in code and schema). Cross-couple replay, channel confusion, or byte tampering fails AEAD tag verification (`SecretBoxAuthenticationError`).
+- **Key Hierarchy:** A random 256-bit `recoverySeed` (the Recovery Key) is generated at couple creation. The couple root key and per-channel keys (`timeline`, `capsules`, `profile`, `scene`, `countdowns`) derive from it via HKDF-SHA256 (salt `deep-sky:salt:v1`, info `deep-sky:couple-root:v1` and `deep-sky:<label>:v1|epoch=<keyEpoch>`). The seed reaches a partner device through a pairwise X25519 SAS-verified delivery (HKDF salt `coupleId`, info `deep-sky:pairing-wrap:v1`, AAD `deep-sky:key-delivery:v1|coupleId=…|from=…|to=…`). The Recovery Key itself (24-word BIP-39 / QR) is the user-held recovery path.
+- **Canonical AAD (`S-01`, `AD-01`):** Every `EncryptedEnvelope` authenticates `deep-sky:envelope:v1|coupleId=…|envelopeId=…|senderDeviceId=…|channel=…|keyEpoch=…` (the format version is the `v1` prefix; the key generation is called `keyEpoch` in code and schema). Cross-couple replay, channel confusion, or byte tampering fails AEAD tag verification (`SecretBoxAuthenticationError`).
 - **Zero-Second-Phone Recovery & Revocation (`AD-01`, `AD-03`):** Recovering devices claim a server-issued single-use challenge nonce (5-minute TTL) by signing it with the Ed25519 keypair deterministically derived from the Recovery Key and register a fresh device keypair, unwrapping `CMK` locally. `POST /api/v1/pairing/devices/{deviceId}/revoke` revokes a device and removes it from future delivery targets.
 
 ## Alternatives Considered
 
-- **Passwords / server-side KMS escrow:** Rejected (`S-01`, `S-03`) — would violate zero-knowledge custody and expose keys on server compromise.
+- **Passwords / server-side KMS escrow:** Rejected (`S-01`, `S-06`) — would violate zero-knowledge custody and expose keys on server compromise.
 - **Skipping per-device Ed25519 HTTP auth in favor of shared bearer tokens:** Rejected (`AD-02`) — prevents fine-grained revocation and replay protection.
 
 ## Consequences & Points for Independent Review (`G-5`)
