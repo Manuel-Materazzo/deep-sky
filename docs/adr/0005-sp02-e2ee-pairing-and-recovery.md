@@ -21,6 +21,7 @@ The prototype (branch `proto/sp-02`, since merged into `development`) implements
 
 - **Passwords / server-side KMS escrow:** Rejected (`S-01`, `S-06`) — would violate zero-knowledge custody and expose keys on server compromise.
 - **Skipping per-device Ed25519 HTTP auth in favor of shared bearer tokens:** Rejected (`AD-02`) — prevents fine-grained revocation and replay protection.
+- **Ephemeral sender X25519 keys for `key_deliveries` (`CA-18`):** Deferred / risk accepted — key deliveries use pairwise static-static X25519 between device identity KEM keys. Because each active device already stores `recoverySeed` and epoch secrets alongside `kemPrivateKey` in `SecureKeyStore`, and post-revocation epoch rotation ([ADR-0012](0012-ca02-epoch-key-rotation-on-revocation.md)) isolates subsequent epochs and rotates `recoverySeed`, lack of forward secrecy on the one-time wrapper ciphertext is an accepted trade-off.
 
 ## Consequences & Points for Independent Review (`G-5`)
 
