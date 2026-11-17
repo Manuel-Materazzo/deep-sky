@@ -15,8 +15,10 @@ interface EncryptedEnvelopeRepository extends JpaRepository<EncryptedEnvelopeEnt
 
 	List<EncryptedEnvelopeEntity> findTop200ByCoupleIdOrderBySeqDesc(UUID coupleId);
 
-	@Query("SELECT COALESCE(SUM(OCTET_LENGTH(e.ciphertext) + OCTET_LENGTH(e.nonce)), 0) "
-			+ "FROM EncryptedEnvelopeEntity e WHERE e.coupleId = :coupleId")
+	@Query(
+			value = "SELECT CAST(COALESCE(SUM(OCTET_LENGTH(ciphertext) + OCTET_LENGTH(nonce)), 0) AS BIGINT) "
+					+ "FROM encrypted_envelopes WHERE couple_id = :coupleId",
+			nativeQuery = true)
 	long sumStoredBytesByCoupleId(@Param("coupleId") UUID coupleId);
 
 	@Modifying
