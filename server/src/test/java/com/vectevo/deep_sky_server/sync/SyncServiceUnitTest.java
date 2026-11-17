@@ -8,8 +8,10 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.vectevo.deep_sky_server.pairing.DeviceAuthLookup;
 import com.vectevo.deep_sky_server.shared.DevicePrincipal;
 import com.vectevo.deep_sky_server.shared.PartnerWakeupRequestedEvent;
+import com.vectevo.deep_sky_server.shared.StaleKeyEpochException;
 import com.vectevo.deep_sky_server.shared.StorageQuotaExceededException;
 import java.time.Instant;
 import java.util.Base64;
@@ -102,6 +104,26 @@ class SyncServiceUnitTest {
 		assertThat(page2.items()).hasSize(1);
 		assertThat(page2.hasMore()).isFalse();
 		assertThat(page2.nextAfterSeq()).isEqualTo(13L);
+	}
+
+	@Test
+	void storeEnvelopeRejectsStaleKeyEpochWithConflictException() {
+		DeviceAuthLookup lookup = mock(DeviceAuthLookup.class);
+		SyncService guardedSync = new SyncService(envelopeRepository, eventPublisher, lookup, 1024L, 4096L);
+		UUID coupleId = UUID.randomUUID();
+		UUID deviceId = UUID.randomUUID();
+		DevicePrincipal principal = new DevicePrincipal(coupleId, deviceId, true);
+		when(lookup.getCurrentKeyEpoch(coupleId)).thenReturn(3);
+
+		String nonceB64 = Base64.getUrlEncoder().encodeToString(new byte[24]);
+		String cipherB64 = Base64.getUrlEncoder().encodeToString(new byte[40]);
+
+		assertThatThrownBy(() -> guardedSync.storeEnvelope(principal, UUID.randomUUID(), "EVENT", 2, nonceB64, cipherB64))
+				.isInstanceOf(StaleKeyEpochException.class)
+				.satisfies(ex -> assertThat(((StaleKeyEpochException) ex).getCurrentKeyEpoch()).isEqualTo(3));
+
+		var page = guardedSync.listEnvelopes(principal, 0L, 10);
+		assertThat(page.coupleKeyEpoch()).isEqualTo(3);
 	}
 
 	private static EncryptedEnvelopeEntity makeEntity(UUID id, UUID coupleId, UUID deviceId, long seq) {

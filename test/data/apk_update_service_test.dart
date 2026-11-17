@@ -413,87 +413,84 @@ void main() {
     expect(controller.updateFeedback, contains('Chiave pubblica Ed25519'));
   });
 
-  test(
-    'oversized .part file is deleted and recovered cleanly, and streaming hash matches in-memory SHA-256 (CA-11)',
-    () async {
-      final rel = await buildSignedRelease(versionCode: 4);
-      final Directory tempDir = Directory.systemTemp.createTempSync(
-        'sp03_oversized_',
-      );
-      addTearDown(() => tempDir.deleteSync(recursive: true));
+  test('oversized .part file is deleted and recovered cleanly, and streaming hash matches in-memory SHA-256 (CA-11)', () async {
+    final rel = await buildSignedRelease(versionCode: 4);
+    final Directory tempDir = Directory.systemTemp.createTempSync(
+      'sp03_oversized_',
+    );
+    addTearDown(() => tempDir.deleteSync(recursive: true));
 
-      final File partFile = File(
-        '${tempDir.path}${Platform.pathSeparator}deep-sky-1.0.4-4.apk.part',
-      );
-      partFile.writeAsBytesSync(List<int>.filled(rel.apkBytes.length + 512, 7));
-      expect(partFile.existsSync(), isTrue);
+    final File partFile = File(
+      '${tempDir.path}${Platform.pathSeparator}deep-sky-1.0.4-4.apk.part',
+    );
+    partFile.writeAsBytesSync(List<int>.filled(rel.apkBytes.length + 512, 7));
+    expect(partFile.existsSync(), isTrue);
 
-      int downloadCalls = 0;
-      final MockClient httpClient = MockClient.streaming((
-        http.BaseRequest req,
-        http.ByteStream bodyStream,
-      ) async {
-        if (req.url.path.endsWith('manifest.json')) {
-          return http.StreamedResponse(
-            Stream<List<int>>.value(rel.manifestBytes),
-            200,
-          );
-        }
-        if (req.url.path.endsWith('manifest.json.sig')) {
-          return http.StreamedResponse(
-            Stream<List<int>>.value(rel.sigBytes),
-            200,
-          );
-        }
-        downloadCalls++;
-        expect(req.headers.containsKey('Range'), isFalse);
+    int downloadCalls = 0;
+    final MockClient httpClient = MockClient.streaming((
+      http.BaseRequest req,
+      http.ByteStream bodyStream,
+    ) async {
+      if (req.url.path.endsWith('manifest.json')) {
         return http.StreamedResponse(
-          Stream<List<int>>.fromIterable(<List<int>>[
-            rel.apkBytes.sublist(0, 1500),
-            rel.apkBytes.sublist(1500),
-          ]),
+          Stream<List<int>>.value(rel.manifestBytes),
           200,
         );
-      });
+      }
+      if (req.url.path.endsWith('manifest.json.sig')) {
+        return http.StreamedResponse(
+          Stream<List<int>>.value(rel.sigBytes),
+          200,
+        );
+      }
+      downloadCalls++;
+      expect(req.headers.containsKey('Range'), isFalse);
+      return http.StreamedResponse(
+        Stream<List<int>>.fromIterable(<List<int>>[
+          rel.apkBytes.sublist(0, 1500),
+          rel.apkBytes.sublist(1500),
+        ]),
+        200,
+      );
+    });
 
-      final ApkUpdateService service = ApkUpdateService(
-        httpClient: httpClient,
-        retryDelay: (_) => Duration.zero,
-      );
-      final ApkReleaseManifest manifest = await service.fetchAndVerifyManifest(
-        sourceBaseUri: Uri.parse('https://mirror.example.test/dl'),
-        trustedPublicKey: rel.publicKey,
-        currentApp: installedApp,
-      );
+    final ApkUpdateService service = ApkUpdateService(
+      httpClient: httpClient,
+      retryDelay: (_) => Duration.zero,
+    );
+    final ApkReleaseManifest manifest = await service.fetchAndVerifyManifest(
+      sourceBaseUri: Uri.parse('https://mirror.example.test/dl'),
+      trustedPublicKey: rel.publicKey,
+      currentApp: installedApp,
+    );
 
-      final File verified = await service.downloadAndVerifyApk(
-        sourceBaseUri: Uri.parse('https://mirror.example.test/dl'),
-        manifest: manifest,
-        stagingDir: tempDir.path,
-        availableBytes: 50 * 1024 * 1024,
-      );
-      expect(downloadCalls, 1);
-      expect(verified.existsSync(), isTrue);
-      expect(verified.lengthSync(), rel.apkBytes.length);
+    final File verified = await service.downloadAndVerifyApk(
+      sourceBaseUri: Uri.parse('https://mirror.example.test/dl'),
+      manifest: manifest,
+      stagingDir: tempDir.path,
+      availableBytes: 50 * 1024 * 1024,
+    );
+    expect(downloadCalls, 1);
+    expect(verified.existsSync(), isTrue);
+    expect(verified.lengthSync(), rel.apkBytes.length);
 
-      // Verify streaming hash equivalence directly on a multi-chunk (>128 KiB) file
-      final File multiChunkFile = File(
-        '${tempDir.path}${Platform.pathSeparator}large_sample.bin',
-      );
-      final Uint8List largeBytes = Uint8List.fromList(
-        List<int>.generate(200 * 1024 + 17, (int i) => (i * 13) & 0xff),
-      );
-      multiChunkFile.writeAsBytesSync(largeBytes);
-      final Hash expectedDigest = await Sha256().hash(largeBytes);
-      final String expectedHex = expectedDigest.bytes
-          .map((int b) => b.toRadixString(16).padLeft(2, '0'))
-          .join();
-      expect(
-        await ApkUpdateService.computeFileSha256Hex(multiChunkFile),
-        expectedHex,
-      );
-    },
-  );
+    // Verify streaming hash equivalence directly on a multi-chunk (>128 KiB) file
+    final File multiChunkFile = File(
+      '${tempDir.path}${Platform.pathSeparator}large_sample.bin',
+    );
+    final Uint8List largeBytes = Uint8List.fromList(
+      List<int>.generate(200 * 1024 + 17, (int i) => (i * 13) & 0xff),
+    );
+    multiChunkFile.writeAsBytesSync(largeBytes);
+    final Hash expectedDigest = await Sha256().hash(largeBytes);
+    final String expectedHex = expectedDigest.bytes
+        .map((int b) => b.toRadixString(16).padLeft(2, '0'))
+        .join();
+    expect(
+      await ApkUpdateService.computeFileSha256Hex(multiChunkFile),
+      expectedHex,
+    );
+  });
 
   test(
     'ApkReleaseManifest.fromJson accepts stringified numeric versionCode',

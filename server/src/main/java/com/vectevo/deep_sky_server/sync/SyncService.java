@@ -1,8 +1,10 @@
 package com.vectevo.deep_sky_server.sync;
 
+import com.vectevo.deep_sky_server.pairing.DeviceAuthLookup;
 import com.vectevo.deep_sky_server.shared.DevicePrincipal;
 import com.vectevo.deep_sky_server.shared.Ed25519SignatureVerifier;
 import com.vectevo.deep_sky_server.shared.PartnerWakeupRequestedEvent;
+import com.vectevo.deep_sky_server.shared.StaleKeyEpochException;
 import com.vectevo.deep_sky_server.shared.StorageQuotaExceededException;
 import java.time.Instant;
 import java.util.Collections;
@@ -28,17 +30,28 @@ public class SyncService {
 
 	private final EncryptedEnvelopeRepository envelopeRepository;
 	private final ApplicationEventPublisher eventPublisher;
+	private final DeviceAuthLookup deviceAuthLookup;
 	private final long maxBlobBytes;
 	private final long maxCoupleStorageBytes;
+
+	public SyncService(
+			EncryptedEnvelopeRepository envelopeRepository,
+			ApplicationEventPublisher eventPublisher,
+			long maxBlobBytes,
+			long maxCoupleStorageBytes) {
+		this(envelopeRepository, eventPublisher, null, maxBlobBytes, maxCoupleStorageBytes);
+	}
 
 	@Autowired
 	public SyncService(
 			EncryptedEnvelopeRepository envelopeRepository,
 			ApplicationEventPublisher eventPublisher,
+			DeviceAuthLookup deviceAuthLookup,
 			@Value("${deepsky.quotas.max-blob-bytes:10485760}") long maxBlobBytes,
 			@Value("${deepsky.quotas.max-couple-storage-bytes:1073741824}") long maxCoupleStorageBytes) {
 		this.envelopeRepository = envelopeRepository;
 		this.eventPublisher = eventPublisher;
+		this.deviceAuthLookup = deviceAuthLookup;
 		this.maxBlobBytes = maxBlobBytes;
 		this.maxCoupleStorageBytes = maxCoupleStorageBytes;
 	}
@@ -57,7 +70,12 @@ public class SyncService {
 	public record EnvelopePageView(
 			List<EnvelopeView> items,
 			long nextAfterSeq,
-			boolean hasMore) {}
+			boolean hasMore,
+			int coupleKeyEpoch) {
+		public EnvelopePageView(List<EnvelopeView> items, long nextAfterSeq, boolean hasMore) {
+			this(items, nextAfterSeq, hasMore, 1);
+		}
+	}
 
 	public record EnvelopeVisibilityRow(
 			UUID id,
@@ -84,6 +102,12 @@ public class SyncService {
 		}
 		if (keyEpoch < 1) {
 			throw new IllegalArgumentException("keyEpoch must be >= 1");
+		}
+		if (deviceAuthLookup != null) {
+			int currentCoupleEpoch = Math.max(1, deviceAuthLookup.getCurrentKeyEpoch(principal.coupleId()));
+			if (keyEpoch < currentCoupleEpoch) {
+				throw new StaleKeyEpochException(currentCoupleEpoch);
+			}
 		}
 		byte[] nonce = Ed25519SignatureVerifier.decodeBase64Url(nonceB64, 24, "nonceB64");
 		byte[] ciphertext = Ed25519SignatureVerifier.decodeBase64UrlVariable(ciphertextB64, "ciphertextB64");
@@ -169,7 +193,10 @@ public class SyncService {
 				.map(SyncService::toView)
 				.toList();
 		long nextAfterSeq = items.isEmpty() ? afterSeq : items.getLast().seq();
-		return new EnvelopePageView(items, nextAfterSeq, hasMore);
+		int coupleKeyEpoch = deviceAuthLookup == null
+				? 1
+				: Math.max(1, deviceAuthLookup.getCurrentKeyEpoch(principal.coupleId()));
+		return new EnvelopePageView(items, nextAfterSeq, hasMore, coupleKeyEpoch);
 	}
 
 	@Transactional(readOnly = true)

@@ -91,6 +91,12 @@ public class GlobalExceptionHandler {
 				.body(new ApiError(ex.getErrorCode(), ex.getMessage(), Instant.now()));
 	}
 
+	@ExceptionHandler(StaleKeyEpochException.class)
+	public ResponseEntity<ApiError> handleStaleKeyEpoch(StaleKeyEpochException ex) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+				.body(new ApiError("STALE_KEY_EPOCH", ex.getMessage(), Instant.now()));
+	}
+
 	@ExceptionHandler(RateLimitExceededException.class)
 	public ResponseEntity<ApiError> handleRateLimited(RateLimitExceededException ex) {
 		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

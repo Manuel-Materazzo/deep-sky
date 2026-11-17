@@ -129,8 +129,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         copiedClipboardText,
-        'https://deepsky.vectevo.com/join#token=tok-welcome-1',
+        startsWith('https://deepsky.vectevo.com/join#token=tok-welcome-1&sas='),
       );
+      expect(copiedClipboardText, equals(controller.activeInviteUri));
       expect(find.text('Copiato!'), findsOneWidget);
 
       // Expand server drawer and save custom LAN IP
@@ -159,7 +160,9 @@ void main() {
       );
       expect(
         controller.activeInviteUri,
-        'https://deepsky.vectevo.com/join#server=http%3A%2F%2F192.168.1.50%3A8080&token=tok-welcome-2',
+        startsWith(
+          'https://deepsky.vectevo.com/join#server=http%3A%2F%2F192.168.1.50%3A8080&token=tok-welcome-2&sas=',
+        ),
       );
       expect(find.text('Personalizzato (192.168.1.50:8080)'), findsOneWidget);
 
@@ -275,7 +278,7 @@ void main() {
                 );
               }
               if (scanMode == 'invite') {
-                return 'https://deepsky.vectevo.com/join#server=http%3A%2F%2F192.168.1.99%3A8080&token=tok_qr_joined';
+                return 'https://deepsky.vectevo.com/join#server=http%3A%2F%2F192.168.1.99%3A8080&token=tok_qr_joined&sas=AQIDBAUGBwgJCgsMDQ4PEA';
               }
               if (scanMode == 'recovery') {
                 return 'stella notte cammino lanterna';

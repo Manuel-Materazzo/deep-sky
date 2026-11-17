@@ -44,4 +44,11 @@ public class DeviceAuthLookup {
 	public boolean consumeNonceIfUnused(UUID deviceId, String nonce, Instant expiresAt) {
 		return requestNonceRepository.insertIfAbsent(deviceId, nonce, expiresAt) == 1;
 	}
+
+	@Transactional(readOnly = true)
+	public int getCurrentKeyEpoch(UUID coupleId) {
+		return coupleRepository.findById(coupleId)
+				.map(CoupleEntity::getCurrentKeyEpoch)
+				.orElse(1);
+	}
 }

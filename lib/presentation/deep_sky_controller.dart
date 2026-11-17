@@ -303,6 +303,7 @@ class DeepSkyController extends ChangeNotifier {
     try {
       final SyncEventsSnapshot snap = await _repository
           .syncEventsWithOfflineFallback();
+      identity = (await _repository.loadIdentity()) ?? identity;
       events = snap.events;
       isOffline = snap.isOffline;
       if (!isOffline) {
@@ -445,6 +446,7 @@ class DeepSkyController extends ChangeNotifier {
     return InviteLinkCodec.buildInviteUri(
       serverUrl: activeServerUrl,
       inviteToken: invite.inviteToken,
+      sasSecret: invite.sasSecret,
       defaultServerUrl: defaultServerUrl,
     );
   }
@@ -457,7 +459,19 @@ class DeepSkyController extends ChangeNotifier {
     return InviteLinkCodec.formatCompactDisplayLink(
       serverUrl: activeServerUrl,
       inviteToken: invite.inviteToken,
+      sasSecret: invite.sasSecret,
       defaultServerUrl: defaultServerUrl,
+    );
+  }
+
+  String? get activeInviteManualCode {
+    final CreateInviteResponse? invite = activeInvite;
+    if (invite == null) {
+      return null;
+    }
+    return InviteLinkCodec.formatManualPairingCode(
+      inviteToken: invite.inviteToken,
+      sasSecret: invite.sasSecret,
     );
   }
 
@@ -631,7 +645,10 @@ class DeepSkyController extends ChangeNotifier {
       return;
     }
     _suppressedAutoPollToken = null;
-    final result = await _repository.checkInviteAndSas(invite.inviteToken);
+    final result = await _repository.checkInviteAndSas(
+      invite.inviteToken,
+      sasSecret: invite.sasSecret,
+    );
     activeInviteStatus = result.status;
     activeSasCode = result.sasCode;
     if (result.status.accepted && result.sasCode != null) {
@@ -673,7 +690,10 @@ class DeepSkyController extends ChangeNotifier {
     _autoPollInFlight = true;
     final String polledToken = invite.inviteToken;
     try {
-      final result = await _repository.checkInviteAndSas(polledToken);
+      final result = await _repository.checkInviteAndSas(
+        polledToken,
+        sasSecret: invite.sasSecret,
+      );
       if (activeInvite?.inviteToken != polledToken ||
           activeSasCode != null ||
           phase == AppBootPhase.upgradeRequired ||
@@ -747,6 +767,19 @@ class DeepSkyController extends ChangeNotifier {
         DeepSkyStrings(languageCode).customServerInsecureError,
       );
     }
+    final String? sasSecret = parsed.sasSecret;
+    if (sasSecret == null || sasSecret.isEmpty) {
+      throw _CalmUserException(
+        DeepSkyStrings(languageCode).inviteMissingSasSecretError,
+      );
+    }
+    try {
+      DeepSkyCrypto.decodeSasSecretB64(sasSecret);
+    } catch (_) {
+      throw _CalmUserException(
+        DeepSkyStrings(languageCode).inviteMissingSasSecretError,
+      );
+    }
     final String rawServer = (parsed.serverUrl ?? serverUrl).trim();
     final String resolvedServer;
     try {
@@ -767,6 +800,7 @@ class DeepSkyController extends ChangeNotifier {
     pendingJoin = await _repository.acceptInvite(
       serverUrl: resolvedServer,
       inviteToken: parsed.inviteToken,
+      sasSecret: sasSecret,
       deviceLabel: cleanLabel,
     );
     _lastKnownPeerLabel = pendingJoin!.peerLabel;
@@ -1024,7 +1058,7 @@ class DeepSkyController extends ChangeNotifier {
   }
 
   Future<void> revokeDevice(String targetDeviceId) => _runGuarded(() async {
-    await _repository.revokeDevice(targetDeviceId);
+    identity = await _repository.revokeDevice(targetDeviceId);
     devices = await _repository.listDevices();
   });
 
@@ -1202,13 +1236,11 @@ class DeepSkyController extends ChangeNotifier {
   Future<void> setSecureScreen(bool enabled) =>
       _nativeBridge.setSecureScreen(enabled);
 
-  Future<void> copySensitiveText(
-    String text, {
-    int clearAfterSeconds = 45,
-  }) => _nativeBridge.copySensitiveText(
-    text,
-    clearAfterSeconds: clearAfterSeconds,
-  );
+  Future<void> copySensitiveText(String text, {int clearAfterSeconds = 45}) =>
+      _nativeBridge.copySensitiveText(
+        text,
+        clearAfterSeconds: clearAfterSeconds,
+      );
 
   void setAllowCustomUpdateTrustAnchor(bool enabled) {
     if (allowCustomUpdateTrustAnchor == enabled) {

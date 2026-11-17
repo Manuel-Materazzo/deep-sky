@@ -1,6 +1,6 @@
 # Code Audit, 2026-11-16
 
-- **Status:** In progress (G-3a non-protocol fixes `CA-03`..`CA-06`, medium `CA-07`..`CA-12`, low `CA-13`/`CA-14`/`CA-16`/`CA-19`/`CA-21`, and `CA-D3` fixed in code/tests; `CA-01`/`CA-02` await ADR & `PD-11` approval).
+- **Status:** In progress (`CA-01`..`CA-14`, `CA-16`, `CA-17`, `CA-19`..`CA-21`, and `CA-D3` implemented & verified in unit/widget/WebMvc/ArchUnit tests; `CA-15` deferred to `S3-3`/`S3-4`; `CA-18`, `CA-D1`, `CA-D2`, `CA-D4` open; DB integration tests await Docker).
 - **Date:** 2026-11-16 (branch `development`)
 - **Reference IDs:** `S-01`, `S-02`, `S-03`, `S-06`, `S-07`, `P-02`, `P-03`, `AD-01`, `AD-02`, `AD-03`, `G5-01`..`G5-09`, `S1-SEC-01`, `S1-SEC-02`, `G-3a`, `ADR-0004`, `ADR-0005`, `ADR-0006`, `ADR-0008`, `ADR-0010`
 
@@ -35,8 +35,8 @@ This was a manual, read-only review of the implemented code. **No tests, builds 
 
 | ID | Status | Finding |
 | :-- | :-- | :-- |
-| CA-01 | Open (needs ADR + `PD-11`) | SAS verification can be defeated by a malicious server |
-| CA-02 | Open (needs ADR + `PD-11`) | Key epochs derived from the recovery seed cannot revoke a device |
+| CA-01 | Fixed (`ADR-0011`, `deep_sky_crypto_test`, `invite_link_codec_test`, `s3_1_enrollment_flows_test`) | SAS verification can be defeated by a malicious server |
+| CA-02 | Fixed (`ADR-0012`, `V5__epoch_key_rotation.sql`, `deep_sky_crypto_test`, `pairing_and_sync_repository_test`, `deep_sky_e2e_flow_test`, `PairingServiceUnitTest`, `SyncServiceUnitTest`) | Key epochs derived from the recovery seed cannot revoke a device |
 | CA-03 | Fixed (unit/WebMvc verified; DB integration pending Docker) | A device that has just joined has full privileges before it is approved |
 
 ### CA-01: SAS verification can be defeated by a malicious server
@@ -214,12 +214,12 @@ This was a manual, read-only review of the implemented code. **No tests, builds 
 | :-- | :-- | :-- | :-- | :-- |
 | CA-13 | Fixed (`SecurityApprovalWebMvcTest`) | `GlobalExceptionHandler` returns raw `IllegalArgumentException` and `IllegalStateException` messages to clients and has no catch-all handler | `shared/GlobalExceptionHandler.java` | Stable error codes with fixed messages (see `docs/enrollment-state-machine.md`); log details server-side; add a catch-all that returns a generic 500 body |
 | CA-14 | Fixed (`SyncServiceUnitTest`) | `storeEnvelope` does `existsById` then insert, so concurrent retries of the same ID raise a unique-violation 500; an ID that belongs to another couple returns a distinct "conflict" error | `SyncService.java` (`storeEnvelope`) | Insert with `ON CONFLICT DO NOTHING` and re-read; return the same response for foreign IDs as for new ones |
-| CA-15 | Open | Every `EVENT` envelope sends `wakeup.thinking_of_you`, whatever the event type | `SyncService.storeEnvelope` | Derive the key from an explicit, non-secret hint chosen by the client, or send a generic key; revisit when mood and countdown events exist (`P-03`) |
+| CA-15 | Deferred to `S3-3`/`S3-4` (`docs/m3-operative-plan.md`) | Every `EVENT` envelope sends `wakeup.thinking_of_you`, whatever the event type | `SyncService.storeEnvelope` | Derive the key from an explicit, non-secret hint chosen by the client, or send a generic key; revisit when mood and countdown events exist (`P-03`) |
 | CA-16 | Fixed (`SecurityApprovalWebMvcTest`) | `DeviceAuthFilter` reads up to 2 MB of body before authenticating, and answers "unknown or revoked" and "invalid signature" differently | `config/DeviceAuthFilter.java` | Verify headers and timestamp first; use one generic message; lower the pre-auth body cap |
-| CA-17 | Open | Public `POST /pairing/invites` creates a couple and a device with no cleanup of couples that never get a second partner | `PairingService.createInitialInvite`, `PairingCleanupService` | Cleanup of never-paired couples after a retention period; keep the rate limit |
-| CA-18 | Open | Key delivery uses static-static X25519, so there is no forward secrecy for the wrapped seed | `wrapRecoverySeed` / `unwrapRecoverySeed` | Accept and document in `ADR-0005`, or use an ephemeral sender key |
+| CA-17 | Fixed (`PairingCleanupService`, `PairingServiceUnitTest`, `Sp02PairingAndSyncIntegrationTest`) | Public `POST /pairing/invites` creates a couple and a device with no cleanup of couples that never get a second partner | `PairingService.createInitialInvite`, `PairingCleanupService` | Cleanup of never-paired couples after a retention period; keep the rate limit |
+| CA-18 | Open (awaiting decision) | Key delivery uses static-static X25519, so there is no forward secrecy for the wrapped seed | `wrapRecoverySeed` / `unwrapRecoverySeed` | Accept and document in `ADR-0005`, or use an ephemeral sender key |
 | CA-19 | Fixed (`compileDebugKotlin`) | The installer compares the whole signing-certificate history, so a legitimate future certificate rotation would be refused | `ApkInstallerCoordinator.kt` (`signingDigests`) | Accept if the installed certificate is in the archive's history; add a test when rotation is planned (`D-14`) |
-| CA-20 | Open | `assetlinks.json` still holds the all-zero placeholder fingerprint, so Android App Links verification fails (the `/join` page fallback still works) | `deploy/web/.well-known/assetlinks.json` | Replace with the real SHA-256 at `S1-REL-01`; add a CI check that rejects the placeholder |
+| CA-20 | Fixed (`deploy/web/.well-known/assetlinks.json`, `.github/workflows/ci.yml`) | `assetlinks.json` still holds the all-zero placeholder fingerprint, so Android App Links verification fails (the `/join` page fallback still works) | `deploy/web/.well-known/assetlinks.json` | Replace with the real SHA-256 at `S1-REL-01`; add a CI check that rejects the placeholder |
 | CA-21 | Fixed (`compileDebugKotlin`) | The installer copies the APK into the session on the calling thread | `ApkInstallerCoordinator.installVerifiedApk`, `PlatformBridgePlugin` | Confirm the bridge calls it off the main thread; move it to a background executor if not |
 
 No XSS was found on the join page: the fragment is only prefixed to a `deepsky://` link and displayed with `textContent`.

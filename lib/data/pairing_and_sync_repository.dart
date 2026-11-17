@@ -85,6 +85,7 @@ class PairingAndSyncRepository {
         'deviceId': invite.deviceId,
         'inviteToken': invite.inviteToken,
         'expiresAt': invite.expiresAt.toUtc().toIso8601String(),
+        if (invite.sasSecret != null) 'sasSecret': invite.sasSecret,
       }),
     );
   }
@@ -101,6 +102,7 @@ class PairingAndSyncRepository {
         deviceId: json['deviceId'] as String,
         inviteToken: json['inviteToken'] as String,
         expiresAt: DateTime.parse(json['expiresAt'] as String).toUtc(),
+        sasSecret: json['sasSecret'] as String?,
       );
     } catch (_) {
       return null;
@@ -146,11 +148,14 @@ class PairingAndSyncRepository {
     );
 
     final CoupleApiClient api = _clientFactory(serverUrl);
-    final CreateInviteResponse invite = await api.createInitialInvite(
+    final CreateInviteResponse serverInvite = await api.createInitialInvite(
       deviceLabel: deviceLabel,
       deviceAuthPublicKey: authPub,
       deviceKemPublicKey: kemPub,
       recoveryAuthPublicKey: recoveryAuthPub,
+    );
+    final CreateInviteResponse invite = serverInvite.copyWith(
+      sasSecret: _crypto.generateSasSecretB64(),
     );
 
     final LocalDeviceIdentity identity = LocalDeviceIdentity(
@@ -174,24 +179,43 @@ class PairingAndSyncRepository {
   /// Existing active device creates a one-time enrollment invite for a new phone (`F-20`).
   Future<CreateInviteResponse> createEnrollmentInvite() async {
     final LocalDeviceIdentity identity = await _requireRootIdentity();
-    final CreateInviteResponse invite = await _clientFactory(identity.serverUrl)
-        .createEnrollmentInvite(identity: identity);
-    if (!identity.pairingCompleted) {
-      await savePendingInvite(invite);
-    }
+    final CreateInviteResponse serverInvite = await _clientFactory(
+      identity.serverUrl,
+    ).createEnrollmentInvite(identity: identity);
+    final CreateInviteResponse invite = serverInvite.copyWith(
+      sasSecret: _crypto.generateSasSecretB64(),
+    );
+    await savePendingInvite(invite);
     return invite;
   }
 
   /// Partner A (or enrolling device) checks if the invite was accepted and computes SAS.
   Future<({InviteStatusResponse status, String? sasCode})> checkInviteAndSas(
-    String inviteToken,
-  ) async {
+    String inviteToken, {
+    String? sasSecret,
+  }) async {
     final LocalDeviceIdentity identity = await _requireRootIdentity();
     final InviteStatusResponse status = await _clientFactory(identity.serverUrl)
         .getInviteStatus(identity: identity, inviteToken: inviteToken);
     if (!status.accepted || status.acceptedKemPublicKey == null) {
       return (status: status, sasCode: null);
     }
+
+    String? resolvedSas = sasSecret?.trim();
+    if (resolvedSas == null || resolvedSas.isEmpty) {
+      final CreateInviteResponse? pending = await loadPendingInvite();
+      if (pending != null && pending.inviteToken == inviteToken) {
+        resolvedSas = pending.sasSecret;
+      }
+    }
+    if (resolvedSas == null || resolvedSas.isEmpty) {
+      throw StateError(
+        'Missing out-of-band SAS secret for invite $inviteToken.',
+      );
+    }
+    final Uint8List sasSecretBytes = DeepSkyCrypto.decodeSasSecretB64(
+      resolvedSas,
+    );
 
     final SimpleKeyPair myKem = await _crypto.deviceKemKeyPairFromPrivateBytes(
       identity.kemPrivateKey,
@@ -202,6 +226,7 @@ class PairingAndSyncRepository {
     );
     final String sas = await _crypto.computeSasCode(
       sharedSecret: shared,
+      sasSecret: sasSecretBytes,
       coupleId: identity.coupleId,
       localKemPublicKey: identity.kemPublicKey,
       peerKemPublicKey: status.acceptedKemPublicKey!,
@@ -222,13 +247,30 @@ class PairingAndSyncRepository {
       myKemKeyPair: myKem,
       peerKemPublicKey: targetKemPublicKey,
     );
-    final WrappedKeyPackage pkg = await _crypto.wrapRecoverySeed(
-      recoverySeed: identity.recoverySeed!,
-      sharedSecret: shared,
-      coupleId: identity.coupleId,
-      fromDeviceId: identity.deviceId,
-      toDeviceId: targetDeviceId,
-    );
+    final WrappedKeyPackage pkg;
+    if (identity.currentKeyEpoch > 1 || identity.epochSecrets.isNotEmpty) {
+      pkg = await _crypto.wrapKeyBundle(
+        bundle: KeyBundle(
+          recoverySeed: identity.recoverySeed!,
+          currentKeyEpoch: identity.currentKeyEpoch,
+          epochSecrets: identity.epochSecrets,
+        ),
+        sharedSecret: shared,
+        coupleId: identity.coupleId,
+        fromDeviceId: identity.deviceId,
+        toDeviceId: targetDeviceId,
+        keyEpoch: identity.currentKeyEpoch,
+        deliveryKind: 'PAIRING_SEED',
+      );
+    } else {
+      pkg = await _crypto.wrapRecoverySeed(
+        recoverySeed: identity.recoverySeed!,
+        sharedSecret: shared,
+        coupleId: identity.coupleId,
+        fromDeviceId: identity.deviceId,
+        toDeviceId: targetDeviceId,
+      );
+    }
     await _clientFactory(identity.serverUrl)
         .uploadKeyDelivery(identity: identity, package: pkg);
     if (!identity.pairingCompleted) {
@@ -241,8 +283,12 @@ class PairingAndSyncRepository {
   Future<PendingJoinSession> acceptInvite({
     required String serverUrl,
     required String inviteToken,
+    required String sasSecret,
     required String deviceLabel,
   }) async {
+    final Uint8List sasSecretBytes = DeepSkyCrypto.decodeSasSecretB64(
+      sasSecret,
+    );
     final SimpleKeyPair authKp = await _crypto.generateDeviceAuthKeyPair();
     final SimpleKeyPair kemKp = await _crypto.generateDeviceKemKeyPair();
     final Uint8List authSeed = Uint8List.fromList(
@@ -287,6 +333,7 @@ class PairingAndSyncRepository {
     );
     final String sas = await _crypto.computeSasCode(
       sharedSecret: shared,
+      sasSecret: sasSecretBytes,
       coupleId: accepted.coupleId,
       localKemPublicKey: kemPub,
       peerKemPublicKey: accepted.peerKemPublicKey,
@@ -322,7 +369,7 @@ class PairingAndSyncRepository {
       myKemKeyPair: myKem,
       peerKemPublicKey: session.peerKemPublicKey,
     );
-    final Uint8List recoverySeed = await _crypto.unwrapRecoverySeed(
+    final KeyBundle bundle = await _crypto.unwrapKeyBundle(
       package: pkg,
       sharedSecret: shared,
       expectedCoupleId: session.identity.coupleId,
@@ -330,7 +377,9 @@ class PairingAndSyncRepository {
     );
 
     final LocalDeviceIdentity completed = session.identity.copyWith(
-      recoverySeed: recoverySeed,
+      recoverySeed: bundle.recoverySeed,
+      currentKeyEpoch: bundle.currentKeyEpoch,
+      epochSecrets: bundle.epochSecrets,
       pairingCompleted: true,
     );
     await saveIdentity(completed);
@@ -392,7 +441,7 @@ class PairingAndSyncRepository {
       newDeviceKemPublicKey: kemPub,
     );
 
-    final String newDeviceId = await api.completeRecovery(
+    final RecoveryCompleteResponse recoveryRes = await api.completeRecovery(
       challengeId: challenge.challengeId,
       deviceLabel: deviceLabel,
       newDeviceAuthPublicKey: authPub,
@@ -400,16 +449,35 @@ class PairingAndSyncRepository {
       recoverySignatureB64: sig,
     );
 
+    Map<int, Uint8List> epochSecrets = const <int, Uint8List>{};
+    if (recoveryRes.currentKeyEpoch >= 2) {
+      if (recoveryRes.recoveryKeyringNonce == null ||
+          recoveryRes.recoveryKeyringCiphertextWithTag == null) {
+        throw StateError(
+          'Missing recovery keyring for couple at keyEpoch=${recoveryRes.currentKeyEpoch}.',
+        );
+      }
+      epochSecrets = await _crypto.decryptRecoveryKeyring(
+        recoverySeed: recoverySeed,
+        coupleId: challenge.coupleId,
+        currentKeyEpoch: recoveryRes.currentKeyEpoch,
+        nonce: recoveryRes.recoveryKeyringNonce!,
+        ciphertextWithTag: recoveryRes.recoveryKeyringCiphertextWithTag!,
+      );
+    }
+
     final LocalDeviceIdentity recovered = LocalDeviceIdentity(
       serverUrl: serverUrl,
       coupleId: challenge.coupleId,
-      deviceId: newDeviceId,
+      deviceId: recoveryRes.deviceId,
       deviceLabel: deviceLabel,
       authPrivateKeySeed: authSeed,
       authPublicKey: authPub,
       kemPrivateKey: kemPriv,
       kemPublicKey: kemPub,
       recoverySeed: recoverySeed,
+      currentKeyEpoch: recoveryRes.currentKeyEpoch,
+      epochSecrets: epochSecrets,
       recoverySavedConfirmed: true,
       pairingCompleted: true,
       nameSetupCompleted: false,
@@ -419,17 +487,15 @@ class PairingAndSyncRepository {
     return recovered;
   }
 
-  /// Encrypts and uploads an event envelope (`S-01`).
+  /// Encrypts and uploads an event envelope (`S-01`, `CA-02`).
   Future<EncryptedEnvelope> sendEncryptedEvent({
     required String eventType,
     required Map<String, Object?> body,
     EnvelopeChannel channel = EnvelopeChannel.event,
-    int keyEpoch = 1,
+    int? keyEpoch,
   }) async {
-    final LocalDeviceIdentity identity = await _requireRootIdentity();
-    final Uint8List rootKey = await _crypto.deriveCoupleRootKey(
-      identity.recoverySeed!,
-    );
+    LocalDeviceIdentity identity = await _requireRootIdentity();
+    final CoupleApiClient api = _clientFactory(identity.serverUrl);
     final String envelopeId = _crypto.generateUuidV4();
     final DecryptedEnvelopePayload payload = DecryptedEnvelopePayload(
       schemaVersion: 1,
@@ -438,35 +504,62 @@ class PairingAndSyncRepository {
       authorDeviceId: identity.deviceId,
       body: body,
     );
-    final EncryptedEnvelope encrypted = await _crypto.encryptEnvelope(
-      rootKey: rootKey,
-      coupleId: identity.coupleId,
-      envelopeId: envelopeId,
-      senderDeviceId: identity.deviceId,
-      channel: channel,
-      keyEpoch: keyEpoch,
-      payload: payload,
-    );
-    return _clientFactory(identity.serverUrl)
-        .uploadEnvelope(identity: identity, envelope: encrypted);
+
+    Future<EncryptedEnvelope> buildAndUpload(LocalDeviceIdentity id) async {
+      final int effectiveEpoch = keyEpoch ?? id.currentKeyEpoch;
+      final Uint8List rootKey =
+          id.epochSecrets[1] ??
+          await _crypto.deriveCoupleRootKey(id.recoverySeed!);
+      final EncryptedEnvelope encrypted = await _crypto.encryptEnvelope(
+        rootKey: rootKey,
+        epochSecret: effectiveEpoch >= 2
+            ? id.epochSecrets[effectiveEpoch]
+            : null,
+        coupleId: id.coupleId,
+        envelopeId: envelopeId,
+        senderDeviceId: id.deviceId,
+        channel: channel,
+        keyEpoch: effectiveEpoch,
+        payload: payload,
+      );
+      return api.uploadEnvelope(identity: id, envelope: encrypted);
+    }
+
+    try {
+      return await buildAndUpload(identity);
+    } on ApiRequestException catch (ex) {
+      if (!ex.isStaleKeyEpoch || keyEpoch != null) {
+        rethrow;
+      }
+      identity = await _syncEpochFromServer(api, identity);
+      return buildAndUpload(identity);
+    }
   }
 
   /// Downloads and locally decrypts all envelopes after `afterSeq`,
-  /// updating the encrypted local offline cache (`AD-06`, `TC-07`).
+  /// syncing any new epoch rotation bundles first (`CA-02`, `AD-06`, `TC-07`).
   Future<List<DecryptedEventRecord>> fetchAndDecryptEvents({
     int afterSeq = 0,
   }) async {
-    final LocalDeviceIdentity identity = await _requireRootIdentity();
-    final Uint8List rootKey = await _crypto.deriveCoupleRootKey(
+    LocalDeviceIdentity identity = await _requireRootIdentity();
+    final CoupleApiClient api = _clientFactory(identity.serverUrl);
+    final pageRes = await api.listEnvelopesWithEpoch(
+      identity: identity,
+      afterSeq: afterSeq,
+    );
+    if (pageRes.coupleKeyEpoch > identity.currentKeyEpoch) {
+      identity = await _syncEpochFromServer(api, identity);
+    }
+    final Uint8List activeRootKey = await _crypto.deriveCoupleRootKey(
       identity.recoverySeed!,
     );
-    final List<EncryptedEnvelope> raw = await _clientFactory(identity.serverUrl)
-        .listEnvelopes(identity: identity, afterSeq: afterSeq);
+    final Uint8List epoch1RootKey = identity.epochSecrets[1] ?? activeRootKey;
 
     final List<DecryptedEventRecord> decrypted = <DecryptedEventRecord>[];
-    for (final EncryptedEnvelope env in raw) {
+    for (final EncryptedEnvelope env in pageRes.envelopes) {
       final DecryptedEnvelopePayload payload = await _crypto.decryptEnvelope(
-        rootKey: rootKey,
+        rootKey: epoch1RootKey,
+        epochSecrets: identity.epochSecrets,
         expectedCoupleId: identity.coupleId,
         envelope: env,
       );
@@ -475,7 +568,7 @@ class PairingAndSyncRepository {
 
     if (afterSeq == 0) {
       await _localCache.saveEvents(
-        coupleRootKey: rootKey,
+        coupleRootKey: activeRootKey,
         coupleId: identity.coupleId,
         entries: decrypted.map(_toCacheEntry).toList(growable: false),
       );
@@ -488,7 +581,7 @@ class PairingAndSyncRepository {
         byId[rec.envelope.envelopeId] = _toCacheEntry(rec);
       }
       await _localCache.saveEvents(
-        coupleRootKey: rootKey,
+        coupleRootKey: activeRootKey,
         coupleId: identity.coupleId,
         entries: byId.values.toList(growable: false),
       );
@@ -597,10 +690,204 @@ class PairingAndSyncRepository {
     return _clientFactory(identity.serverUrl).listDevices(identity: identity);
   }
 
-  Future<void> revokeDevice(String targetDeviceId) async {
-    final LocalDeviceIdentity identity = await _requireIdentity();
-    await _clientFactory(identity.serverUrl)
-        .revokeDevice(identity: identity, targetDeviceId: targetDeviceId);
+  /// Revokes a device and, when revoking a peer device, atomically rotates
+  /// epoch keys, recovery seed, and recovery keyring (`CA-02`, `ADR-0012`).
+  Future<LocalDeviceIdentity> revokeDevice(String targetDeviceId) async {
+    final LocalDeviceIdentity identity = await _requireRootIdentity();
+    final CoupleApiClient api = _clientFactory(identity.serverUrl);
+    if (targetDeviceId == identity.deviceId) {
+      await api.revokeDevice(
+        identity: identity,
+        targetDeviceId: targetDeviceId,
+      );
+      return identity;
+    }
+
+    final List<DeviceSummary> devices = await api.listDevices(
+      identity: identity,
+    );
+    final List<DeviceSummary> peersToRekey = devices
+        .where(
+          (DeviceSummary d) =>
+              d.revokedAt == null &&
+              d.approved &&
+              d.deviceId != identity.deviceId &&
+              d.deviceId != targetDeviceId,
+        )
+        .toList(growable: false);
+
+    final int nextEpoch = identity.currentKeyEpoch + 1;
+    final Uint8List oldActiveRootKey = await _crypto.deriveCoupleRootKey(
+      identity.recoverySeed!,
+    );
+    final Uint8List epoch1RootKey =
+        identity.epochSecrets[1] ?? oldActiveRootKey;
+    final Uint8List newEpochSecret = _crypto.generateEpochSecret();
+    final Uint8List newRecoverySeed = _crypto.generateRecoverySeed();
+    final Map<int, Uint8List> nextEpochs = Map<int, Uint8List>.unmodifiable(
+      <int, Uint8List>{
+        ...identity.epochSecrets,
+        1: epoch1RootKey,
+        nextEpoch: newEpochSecret,
+      },
+    );
+
+    final SimpleKeyPair newRecoveryAuthKp = await _crypto
+        .deriveRecoveryAuthKeyPair(newRecoverySeed);
+    final Uint8List newRecoveryAuthPub = Uint8List.fromList(
+      (await newRecoveryAuthKp.extractPublicKey()).bytes,
+    );
+    final keyring = await _crypto.encryptRecoveryKeyring(
+      recoverySeed: newRecoverySeed,
+      coupleId: identity.coupleId,
+      currentKeyEpoch: nextEpoch,
+      epochSecrets: nextEpochs,
+    );
+
+    final KeyBundle bundle = KeyBundle(
+      recoverySeed: newRecoverySeed,
+      currentKeyEpoch: nextEpoch,
+      epochSecrets: nextEpochs,
+    );
+    final SimpleKeyPair myKem = await _crypto.deviceKemKeyPairFromPrivateBytes(
+      identity.kemPrivateKey,
+    );
+    final List<Map<String, Object?>> deliveries = <Map<String, Object?>>[];
+    for (final DeviceSummary peer in peersToRekey) {
+      if (peer.kemPublicKey == null || peer.kemPublicKey!.length != 32) {
+        throw StateError(
+          'Missing KEM public key for surviving device ${peer.deviceId}.',
+        );
+      }
+      final Uint8List shared = await _crypto.computeSharedSecret(
+        myKemKeyPair: myKem,
+        peerKemPublicKey: peer.kemPublicKey!,
+      );
+      final WrappedKeyPackage pkg = await _crypto.wrapKeyBundle(
+        bundle: bundle,
+        sharedSecret: shared,
+        coupleId: identity.coupleId,
+        fromDeviceId: identity.deviceId,
+        toDeviceId: peer.deviceId,
+        keyEpoch: nextEpoch,
+        deliveryKind: 'EPOCH_ROTATION',
+      );
+      deliveries.add(<String, Object?>{
+        'toDeviceId': peer.deviceId,
+        'nonceB64': base64UrlEncode(pkg.nonce),
+        'ciphertextB64': base64UrlEncode(pkg.ciphertextWithTag),
+      });
+    }
+
+    await api.revokeDevice(
+      identity: identity,
+      targetDeviceId: targetDeviceId,
+      rotationBody: <String, Object?>{
+        'targetEpoch': nextEpoch,
+        'newRecoveryAuthPublicKeyB64': base64UrlEncode(newRecoveryAuthPub),
+        'recoveryKeyringNonceB64': base64UrlEncode(keyring.nonce),
+        'recoveryKeyringCiphertextB64': base64UrlEncode(
+          keyring.ciphertextWithTag,
+        ),
+        'deliveries': deliveries,
+      },
+    );
+
+    final LocalDeviceIdentity rotated = identity.copyWith(
+      recoverySeed: newRecoverySeed,
+      currentKeyEpoch: nextEpoch,
+      epochSecrets: nextEpochs,
+      recoverySavedConfirmed: false,
+    );
+    await _reencryptLocalCacheBestEffort(
+      oldRootKey: oldActiveRootKey,
+      newIdentity: rotated,
+    );
+    await saveIdentity(rotated);
+    return rotated;
+  }
+
+  Future<LocalDeviceIdentity> _syncEpochFromServer(
+    CoupleApiClient api,
+    LocalDeviceIdentity identity,
+  ) async {
+    final EpochRotationStateResponse rot = await api.fetchMyEpochRotation(
+      identity: identity,
+    );
+    final WrappedKeyPackage? pkg = rot.pendingDelivery;
+    if (pkg == null) {
+      throw StateError(
+        'Missing epoch rotation delivery (server epoch=${rot.currentKeyEpoch}).',
+      );
+    }
+    final List<DeviceSummary> devices = await api.listDevices(
+      identity: identity,
+    );
+    final DeviceSummary sender = devices.firstWhere(
+      (DeviceSummary d) => d.deviceId == pkg.fromDeviceId,
+      orElse: () => throw StateError(
+        'Epoch rotation sender ${pkg.fromDeviceId} not found.',
+      ),
+    );
+    if (sender.kemPublicKey == null || sender.kemPublicKey!.length != 32) {
+      throw StateError(
+        'Missing KEM public key for epoch rotation sender ${pkg.fromDeviceId}.',
+      );
+    }
+
+    final SimpleKeyPair myKem = await _crypto.deviceKemKeyPairFromPrivateBytes(
+      identity.kemPrivateKey,
+    );
+    final Uint8List shared = await _crypto.computeSharedSecret(
+      myKemKeyPair: myKem,
+      peerKemPublicKey: sender.kemPublicKey!,
+    );
+    final KeyBundle bundle = await _crypto.unwrapKeyBundle(
+      package: pkg,
+      sharedSecret: shared,
+      expectedCoupleId: identity.coupleId,
+      expectedToDeviceId: identity.deviceId,
+    );
+
+    final Uint8List oldActiveRootKey = await _crypto.deriveCoupleRootKey(
+      identity.recoverySeed!,
+    );
+    final LocalDeviceIdentity updated = identity.copyWith(
+      recoverySeed: bundle.recoverySeed,
+      currentKeyEpoch: bundle.currentKeyEpoch,
+      epochSecrets: bundle.epochSecrets,
+      recoverySavedConfirmed: false,
+    );
+    await _reencryptLocalCacheBestEffort(
+      oldRootKey: oldActiveRootKey,
+      newIdentity: updated,
+    );
+    await saveIdentity(updated);
+    return updated;
+  }
+
+  Future<void> _reencryptLocalCacheBestEffort({
+    required Uint8List oldRootKey,
+    required LocalDeviceIdentity newIdentity,
+  }) async {
+    try {
+      final List<CachedEventEntry> cached = await _localCache.loadEvents(
+        coupleRootKey: oldRootKey,
+        coupleId: newIdentity.coupleId,
+      );
+      if (cached.isNotEmpty) {
+        final Uint8List newRootKey = await _crypto.deriveCoupleRootKey(
+          newIdentity.recoverySeed!,
+        );
+        await _localCache.saveEvents(
+          coupleRootKey: newRootKey,
+          coupleId: newIdentity.coupleId,
+          entries: cached,
+        );
+      }
+    } catch (_) {
+      // Cache will be rebuilt by fetchAndDecryptEvents if unavailable.
+    }
   }
 
   /// Unlinks ONLY the current device on the server (best-effort) and clears

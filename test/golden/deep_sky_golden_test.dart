@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:deep_sky/data/secure_key_store.dart';
+import 'package:deep_sky/domain/crypto/deep_sky_crypto.dart';
 import 'package:deep_sky/domain/platform_capabilities.dart';
 import 'package:deep_sky/presentation/deep_sky_app.dart';
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
@@ -9,6 +10,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:material_ui/material_ui.dart';
+
+class _GoldenDeepSkyCrypto extends DeepSkyCrypto {
+  @override
+  String generateSasSecretB64() => 'AQIDBAUGBwgJCgsMDQ4PEA';
+}
 
 void main() {
   testWidgets(
@@ -43,6 +49,7 @@ void main() {
 
       final DeepSkyController controller = DeepSkyController(
         keyStore: InMemorySecureKeyStore(),
+        crypto: _GoldenDeepSkyCrypto(),
         httpClient: mockHttp,
         loadAssetString: (_) async => pilotManifestRaw,
         loadCapabilities: () async => const PlatformCapabilities(

@@ -8,5 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 interface KeyDeliveryRepository extends JpaRepository<KeyDeliveryEntity, UUID> {
 	Optional<KeyDeliveryEntity> findFirstByToDeviceIdOrderByCreatedAtDesc(UUID toDeviceId);
 
+	Optional<KeyDeliveryEntity> findFirstByToDeviceIdAndDeliveryKindOrderByKeyEpochDescCreatedAtDesc(
+			UUID toDeviceId, String deliveryKind);
+
 	List<KeyDeliveryEntity> findAllByCoupleIdOrderByCreatedAtAsc(UUID coupleId);
 }

@@ -299,16 +299,43 @@ class Sp02PairingAndSyncIntegrationTest {
 						.content(completeRecoveryBody))
 				.andExpect(status().isConflict());
 
-		// 7. Device revocation (SP02-06): Device A revokes Device B -> Device B gets 401
+		// 7. Device revocation with atomic CA-02 epoch rotation (SP02-06, ADR-0012):
+		// Device A revokes Device B, rotates epoch to 2 and delivers rotated bundle to surviving Device R
+		KeyPair rotatedRecKp = generateEd25519();
+		byte[] rotDeliveryCipher = new byte[48];
+		Arrays.fill(rotDeliveryCipher, (byte) 0x77);
+		String revokeWithRotationBody = objectMapper.writeValueAsString(new EpochRotationBody(
+				2,
+				rawEd25519B64(rotatedRecKp),
+				b64(wrapNonce),
+				b64(rotDeliveryCipher),
+				List.of(new EpochRotationDeliveryBody(devRId, b64(wrapNonce), b64(rotDeliveryCipher)))));
 		mockMvc.perform(signed(
-						post("/api/v1/pairing/devices/" + devBId + "/revoke"),
+						post("/api/v1/pairing/devices/" + devBId + "/revoke")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(revokeWithRotationBody),
 						devAId,
 						devAAuthKp,
-						""))
+						revokeWithRotationBody))
 				.andExpect(status().isNoContent());
 
 		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), devBId, devBAuthKp, ""))
 				.andExpect(status().isUnauthorized());
+
+		// Surviving Device R sees epoch 2, fetches pending EPOCH_ROTATION delivery, and stale epoch-1 uploads get 409
+		mockMvc.perform(signed(get("/api/v1/pairing/epoch-rotations/me"), devRId, devRAuthKp, ""))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.currentKeyEpoch").value(2))
+				.andExpect(jsonPath("$.pendingDelivery.keyEpoch").value(2));
+		String staleEnvBody = objectMapper.writeValueAsString(
+				new UploadEnvBody(UUID.randomUUID().toString(), "EVENT", 1, b64(envNonce), b64(envCipher)));
+		mockMvc.perform(signed(
+						post("/api/v1/sync/envelopes")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(staleEnvBody),
+						devRId, devRAuthKp, staleEnvBody))
+				.andExpect(status().isConflict())
+				.andExpect(jsonPath("$.code").value("STALE_KEY_EPOCH"));
 
 		// 8. Self-revocation only revokes the calling device while keeping the couple & other devices active
 		mockMvc.perform(signed(
@@ -340,9 +367,11 @@ class Sp02PairingAndSyncIntegrationTest {
 				.andExpect(status().isNoContent());
 		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), devAId, devAAuthKp, ""))
 				.andExpect(status().isUnauthorized());
+		String rotatedChallengeReq = objectMapper.writeValueAsString(
+				new ChallengeBody(rawEd25519B64(rotatedRecKp)));
 		mockMvc.perform(post("/api/v1/recovery/challenges")
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(challengeReq))
+						.content(rotatedChallengeReq))
 				.andExpect(status().isConflict());
 	}
 
@@ -530,6 +559,30 @@ class Sp02PairingAndSyncIntegrationTest {
 		// Expired invites purge removes past-expiry invites cleanly.
 		int purgedInvites = cleanupService.purgeExpiredInvites(Instant.now().plusSeconds(3600));
 		assertThat(purgedInvites).isGreaterThanOrEqualTo(1);
+
+		// Never-paired orphan couple cleanup (CA-17):
+		// Create an orphan couple, purge its expired invite, then verify orphan cleanup removes only it
+		// while leaving Couple A (which has envelopes) intact.
+		KeyPair orphanRecKp = generateEd25519();
+		KeyPair orphanDevKp = generateEd25519();
+		MvcResult orphanRes = mockMvc.perform(post("/api/v1/pairing/invites")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(objectMapper.writeValueAsString(new CreateInviteBody(
+								"Orphan Phone",
+								rawEd25519B64(orphanDevKp),
+								b64(randomBytes32()),
+								rawEd25519B64(orphanRecKp)))))
+				.andExpect(status().isCreated())
+				.andReturn();
+		String orphanDevId = objectMapper.readTree(orphanRes.getResponse().getContentAsString())
+				.get("deviceId").asText();
+		cleanupService.purgeExpiredInvites(Instant.now().plusSeconds(3600));
+		int removedOrphans = cleanupService.purgeOrphanNeverPairedCouples(Instant.now().plusSeconds(86400));
+		assertThat(removedOrphans).isGreaterThanOrEqualTo(1);
+		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), orphanDevId, orphanDevKp, ""))
+				.andExpect(status().isUnauthorized());
+		mockMvc.perform(signed(get("/api/v1/sync/envelopes?afterSeq=0"), devAId, devAKp, ""))
+				.andExpect(status().isOk());
 	}
 
 	@Test
@@ -694,4 +747,13 @@ class Sp02PairingAndSyncIntegrationTest {
 			String newDeviceAuthPublicKeyB64,
 			String newDeviceKemPublicKeyB64,
 			String recoverySignatureB64) {}
+
+	private record EpochRotationDeliveryBody(String toDeviceId, String nonceB64, String ciphertextB64) {}
+
+	private record EpochRotationBody(
+			int targetEpoch,
+			String newRecoveryAuthPublicKeyB64,
+			String recoveryKeyringNonceB64,
+			String recoveryKeyringCiphertextB64,
+			List<EpochRotationDeliveryBody> deliveries) {}
 }

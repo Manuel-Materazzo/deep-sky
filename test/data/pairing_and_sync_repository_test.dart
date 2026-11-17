@@ -16,7 +16,13 @@ import 'package:http/testing.dart';
 void main() {
   test('SP-02 full client flow: pairing with SAS, E2EE envelopes, 24-word/QR recovery, enrollment, revocation', () async {
     final _FakeServer fakeServer = _FakeServer();
-    final MockClient mockHttp = MockClient(fakeServer.handle);
+    final List<String> recordedWireTraffic = <String>[];
+    final MockClient mockHttp = MockClient((http.Request req) {
+      recordedWireTraffic.add(
+        '${req.method} ${req.url} ${req.headers} ${req.body}',
+      );
+      return fakeServer.handle(req);
+    });
     final DeepSkyCrypto crypto = DeepSkyCrypto();
 
     PairingAndSyncRepository makeRepo(InMemorySecureKeyStore store) =>
@@ -42,14 +48,23 @@ void main() {
     );
 
     // 2. Device B accepts invite -> SAS matches Device A's SAS
+    expect(init.invite.sasSecret, isNotEmpty);
     final PendingJoinSession joinSession = await repoB.acceptInvite(
       serverUrl: 'https://test.local',
       inviteToken: init.invite.inviteToken,
+      sasSecret: init.invite.sasSecret!,
       deviceLabel: 'Phone B',
     );
-    final status = await repoA.checkInviteAndSas(init.invite.inviteToken);
+    final status = await repoA.checkInviteAndSas(
+      init.invite.inviteToken,
+      sasSecret: init.invite.sasSecret,
+    );
     expect(status.status.accepted, isTrue);
     expect(status.sasCode, equals(joinSession.sasCode));
+    expect(
+      recordedWireTraffic.join('\n').contains(init.invite.sasSecret!),
+      isFalse,
+    );
 
     // 3. Device A delivers wrapped recoverySeed -> Device B completes pairing
     await repoA.confirmSasAndDeliverRootKey(
@@ -109,10 +124,12 @@ void main() {
     final PendingJoinSession b2Join = await repoB2.acceptInvite(
       serverUrl: 'https://test.local',
       inviteToken: enrollInvite.inviteToken,
+      sasSecret: enrollInvite.sasSecret!,
       deviceLabel: 'New Phone B2',
     );
     final enrollStatus = await repoA.checkInviteAndSas(
       enrollInvite.inviteToken,
+      sasSecret: enrollInvite.sasSecret,
     );
     expect(enrollStatus.sasCode, equals(b2Join.sasCode));
     await repoA.confirmSasAndDeliverRootKey(
@@ -124,12 +141,69 @@ void main() {
     );
     expect(idB2.recoverySeed, orderedEquals(init.identity.recoverySeed!));
 
-    // 7. Device revocation: Device A revokes Device B -> Device B is blocked
+    // 7. Device revocation (CA-02): Device A revokes Device B -> epoch rotates to 2,
+    //    surviving Device B2 catches up automatically, reads epoch 1 + epoch 2 history,
+    //    and pre-revocation epoch-1 seed cannot decrypt epoch-2 envelopes or recover.
+    final Uint8List preRevocationSeed = Uint8List.fromList(
+      init.identity.recoverySeed!,
+    );
     await repoA.revokeDevice(idB.deviceId);
     await expectLater(
       repoB.fetchAndDecryptEvents(),
       throwsA(isA<ApiRequestException>()),
     );
+
+    final LocalDeviceIdentity? rotatedA = await repoA.loadIdentity();
+    expect(rotatedA?.currentKeyEpoch, 2);
+    expect(rotatedA?.recoverySavedConfirmed, isFalse);
+    await repoA.confirmRecoveryKeySaved();
+    await repoA.sendEncryptedEvent(
+      eventType: 'thinking_of_you',
+      body: <String, Object?>{'note': 'Post-rotation secret'},
+    );
+
+    final List<DecryptedEventRecord> eventsOnB2 = await repoB2
+        .fetchAndDecryptEvents();
+    expect(eventsOnB2, hasLength(2));
+    expect(eventsOnB2[0].envelope.keyEpoch, 1);
+    expect(eventsOnB2[0].payload.body['title'], 'Anniversario');
+    expect(eventsOnB2[1].envelope.keyEpoch, 2);
+    expect(eventsOnB2[1].payload.body['note'], 'Post-rotation secret');
+
+    // Revoked phone holding pre-revocation epoch-1 keys cannot decrypt epoch-2 envelope
+    final Uint8List staleRootKey = await crypto.deriveCoupleRootKey(
+      preRevocationSeed,
+    );
+    await expectLater(
+      crypto.decryptEnvelope(
+        rootKey: staleRootKey,
+        expectedCoupleId: init.identity.coupleId,
+        envelope: eventsOnB2[1].envelope,
+      ),
+      throwsA(isA<FormatException>()),
+    );
+
+    // Pre-revocation 24 words can no longer recover; rotated 24 words restore epochs 1 + 2
+    await expectLater(
+      makeRepo(InMemorySecureKeyStore()).recoverWithRecoveryKey(
+        serverUrl: 'https://test.local',
+        recoveryInput: RecoveryKeyCodec.toSentence(preRevocationSeed),
+        deviceLabel: 'Stale Thief',
+      ),
+      throwsA(anything),
+    );
+    final PairingAndSyncRepository repoR2 = makeRepo(InMemorySecureKeyStore());
+    await repoR2.recoverWithRecoveryKey(
+      serverUrl: 'https://test.local',
+      recoveryInput: RecoveryKeyCodec.toSentence(rotatedA!.recoverySeed!),
+      deviceLabel: 'Recovered After Rotation',
+    );
+    final List<DecryptedEventRecord> r2Events = await repoR2
+        .fetchAndDecryptEvents();
+    expect(r2Events.map((e) => e.payload.body.values.first), <Object?>[
+      'Anniversario',
+      'Post-rotation secret',
+    ]);
   });
 
   test('offline encrypted local cache stores ciphertext only and survives offline fallback (AD-06, TC-07)', () async {
@@ -233,9 +307,13 @@ void main() {
     final PendingJoinSession joinB = await repoB.acceptInvite(
       serverUrl: 'https://test.local',
       inviteToken: init.invite.inviteToken,
+      sasSecret: init.invite.sasSecret!,
       deviceLabel: 'Phone B',
     );
-    final status = await repoA.checkInviteAndSas(init.invite.inviteToken);
+    final status = await repoA.checkInviteAndSas(
+      init.invite.inviteToken,
+      sasSecret: init.invite.sasSecret,
+    );
     await repoA.confirmSasAndDeliverRootKey(
       targetDeviceId: status.status.acceptedDeviceId!,
       targetKemPublicKey: status.status.acceptedKemPublicKey!,
@@ -387,6 +465,9 @@ class _FakeServer {
       couples[coupleId] = <String, Object?>{
         'coupleId': coupleId,
         'recoveryAuthPublicKeyB64': bodyJson['recoveryAuthPublicKeyB64'],
+        'currentKeyEpoch': 1,
+        'recoveryKeyringNonceB64': null,
+        'recoveryKeyringCiphertextB64': null,
       };
       devices[deviceId] = <String, Object?>{
         'deviceId': deviceId,
@@ -396,6 +477,7 @@ class _FakeServer {
         'kemPublicKeyB64': bodyJson['deviceKemPublicKeyB64'],
         'enrolledVia': 'INVITE_INIT',
         'createdAt': DateTime.now().toUtc().toIso8601String(),
+        'approved': true,
         'revokedAt': null,
       };
       invites[token] = <String, Object?>{
@@ -429,6 +511,7 @@ class _FakeServer {
         'kemPublicKeyB64': bodyJson['deviceKemPublicKeyB64'],
         'enrolledVia': 'INVITE_JOIN',
         'createdAt': DateTime.now().toUtc().toIso8601String(),
+        'approved': false,
         'revokedAt': null,
       };
       inv['acceptedDeviceId'] = newDeviceId;
@@ -495,11 +578,16 @@ class _FakeServer {
         'kemPublicKeyB64': kemPub,
         'enrolledVia': 'RECOVERY_KEY',
         'createdAt': DateTime.now().toUtc().toIso8601String(),
+        'approved': true,
         'revokedAt': null,
       };
+      final Map<String, Object?> couple = couples[coupleId]!;
       return _json(200, <String, Object?>{
         'coupleId': coupleId,
         'deviceId': newDevId,
+        'currentKeyEpoch': couple['currentKeyEpoch'],
+        'recoveryKeyringNonceB64': couple['recoveryKeyringNonceB64'],
+        'recoveryKeyringCiphertextB64': couple['recoveryKeyringCiphertextB64'],
       });
     }
 
@@ -570,18 +658,39 @@ class _FakeServer {
 
     if (method == 'POST' && path == '/api/v1/pairing/key-deliveries') {
       final String toId = bodyJson['toDeviceId']! as String;
+      devices[toId]!['approved'] = true;
       deliveries[toId] = <String, Object?>{
         'coupleId': coupleId,
         'fromDeviceId': deviceId,
         'toDeviceId': toId,
         'nonceB64': bodyJson['nonceB64'],
         'ciphertextB64': bodyJson['ciphertextB64'],
+        'deliveryKind': 'PAIRING_SEED',
+        'keyEpoch':
+            bodyJson['keyEpoch'] ?? couples[coupleId]!['currentKeyEpoch'],
       };
       return _json(201, null);
     }
 
     if (method == 'GET' && path == '/api/v1/pairing/key-deliveries/me') {
       return _json(200, deliveries[deviceId]!);
+    }
+
+    if (method == 'GET' && path == '/api/v1/pairing/devices') {
+      return _json(
+        200,
+        devices.values
+            .where((Map<String, Object?> d) => d['coupleId'] == coupleId)
+            .toList(),
+      );
+    }
+
+    if (method == 'GET' && path == '/api/v1/pairing/epoch-rotations/me') {
+      final Map<String, Object?> couple = couples[coupleId]!;
+      return _json(200, <String, Object?>{
+        'currentKeyEpoch': couple['currentKeyEpoch'],
+        'pendingDelivery': deliveries['epoch:$deviceId'],
+      });
     }
 
     if (method == 'POST' &&
@@ -591,17 +700,50 @@ class _FakeServer {
       devices[targetId]!['revokedAt'] = DateTime.now()
           .toUtc()
           .toIso8601String();
+      if (bodyJson.isNotEmpty) {
+        final Map<String, Object?> couple = couples[coupleId]!;
+        final int targetEpoch = bodyJson['targetEpoch']! as int;
+        couple['currentKeyEpoch'] = targetEpoch;
+        couple['recoveryAuthPublicKeyB64'] =
+            bodyJson['newRecoveryAuthPublicKeyB64'];
+        couple['recoveryKeyringNonceB64'] = bodyJson['recoveryKeyringNonceB64'];
+        couple['recoveryKeyringCiphertextB64'] =
+            bodyJson['recoveryKeyringCiphertextB64'];
+        final List<Object?> items =
+            bodyJson['deliveries'] as List<Object?>? ?? const <Object?>[];
+        for (final Object? rawItem in items) {
+          final Map<String, Object?> item = rawItem! as Map<String, Object?>;
+          final String toId = item['toDeviceId']! as String;
+          deliveries['epoch:$toId'] = <String, Object?>{
+            'coupleId': coupleId,
+            'fromDeviceId': deviceId,
+            'toDeviceId': toId,
+            'nonceB64': item['nonceB64'],
+            'ciphertextB64': item['ciphertextB64'],
+            'deliveryKind': 'EPOCH_ROTATION',
+            'keyEpoch': targetEpoch,
+          };
+        }
+      }
       return _json(204, null);
     }
 
     if (method == 'POST' && path == '/api/v1/sync/envelopes') {
+      final int coupleEpoch = couples[coupleId]!['currentKeyEpoch']! as int;
+      final int envEpoch = bodyJson['keyEpoch']! as int;
+      if (envEpoch < coupleEpoch) {
+        return _json(409, <String, Object?>{
+          'code': 'STALE_KEY_EPOCH',
+          'message': 'Envelope keyEpoch is older than couple active epoch',
+        });
+      }
       final Map<String, Object?> stored = <String, Object?>{
         'envelopeId': bodyJson['envelopeId'],
         'coupleId': coupleId,
         'senderDeviceId': deviceId,
         'seq': _seqCounter++,
         'channel': bodyJson['channel'],
-        'keyEpoch': bodyJson['keyEpoch'],
+        'keyEpoch': envEpoch,
         'nonceB64': bodyJson['nonceB64'],
         'ciphertextB64': bodyJson['ciphertextB64'],
         'createdAtServer': DateTime.now().toUtc().toIso8601String(),
@@ -632,6 +774,7 @@ class _FakeServer {
         'items': page,
         'nextAfterSeq': nextAfterSeq,
         'hasMore': hasMore,
+        'coupleKeyEpoch': couples[coupleId]!['currentKeyEpoch'],
       });
     }
 

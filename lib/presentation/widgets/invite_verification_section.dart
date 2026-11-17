@@ -131,6 +131,11 @@ class _InviteVerificationSectionState extends State<InviteVerificationSection> {
     final String inviteUri = InviteLinkCodec.buildInviteUri(
       serverUrl: widget.serverUrl,
       inviteToken: widget.invite.inviteToken,
+      sasSecret: widget.invite.sasSecret,
+    );
+    final String manualCode = InviteLinkCodec.formatManualPairingCode(
+      inviteToken: widget.invite.inviteToken,
+      sasSecret: widget.invite.sasSecret,
     );
 
     return Column(
@@ -161,7 +166,7 @@ class _InviteVerificationSectionState extends State<InviteVerificationSection> {
         ),
         const SizedBox(height: 8),
         SelectableText(
-          '${widget.tokenLabelPrefix}: ${widget.invite.inviteToken}',
+          '${widget.tokenLabelPrefix}: $manualCode',
           key: widget.tokenKey,
         ),
         const SizedBox(height: 12),
@@ -183,10 +188,8 @@ class _InviteVerificationSectionState extends State<InviteVerificationSection> {
                   child: Text(
                     widget.waitingStatusLabel!,
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontSize: 12,
-                      color: tokens.mutedInk,
-                    ),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(fontSize: 12, color: tokens.mutedInk),
                   ),
                 ),
               ],
@@ -204,9 +207,8 @@ class _InviteVerificationSectionState extends State<InviteVerificationSection> {
               widget.acceptedDeviceLabel!.trim().isNotEmpty) ...<Widget>[
             Text(
               'Dispositivo collegato: ${widget.acceptedDeviceLabel}',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: tokens.mutedInk),
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: tokens.mutedInk),
             ),
             const SizedBox(height: 4),
           ],

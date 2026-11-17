@@ -230,10 +230,9 @@ class NativeBridge {
   /// Enables or disables `FLAG_SECURE` on the host Android window (`CA-10`).
   Future<void> setSecureScreen(bool enabled) async {
     try {
-      await _channel.invokeMethod<void>(
-        'setSecureScreen',
-        <String, Object?>{'enabled': enabled},
-      );
+      await _channel.invokeMethod<void>('setSecureScreen', <String, Object?>{
+        'enabled': enabled,
+      });
     } on MissingPluginException {
       // Desktop / headless widget tests run without Android platform channels.
     } on PlatformException {
@@ -250,10 +249,7 @@ class NativeBridge {
     try {
       final bool? handled = await _channel.invokeMethod<bool>(
         'copySensitiveText',
-        <String, Object?>{
-          'text': text,
-          'clearAfterSeconds': clearAfterSeconds,
-        },
+        <String, Object?>{'text': text, 'clearAfterSeconds': clearAfterSeconds},
       );
       if (handled == true) {
         return;

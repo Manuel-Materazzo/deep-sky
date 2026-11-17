@@ -114,11 +114,15 @@ void main() {
                 'deviceId': 'd-custom',
                 'peerDeviceId': 'd-peer',
                 'peerLabel': 'Peer',
-                'peerAuthPublicKeyB64': base64UrlEncode(List<int>.filled(32, 1)),
+                'peerAuthPublicKeyB64': base64UrlEncode(
+                  List<int>.filled(32, 1),
+                ),
                 'peerKemPublicKeyB64': base64UrlEncode(List<int>.filled(32, 2)),
               }),
               200,
-              headers: const <String, String>{'Content-Type': 'application/json'},
+              headers: const <String, String>{
+                'Content-Type': 'application/json',
+              },
             );
           }
           return http.Response('{}', 404);
@@ -134,7 +138,7 @@ void main() {
       await tester.pumpAndSettle();
 
       controller.handleIncomingDeepLink(
-        'https://deepsky.vectevo.com/join#server=https%3A%2F%2Fcasa.example.test&token=tok-deep-42',
+        'https://deepsky.vectevo.com/join#server=https%3A%2F%2Fcasa.example.test&token=tok-deep-42&sas=AQIDBAUGBwgJCgsMDQ4PEA',
       );
       await tester.pumpAndSettle();
 
@@ -551,6 +555,45 @@ void main() {
         find.byKey(const Key('open-notification-settings-button')),
       );
       expect(openedSettings, isTrue);
+    },
+  );
+
+  testWidgets(
+    'CA-01: invite token without out-of-band SAS secret is rejected before network accept',
+    (WidgetTester tester) async {
+      final List<Uri> acceptRequests = <Uri>[];
+      final MockClient mockHttp = MockClient((http.Request req) async {
+        if (req.url.path == '/api/v1/pairing/invites/accept') {
+          acceptRequests.add(req.url);
+        }
+        return http.Response(
+          jsonEncode(<String, Object?>{
+            'minClientVersionCode': 1,
+            'minProtocolVersion': 1,
+          }),
+          200,
+          headers: const <String, String>{'Content-Type': 'application/json'},
+        );
+      });
+
+      final DeepSkyController controller = DeepSkyController(
+        keyStore: InMemorySecureKeyStore(),
+        httpClient: mockHttp,
+        loadAssetString: (_) async => pilotManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+      );
+      controller.reduceMotion = true;
+      await controller.initialize();
+
+      await controller.acceptInvite(
+        serverUrl: 'https://couple.example.test',
+        inviteToken: 'raw_token_without_sas',
+        deviceLabel: 'Telefono B',
+      );
+      expect(acceptRequests, isEmpty);
+      expect(controller.pendingJoin, isNull);
+      expect(controller.errorNotice, contains('incompleto'));
     },
   );
 }

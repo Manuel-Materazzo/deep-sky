@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:deep_sky/data/pairing_and_sync_repository.dart';
+import 'package:deep_sky/domain/crypto/deep_sky_crypto.dart';
 import 'package:deep_sky/domain/crypto/recovery_key_codec.dart';
 import 'package:deep_sky/domain/pairing/invite_link_codec.dart';
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
@@ -461,6 +462,16 @@ class _OnboardingPageState extends State<OnboardingPage> {
     final parsed = InviteLinkCodec.parseInviteInputChecked(rawInput);
     if (parsed.rejectedServerError != null) {
       c.setErrorNotice(s.customServerInsecureError);
+      return;
+    }
+    if (parsed.sasSecret == null || parsed.sasSecret!.isEmpty) {
+      c.setErrorNotice(s.inviteMissingSasSecretError);
+      return;
+    }
+    try {
+      DeepSkyCrypto.decodeSasSecretB64(parsed.sasSecret!);
+    } catch (_) {
+      c.setErrorNotice(s.inviteMissingSasSecretError);
       return;
     }
     final String rawTargetServer = (parsed.serverUrl ?? _serverController.text)

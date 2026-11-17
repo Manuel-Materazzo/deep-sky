@@ -1,6 +1,6 @@
 # ADR-0005: E2EE Pairing, Recovery, Cross-Device Enrollment, and Revocation (`SP-02`)
 
-- **Status:** Accepted (verified on real Android hardware; `PD-05` non-technical walkthrough and `G-5` independent review remain tracked before real couple data)
+- **Status:** Accepted (verified on real Android hardware; SAS derivation superseded by [ADR-0011](0011-ca01-sas-out-of-band-secret.md); key-epoch & recovery rotation superseded by [ADR-0012](0012-ca02-epoch-key-rotation-on-revocation.md); `PD-05` and `G-5` remain tracked before real couple data)
 - **Date:** 2026-11-15 (baseline 2026-11-14)
 - **Reference IDs:** `S-01`, `S-03`, `S-06`, `F-01`, `F-02`, `AD-01`, `AD-02`, `AD-03`, `SP-02`
 

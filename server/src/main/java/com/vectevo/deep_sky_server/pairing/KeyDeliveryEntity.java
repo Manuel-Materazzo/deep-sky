@@ -40,4 +40,10 @@ public class KeyDeliveryEntity {
 
 	@Column(name = "delivered_at")
 	private Instant deliveredAt;
+
+	@Column(name = "delivery_kind", nullable = false)
+	private String deliveryKind = "PAIRING_SEED";
+
+	@Column(name = "key_epoch", nullable = false)
+	private int keyEpoch = 1;
 }

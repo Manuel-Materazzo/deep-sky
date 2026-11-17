@@ -128,9 +128,8 @@ class DeepSkyStrings {
   String get serverSyncNote => isIt
       ? 'Il link d\'invito e il QR code si sincronizzeranno in automatico.'
       : 'Your invite link and QR code will update automatically.';
-  String get customServerConfirmTitle => isIt
-      ? 'Conferma server personalizzato'
-      : 'Confirm custom server';
+  String get customServerConfirmTitle =>
+      isIt ? 'Conferma server personalizzato' : 'Confirm custom server';
   String customServerConfirmBody(String host, String fullUrl) => isIt
       ? 'Questo invito punta a un server diverso da quello ufficiale Deep Sky:\n\n$host\n($fullUrl)\n\nI metadati di abbinamento e i pacchetti cifrati passeranno da questo server. Vuoi continuare?'
       : 'This invite points to a server other than the official Deep Sky server:\n\n$host\n($fullUrl)\n\nPairing metadata and encrypted envelopes will go through this server. Do you want to continue?';
@@ -453,9 +452,8 @@ class DeepSkyStrings {
       : 'Release source (owner/repo or URL)';
   String get updatePublicKeyFieldLabel =>
       isIt ? 'Chiave pubblica Ed25519 (base64)' : 'Ed25519 public key (base64)';
-  String get advancedUpdateOptionsLabel => isIt
-      ? 'Opzioni avanzate sviluppatore'
-      : 'Advanced developer options';
+  String get advancedUpdateOptionsLabel =>
+      isIt ? 'Opzioni avanzate sviluppatore' : 'Advanced developer options';
   String get allowCustomUpdateAnchorLabel => isIt
       ? 'Consenti sorgente o chiave personalizzata'
       : 'Allow custom update source or trust key';
@@ -472,4 +470,8 @@ class DeepSkyStrings {
   ) => isIt
       ? 'Versione installata: $installedName (codice $installedCode) · Minima server: ${minCode ?? '?'}'
       : 'Installed version: $installedName (code $installedCode) · Server minimum: ${minCode ?? '?'}';
+
+  String get inviteMissingSasSecretError => isIt
+      ? 'Questo codice è incompleto: incolla l\'intero link d\'invito o il codice completo ricevuto dal partner, oppure scansiona il QR.'
+      : 'This invite code is incomplete: paste the full invite link or full pairing code from your partner, or scan the QR.';
 }

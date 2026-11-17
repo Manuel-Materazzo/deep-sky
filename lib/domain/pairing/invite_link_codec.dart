@@ -12,6 +12,7 @@ class InviteLinkCodec {
   static String buildInviteUri({
     required String serverUrl,
     required String inviteToken,
+    String? sasSecret,
     String defaultServerUrl = officialServerUrl,
   }) {
     final String normalizedServer = _trimTrailingSlashes(serverUrl.trim());
@@ -19,45 +20,78 @@ class InviteLinkCodec {
       defaultServerUrl.trim(),
     );
     final String cleanToken = inviteToken.trim();
+    final String? cleanSas = sasSecret?.trim();
 
-    final String fragment =
-        normalizedServer.isEmpty || normalizedServer == normalizedDefault
-        ? 'token=${Uri.encodeQueryComponent(cleanToken)}'
-        : 'server=${Uri.encodeQueryComponent(normalizedServer)}&token=${Uri.encodeQueryComponent(cleanToken)}';
+    final List<String> params = <String>[
+      if (normalizedServer.isNotEmpty && normalizedServer != normalizedDefault)
+        'server=${Uri.encodeQueryComponent(normalizedServer)}',
+      'token=${Uri.encodeQueryComponent(cleanToken)}',
+      if (cleanSas != null && cleanSas.isNotEmpty)
+        'sas=${Uri.encodeQueryComponent(cleanSas)}',
+    ];
 
-    return '$normalizedDefault/join#$fragment';
+    return '$normalizedDefault/join#${params.join('&')}';
   }
 
   /// Formats a compact human-friendly link string for the copy bar without the `https://` prefix.
   static String formatCompactDisplayLink({
     required String serverUrl,
     required String inviteToken,
+    String? sasSecret,
     String defaultServerUrl = officialServerUrl,
   }) {
     final String full = buildInviteUri(
       serverUrl: serverUrl,
       inviteToken: inviteToken,
+      sasSecret: sasSecret,
       defaultServerUrl: defaultServerUrl,
     );
     return full.replaceFirst(RegExp(r'^https?://'), '');
   }
 
-  /// Extracts an invite token and optional server URL from a raw token,
-  /// `https://.../join#...` link, `deepsky://pair?...` link, or `/c/<token>` path.
-  static ({String? serverUrl, String inviteToken}) parseInviteInput(
-    String rawInput,
-  ) {
+  /// Formats the compact manual pairing code `<inviteToken>.<sasSecret>` (`CA-01`).
+  static String formatManualPairingCode({
+    required String inviteToken,
+    String? sasSecret,
+  }) {
+    final String cleanToken = inviteToken.trim();
+    final String? cleanSas = sasSecret?.trim();
+    if (cleanSas != null && cleanSas.isNotEmpty) {
+      return '$cleanToken.$cleanSas';
+    }
+    return cleanToken;
+  }
+
+  /// Extracts an invite token, optional out-of-band `sasSecret`, and optional
+  /// server URL from a raw token, `<token>.<sas>` manual code, `https://.../join#...`,
+  /// `deepsky://pair?...`, or `/c/<token>` path.
+  static ({String? serverUrl, String inviteToken, String? sasSecret})
+  parseInviteInput(String rawInput) {
     final checked = parseInviteInputChecked(rawInput);
-    return (serverUrl: checked.serverUrl, inviteToken: checked.inviteToken);
+    return (
+      serverUrl: checked.serverUrl,
+      inviteToken: checked.inviteToken,
+      sasSecret: checked.sasSecret,
+    );
   }
 
   /// Same as [parseInviteInput], but also reports when a `server=` parameter
   /// or origin was rejected (for example non-local plain `http://` URLs).
-  static ({String? serverUrl, String inviteToken, String? rejectedServerError})
+  static ({
+    String? serverUrl,
+    String inviteToken,
+    String? sasSecret,
+    String? rejectedServerError,
+  })
   parseInviteInputChecked(String rawInput) {
     final String trimmed = rawInput.trim();
     if (trimmed.isEmpty) {
-      return (serverUrl: null, inviteToken: '', rejectedServerError: null);
+      return (
+        serverUrl: null,
+        inviteToken: '',
+        sasSecret: null,
+        rejectedServerError: null,
+      );
     }
 
     final Uri? uri = _tryParseLink(trimmed);
@@ -69,9 +103,11 @@ class InviteLinkCodec {
         final String? fragToken = fragParams['token']?.trim();
         if (fragToken != null && fragToken.isNotEmpty) {
           final serverRes = _cleanOptionalServerChecked(fragParams['server']);
+          final String? fragSas = _cleanOptionalNonEmpty(fragParams['sas']);
           return (
             serverUrl: serverRes.serverUrl,
             inviteToken: fragToken,
+            sasSecret: fragSas,
             rejectedServerError: serverRes.error,
           );
         }
@@ -82,9 +118,13 @@ class InviteLinkCodec {
         final serverRes = _cleanOptionalServerChecked(
           uri.queryParameters['server'],
         );
+        final String? querySas = _cleanOptionalNonEmpty(
+          uri.queryParameters['sas'],
+        );
         return (
           serverUrl: serverRes.serverUrl,
           inviteToken: queryToken,
+          sasSecret: querySas,
           rejectedServerError: serverRes.error,
         );
       }
@@ -97,13 +137,41 @@ class InviteLinkCodec {
           return (
             serverUrl: serverRes.serverUrl,
             inviteToken: pathToken,
+            sasSecret: null,
             rejectedServerError: serverRes.error,
           );
         }
       }
     }
 
-    return (serverUrl: null, inviteToken: trimmed, rejectedServerError: null);
+    if (uri == null && !RegExp(r'\s').hasMatch(trimmed)) {
+      final List<String> dotParts = trimmed.split('.');
+      if (dotParts.length == 2 &&
+          dotParts[0].isNotEmpty &&
+          dotParts[1].isNotEmpty) {
+        return (
+          serverUrl: null,
+          inviteToken: dotParts[0],
+          sasSecret: dotParts[1],
+          rejectedServerError: null,
+        );
+      }
+    }
+
+    return (
+      serverUrl: null,
+      inviteToken: trimmed,
+      sasSecret: null,
+      rejectedServerError: null,
+    );
+  }
+
+  static String? _cleanOptionalNonEmpty(String? raw) {
+    final String? trimmed = raw?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed;
   }
 
   /// Normalizes user-entered server addresses (e.g., `casa.mioserver.it` or `192.168.1.100:8080`).
@@ -147,12 +215,10 @@ class InviteLinkCodec {
     String defaultServerUrl = officialServerUrl,
   }) {
     try {
-      final String normalizedCandidate = normalizeServerUrl(
-        serverUrl,
-      ).toLowerCase();
-      final String normalizedDefault = normalizeServerUrl(
-        defaultServerUrl,
-      ).toLowerCase();
+      final String normalizedCandidate = normalizeServerUrl(serverUrl)
+          .toLowerCase();
+      final String normalizedDefault = normalizeServerUrl(defaultServerUrl)
+          .toLowerCase();
       return normalizedCandidate == normalizedDefault;
     } on FormatException {
       return false;

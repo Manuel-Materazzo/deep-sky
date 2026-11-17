@@ -85,11 +85,12 @@ void main() {
       await tester.pumpAndSettle();
 
       final String firstInviteToken = server.lastInviteToken!;
+      final String firstInviteUri = ctrlA.activeInviteUri!;
 
       await ctrlB.initialize();
       await ctrlB.acceptInvite(
         serverUrl: 'https://couple.example.test',
-        inviteToken: firstInviteToken,
+        inviteToken: firstInviteUri,
         deviceLabel: 'Telefono B',
       );
       final String expectedSas = ctrlB.pendingJoin!.sasCode;
@@ -152,7 +153,7 @@ void main() {
       await ctrlB.initialize();
       await ctrlB.acceptInvite(
         serverUrl: 'https://couple.example.test',
-        inviteToken: server.lastInviteToken!,
+        inviteToken: ctrlA.activeInviteUri!,
         deviceLabel: 'Telefono B',
       );
 
@@ -217,7 +218,7 @@ void main() {
       await ctrlB.initialize();
       await ctrlB.acceptInvite(
         serverUrl: 'https://couple.example.test',
-        inviteToken: server.lastInviteToken!,
+        inviteToken: ctrlA.activeInviteUri!,
         deviceLabel: 'Sofia',
       );
       await ctrlA.pollActiveInvite();
@@ -334,6 +335,7 @@ void main() {
 
       expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
       final String firstToken = server.lastInviteToken!;
+      final String firstInviteUri = ctrlA.activeInviteUri!;
 
       // Before partner joins, automatic poll ticks quietly without errors or busy lock.
       await tester.pump(const Duration(milliseconds: 300));
@@ -347,7 +349,7 @@ void main() {
       await ctrlB.initialize();
       await ctrlB.acceptInvite(
         serverUrl: 'https://couple.example.test',
-        inviteToken: firstToken,
+        inviteToken: firstInviteUri,
         deviceLabel: 'Telefono B',
       );
       final String firstSas = ctrlB.pendingJoin!.sasCode;
@@ -359,7 +361,10 @@ void main() {
       expect(find.bySemanticsLabel('SAS $firstSas'), findsOneWidget);
 
       // Going back suppresses auto-reentry on the dismissed token.
-      await tapVisible(tester, find.byKey(const Key('verification-back-button')));
+      await tapVisible(
+        tester,
+        find.byKey(const Key('verification-back-button')),
+      );
       expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pumpAndSettle();
@@ -384,7 +389,7 @@ void main() {
       await ctrlB2.initialize();
       await ctrlB2.acceptInvite(
         serverUrl: 'https://couple.example.test',
-        inviteToken: secondToken,
+        inviteToken: ctrlA.activeInviteUri!,
         deviceLabel: 'Telefono B2',
       );
 
@@ -434,7 +439,7 @@ void main() {
       await ctrlB.initialize();
       await ctrlB.acceptInvite(
         serverUrl: 'https://couple.example.test',
-        inviteToken: server.lastInviteToken!,
+        inviteToken: ctrlA.activeInviteUri!,
         deviceLabel: 'Telefono B',
       );
 
@@ -443,7 +448,10 @@ void main() {
 
       expect(find.byKey(const Key('code-verification-page')), findsOneWidget);
       await tapVisible(tester, find.byKey(const Key('confirm-sas-button')));
-      await tapVisible(tester, find.byKey(const Key('space-setup-skip-button')));
+      await tapVisible(
+        tester,
+        find.byKey(const Key('space-setup-skip-button')),
+      );
       await tapVisible(
         tester,
         find.byKey(const Key('recovery-saved-checkbox')),
@@ -461,7 +469,7 @@ void main() {
         find.byKey(const Key('create-enrollment-invite-button')),
       );
       expect(find.byKey(const Key('enroll-invite-token')), findsOneWidget);
-      final String enrollToken = server.lastInviteToken!;
+      final String enrollCode = ctrlA.activeInviteManualCode!;
 
       // New phone C accepts the enrollment invite.
       final DeepSkyController ctrlC = DeepSkyController(
@@ -475,7 +483,7 @@ void main() {
       await ctrlC.initialize();
       await ctrlC.acceptInvite(
         serverUrl: 'https://couple.example.test',
-        inviteToken: enrollToken,
+        inviteToken: enrollCode,
         deviceLabel: 'Telefono C',
       );
       final String expectedEnrollSas = ctrlC.pendingJoin!.sasCode;

@@ -19,3 +19,5 @@ Significant architectural choices, version pins, contract changes, and M1 protot
 | [ADR-0008](0008-sp03-apk-self-updater.md) | Signed-Manifest Self-Update & PackageInstaller Flow (`SP-03`) | Accepted | `F-19`, `TC-10`, `SEC-04`, `D-14`, `SP-03` |
 | [ADR-0009](0009-sp05-backend-footprint.md) | Backend Memory Limits and Self-Hosting Footprint (`SP-05`) | Accepted | `TC-02`, `TC-17`, `SRV-02`, `SP-05` |
 | [ADR-0010](0010-g5-09-cryptography-timing-evaluation.md) | Cryptography Library Evaluation: `cryptography` vs `cryptography_flutter` (`G5-09`) | Proposed (`G-5` review) | `G5-09`, `S-01`, `S-06`, `N-06`, `AD-01`, `AD-06` |
+| [ADR-0011](0011-ca01-sas-out-of-band-secret.md) | Out-of-Band Link/QR Secret in Pairing SAS Derivation (`CA-01`) | Accepted (`PD-11`) | `S-01`, `S-06`, `F-01`, `G5-01`, `G5-03`, `S1-SEC-01`, `CA-01` |
+| [ADR-0012](0012-ca02-epoch-key-rotation-on-revocation.md) | Independent Epoch Key Rotation and Recovery Key Rotation on Revocation (`CA-02`) | Accepted (`PD-11`) | `S-01`, `S-06`, `AD-01`, `PD-19`, `G5-05`, `S1-SEC-02`, `CA-02` |

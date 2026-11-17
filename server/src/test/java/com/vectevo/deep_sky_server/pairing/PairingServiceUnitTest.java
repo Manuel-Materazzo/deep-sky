@@ -17,6 +17,7 @@ import java.security.Signature;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -152,5 +153,88 @@ class PairingServiceUnitTest {
 		// Second attempt on same challenge throws conflict
 		assertThatThrownBy(() -> pairingService.completeRecovery(challengeId, "Recovered", b64Key, b64Key, sigB64))
 				.isInstanceOf(IllegalStateException.class);
+	}
+
+	@Test
+	void cleanupPurgesOrphanNeverPairedCouplesWithoutTouchingActiveState() {
+		RequestNonceRepository nonceRepository = mock(RequestNonceRepository.class);
+		PairingCleanupService cleanup = new PairingCleanupService(
+				nonceRepository,
+				challengeRepository,
+				inviteRepository,
+				deviceRepository,
+				coupleRepository,
+				pushService);
+		UUID orphanCoupleId = UUID.randomUUID();
+		Instant cutoff = Instant.now();
+		when(coupleRepository.findOrphanNeverPairedCoupleIds(cutoff)).thenReturn(List.of(orphanCoupleId));
+
+		int removed = cleanup.purgeOrphanNeverPairedCouples(cutoff);
+		assertThat(removed).isEqualTo(1);
+		verify(pushService).unregisterCouple(orphanCoupleId);
+		verify(deviceRepository).deleteByCoupleId(orphanCoupleId);
+		verify(coupleRepository).deleteAllByIdInBatch(List.of(orphanCoupleId));
+	}
+
+	@Test
+	void revokeDeviceWithEpochRotationUpdatesCoupleAndDeliversOnlyToActiveApprovedPeers() {
+		UUID coupleId = UUID.randomUUID();
+		UUID deviceAId = UUID.randomUUID();
+		UUID revokedBId = UUID.randomUUID();
+		UUID survivingCId = UUID.randomUUID();
+
+		CoupleEntity couple = new CoupleEntity();
+		couple.setId(coupleId);
+		couple.setCurrentKeyEpoch(1);
+		couple.setRecoveryAuthPublicKey(new byte[32]);
+
+		DeviceEntity devA = new DeviceEntity();
+		devA.setId(deviceAId);
+		devA.setCoupleId(coupleId);
+		devA.setApprovedAt(Instant.now());
+
+		DeviceEntity devB = new DeviceEntity();
+		devB.setId(revokedBId);
+		devB.setCoupleId(coupleId);
+		devB.setApprovedAt(Instant.now());
+
+		DeviceEntity devC = new DeviceEntity();
+		devC.setId(survivingCId);
+		devC.setCoupleId(coupleId);
+		devC.setApprovedAt(Instant.now());
+
+		when(deviceRepository.findById(revokedBId)).thenReturn(Optional.of(devB));
+		when(deviceRepository.findById(survivingCId)).thenReturn(Optional.of(devC));
+		when(deviceRepository.findAllByCoupleIdOrderByCreatedAtAsc(coupleId)).thenReturn(List.of(devA, devB, devC));
+		when(coupleRepository.findByIdForUpdate(coupleId)).thenReturn(Optional.of(couple));
+		when(coupleRepository.findByRecoveryAuthPublicKey(any())).thenReturn(Optional.empty());
+
+		String b64Key = Base64.getUrlEncoder().encodeToString(new byte[32]);
+		String b64Nonce = Base64.getUrlEncoder().encodeToString(new byte[24]);
+		String b64Cipher = Base64.getUrlEncoder().encodeToString(new byte[40]);
+
+		// Missing surviving peer C must be rejected
+		var missingPeerRotation = new PairingService.EpochRotationRequestData(
+				2, b64Key, b64Nonce, b64Cipher, List.of());
+		assertThatThrownBy(() -> pairingService.revokeDevice(
+				new DevicePrincipal(coupleId, deviceAId, true), revokedBId, missingPeerRotation))
+				.isInstanceOf(IllegalArgumentException.class);
+
+		// Valid rotation targets surviving peer C and bumps epoch to 2
+		var validRotation = new PairingService.EpochRotationRequestData(
+				2,
+				b64Key,
+				b64Nonce,
+				b64Cipher,
+				List.of(new PairingService.EpochKeyDeliveryInput(survivingCId, b64Nonce, b64Cipher)));
+		pairingService.revokeDevice(new DevicePrincipal(coupleId, deviceAId, true), revokedBId, validRotation);
+
+		assertThat(devB.getRevokedAt()).isNotNull();
+		assertThat(couple.getCurrentKeyEpoch()).isEqualTo(2);
+		ArgumentCaptor<KeyDeliveryEntity> kdCaptor = ArgumentCaptor.forClass(KeyDeliveryEntity.class);
+		verify(keyDeliveryRepository).save(kdCaptor.capture());
+		assertThat(kdCaptor.getValue().getToDeviceId()).isEqualTo(survivingCId);
+		assertThat(kdCaptor.getValue().getDeliveryKind()).isEqualTo("EPOCH_ROTATION");
+		assertThat(kdCaptor.getValue().getKeyEpoch()).isEqualTo(2);
 	}
 }
