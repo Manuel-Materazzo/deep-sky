@@ -10,11 +10,14 @@ import static org.mockito.Mockito.when;
 import com.vectevo.deep_sky_server.push.PushService;
 import com.vectevo.deep_sky_server.shared.DevicePrincipal;
 import com.vectevo.deep_sky_server.shared.PartnerWakeupRequestedEvent;
+import com.vectevo.deep_sky_server.shared.RateLimitExceededException;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.Signature;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
@@ -236,5 +239,95 @@ class PairingServiceUnitTest {
 		assertThat(kdCaptor.getValue().getToDeviceId()).isEqualTo(survivingCId);
 		assertThat(kdCaptor.getValue().getDeliveryKind()).isEqualTo("EPOCH_ROTATION");
 		assertThat(kdCaptor.getValue().getKeyEpoch()).isEqualTo(2);
+	}
+
+	@Test
+	void recoveryEndpointsEnforcePerCoupleSlidingWindowRateLimit() {
+		Clock fixedClock = Clock.fixed(Instant.parse("2026-11-17T22:00:00Z"), ZoneOffset.UTC);
+		PairingService limited = new PairingService(
+				coupleRepository,
+				deviceRepository,
+				inviteRepository,
+				keyDeliveryRepository,
+				challengeRepository,
+				pushService,
+				eventPublisher,
+				fixedClock,
+				2,
+				15);
+
+		UUID coupleAId = UUID.randomUUID();
+		CoupleEntity coupleA = new CoupleEntity();
+		coupleA.setId(coupleAId);
+		byte[] keyA = new byte[32];
+		Arrays.fill(keyA, (byte) 0x0A);
+		String b64KeyA = Base64.getUrlEncoder().encodeToString(keyA);
+
+		UUID coupleBId = UUID.randomUUID();
+		CoupleEntity coupleB = new CoupleEntity();
+		coupleB.setId(coupleBId);
+		byte[] keyB = new byte[32];
+		Arrays.fill(keyB, (byte) 0x0B);
+		String b64KeyB = Base64.getUrlEncoder().encodeToString(keyB);
+
+		when(coupleRepository.findByRecoveryAuthPublicKey(keyA)).thenReturn(Optional.of(coupleA));
+		when(coupleRepository.findByRecoveryAuthPublicKey(keyB)).thenReturn(Optional.of(coupleB));
+
+		limited.createRecoveryChallenge(b64KeyA);
+		limited.createRecoveryChallenge(b64KeyA);
+		assertThatThrownBy(() -> limited.createRecoveryChallenge(b64KeyA))
+				.isInstanceOf(RateLimitExceededException.class);
+
+		// Different couple remains unaffected
+		assertThat(limited.createRecoveryChallenge(b64KeyB).coupleId()).isEqualTo(coupleBId);
+
+		// Recovery completion failures are also capped per couple
+		UUID challengeAId = UUID.randomUUID();
+		RecoveryChallengeEntity challengeA = new RecoveryChallengeEntity();
+		challengeA.setId(challengeAId);
+		challengeA.setCoupleId(coupleAId);
+		challengeA.setNonce(new byte[32]);
+		challengeA.setExpiresAt(fixedClock.instant().plusSeconds(300));
+		coupleA.setRecoveryAuthPublicKey(keyA);
+		when(challengeRepository.findByIdForUpdate(challengeAId)).thenReturn(Optional.of(challengeA));
+		when(coupleRepository.findById(coupleAId)).thenReturn(Optional.of(coupleA));
+
+		String badSig = Base64.getUrlEncoder().encodeToString(new byte[64]);
+		assertThatThrownBy(() -> limited.completeRecovery(challengeAId, "Phone", b64KeyA, b64KeyA, badSig))
+				.isInstanceOf(SecurityException.class);
+		assertThatThrownBy(() -> limited.completeRecovery(challengeAId, "Phone", b64KeyA, b64KeyA, badSig))
+				.isInstanceOf(SecurityException.class);
+		assertThatThrownBy(() -> limited.completeRecovery(challengeAId, "Phone", b64KeyA, b64KeyA, badSig))
+				.isInstanceOf(RateLimitExceededException.class);
+	}
+
+	@Test
+	void pd19ServerAcceptsLegacyPayloadsWithoutKeyEpochOrRotationBody() {
+		UUID coupleId = UUID.randomUUID();
+		UUID deviceAId = UUID.randomUUID();
+		UUID deviceBId = UUID.randomUUID();
+
+		CoupleEntity couple = new CoupleEntity();
+		couple.setId(coupleId);
+		couple.setCurrentKeyEpoch(1);
+		DeviceEntity devB = new DeviceEntity();
+		devB.setId(deviceBId);
+		devB.setCoupleId(coupleId);
+
+		when(deviceRepository.findById(deviceBId)).thenReturn(Optional.of(devB));
+		when(coupleRepository.findById(coupleId)).thenReturn(Optional.of(couple));
+
+		String nonce = Base64.getUrlEncoder().encodeToString(new byte[24]);
+		String cipher = Base64.getUrlEncoder().encodeToString(new byte[40]);
+		pairingService.storeKeyDelivery(new DevicePrincipal(coupleId, deviceAId, true), deviceBId, nonce, cipher);
+		ArgumentCaptor<KeyDeliveryEntity> kdCaptor = ArgumentCaptor.forClass(KeyDeliveryEntity.class);
+		verify(keyDeliveryRepository).save(kdCaptor.capture());
+		assertThat(kdCaptor.getValue().getKeyEpoch()).isEqualTo(1);
+		assertThat(kdCaptor.getValue().getDeliveryKind()).isEqualTo("PAIRING_SEED");
+
+		// Legacy empty-body revoke succeeds without touching keyEpoch
+		pairingService.revokeDevice(new DevicePrincipal(coupleId, deviceBId, true), deviceBId);
+		assertThat(devB.getRevokedAt()).isNotNull();
+		assertThat(couple.getCurrentKeyEpoch()).isEqualTo(1);
 	}
 }

@@ -4,8 +4,11 @@ import com.vectevo.deep_sky_server.push.PushService;
 import com.vectevo.deep_sky_server.shared.DevicePrincipal;
 import com.vectevo.deep_sky_server.shared.Ed25519SignatureVerifier;
 import com.vectevo.deep_sky_server.shared.PartnerWakeupRequestedEvent;
+import com.vectevo.deep_sky_server.shared.RateLimitExceededException;
+import com.vectevo.deep_sky_server.shared.SlidingWindowLimiter;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
@@ -15,6 +18,7 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +39,30 @@ public class PairingService {
 	private final RecoveryChallengeRepository challengeRepository;
 	private final PushService pushService;
 	private final ApplicationEventPublisher eventPublisher;
+	private final Clock clock;
+	private final SlidingWindowLimiter coupleRecoveryLimiter;
 	private final SecureRandom secureRandom = new SecureRandom();
+
+	public PairingService(
+			CoupleRepository coupleRepository,
+			DeviceRepository deviceRepository,
+			PairingInviteRepository inviteRepository,
+			KeyDeliveryRepository keyDeliveryRepository,
+			RecoveryChallengeRepository challengeRepository,
+			PushService pushService,
+			ApplicationEventPublisher eventPublisher) {
+		this(
+				coupleRepository,
+				deviceRepository,
+				inviteRepository,
+				keyDeliveryRepository,
+				challengeRepository,
+				pushService,
+				eventPublisher,
+				Clock.systemUTC(),
+				5,
+				15);
+	}
 
 	@Autowired
 	public PairingService(
@@ -45,7 +72,10 @@ public class PairingService {
 			KeyDeliveryRepository keyDeliveryRepository,
 			RecoveryChallengeRepository challengeRepository,
 			PushService pushService,
-			ApplicationEventPublisher eventPublisher) {
+			ApplicationEventPublisher eventPublisher,
+			Clock clock,
+			@Value("${deepsky.rate-limit.couple-recovery-max:5}") int coupleRecoveryMaxAttempts,
+			@Value("${deepsky.rate-limit.couple-recovery-window-minutes:15}") int coupleRecoveryWindowMinutes) {
 		this.coupleRepository = coupleRepository;
 		this.deviceRepository = deviceRepository;
 		this.inviteRepository = inviteRepository;
@@ -53,6 +83,11 @@ public class PairingService {
 		this.challengeRepository = challengeRepository;
 		this.pushService = pushService;
 		this.eventPublisher = eventPublisher;
+		this.clock = clock;
+		this.coupleRecoveryLimiter = new SlidingWindowLimiter(
+				clock,
+				Duration.ofMinutes(Math.max(1, coupleRecoveryWindowMinutes)),
+				coupleRecoveryMaxAttempts);
 	}
 
 	public record CreateInviteResult(UUID coupleId, UUID deviceId, String inviteToken, Instant expiresAt) {}
@@ -572,6 +607,7 @@ public class PairingService {
 	public RecoveryChallengeResult createRecoveryChallenge(String recoveryAuthPublicKeyB64) {
 		byte[] recoveryAuthPub = Ed25519SignatureVerifier.decodeBase64Url(
 				recoveryAuthPublicKeyB64, 32, "recoveryAuthPublicKeyB64");
+		enforceCoupleRecoveryLimit("challenge:" + Ed25519SignatureVerifier.encodeBase64Url(recoveryAuthPub));
 		CoupleEntity couple = coupleRepository.findByRecoveryAuthPublicKey(recoveryAuthPub)
 				.orElseThrow(() -> new NoSuchElementException("Couple not found for recovery key"));
 		if (couple.getUnpairedAt() != null) {
@@ -580,7 +616,7 @@ public class PairingService {
 
 		byte[] nonce = new byte[32];
 		secureRandom.nextBytes(nonce);
-		Instant expiresAt = Instant.now().plus(CHALLENGE_TTL);
+		Instant expiresAt = clock.instant().plus(CHALLENGE_TTL);
 		RecoveryChallengeEntity challenge = new RecoveryChallengeEntity();
 		challenge.setId(UUID.randomUUID());
 		challenge.setCoupleId(couple.getId());
@@ -604,7 +640,7 @@ public class PairingService {
 			String recoverySignatureB64) {
 		RecoveryChallengeEntity challenge = challengeRepository.findByIdForUpdate(challengeId)
 				.orElseThrow(() -> new NoSuchElementException("Recovery challenge not found"));
-		Instant now = Instant.now();
+		Instant now = clock.instant();
 		if (challenge.getUsedAt() != null) {
 			throw new IllegalStateException("Recovery challenge already used");
 		}
@@ -617,6 +653,7 @@ public class PairingService {
 		if (couple.getUnpairedAt() != null) {
 			throw new IllegalStateException("Couple has been unpaired");
 		}
+		enforceCoupleRecoveryLimit("complete:" + couple.getId());
 
 		byte[] authPub = Ed25519SignatureVerifier.decodeBase64Url(
 				newDeviceAuthPublicKeyB64, 32, "newDeviceAuthPublicKeyB64");
@@ -663,6 +700,15 @@ public class PairingService {
 				couple.getRecoveryKeyringCiphertext() == null
 						? null
 						: Ed25519SignatureVerifier.encodeBase64Url(couple.getRecoveryKeyringCiphertext()));
+	}
+
+	private void enforceCoupleRecoveryLimit(String bucketKey) {
+		SlidingWindowLimiter.Decision decision = coupleRecoveryLimiter.tryConsume(bucketKey);
+		if (!decision.allowed()) {
+			throw new RateLimitExceededException(
+					"Too many recovery attempts for this couple; please wait before retrying.",
+					decision.retryAfterSeconds());
+		}
 	}
 
 	@Transactional(readOnly = true)

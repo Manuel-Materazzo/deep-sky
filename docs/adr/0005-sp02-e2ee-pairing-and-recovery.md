@@ -29,7 +29,7 @@ The prototype (branch `proto/sp-02`, since merged into `development`) implements
 - **Verified in M2 on physical hardware (2026-11-15):** Real Android multi-device verification passed for SAS-verified pairing (`F-01`), Recovery Key restoration (`F-20`), cross-device enrollment, E2EE gesture sync (`F-03`), and device revocation (`S-06`).
 - **Independent review (`G-5`) focus areas:**
   1. Entropy, domain separation strings, and AAD canonical encoding in `DeepSkyCrypto` & `RecoveryKeyCodec`.
-  2. Recovery challenge rate-limiting / brute-force resistance: a per-IP `PublicEndpointRateLimiter` (HTTP 429) now covers the recovery route; review its limits and per-couple lockout behavior.
+  2. Recovery challenge rate-limiting / brute-force resistance: both per-IP (`PublicEndpointRateLimiter`) and per-couple/per-key (`PairingService` sliding-window `HTTP 429` throttle) limits are active on `/api/v1/recovery/**` (`S1-SEC-01`, `G5-03`).
   3. Key-rotation (`keyEpoch >= 2`) & recovery rotation strategy (implemented via [ADR-0012](0012-ca02-epoch-key-rotation-on-revocation.md) and Flyway `V5`; verify end-to-end on real Android hardware before `G-3a`).
   4. Pure-Dart cryptography (`package:cryptography` without `cryptography_flutter`): evaluate constant-time guarantees and timing side-channel risk on Android devices for `X25519`, `Ed25519`, and `XChaCha20-Poly1305`, deciding whether to add `cryptography_flutter` before `G-5` (`G5-09`).
   5. Android Auto Backup & offline cache exclusion (`AD-06`): verify `AndroidManifest.xml` (`allowBackup="false"`, `dataExtractionRules`, `fullBackupContent`) prevents Google Auto Backup, `adb backup`, or device-to-device transfer from extracting key material, `SharedPreferences`, or local cache (`G5-06`).

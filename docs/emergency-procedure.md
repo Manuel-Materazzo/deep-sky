@@ -34,7 +34,8 @@ Documento operativo sintetico in linguaggio chiaro per gestire incidenti reali d
 
 ## 3. Smarrimento o sostituzione di UN telefono (l'altro partner ha ancora l'app)
 1. Sul telefono rimasto attivo, apri **Dispositivi**:
-   - Tocca **Revoca** accanto al telefono smarrito/vecchio e conferma. Il dispositivo revocato viene bloccato subito lato server (`HTTP 401`, token push rimosso).
+   - Tocca **Revoca** accanto al telefono smarrito/vecchio e conferma. Il dispositivo revocato viene bloccato subito lato server (`HTTP 401`, token push rimosso) e la revoca **ruota automaticamente le chiavi di epoca e la Recovery Key** (`CA-02`, `ADR-0012`) così che il telefono revocato non possa leggere né recuperare nulla di futuro.
+   - Salva e conferma subito le **nuove 24 parole** mostrate dall'app (`RecoveryKeySetupPage`); le 24 parole precedenti non sono più valide per il recupero.
    - Avvia un nuovo **arruolamento dispositivo** per generare QR / link temporaneo.
 2. Sul nuovo telefono:
    - Installa l'APK ufficiale -> scegli **Unisciti** -> inquadra il QR o incolla il link.

@@ -52,8 +52,8 @@ Proposta (PD-17). Prima di inserire dati intimi veri, con PD-05 come criterio gu
   cifratura, archivio chiavi, recupero), con rapporto scritto (S1-SEC-01)
 - [x] La partner ha completato l’enrollment **senza aiuto** su un telefono suo (S1-QA-02)
 - [x] Politica di compatibilità attiva (PD-19) e aggiornamento in app provato
-- [ ] Procedura di emergenza scritta: cosa fare se il server non risponde o se un aggiornamento ha
-  un difetto
+- [x] Procedura di emergenza scritta: cosa fare se il server non risponde, se un aggiornamento ha
+  un difetto o se si revoca/perde un telefono (`docs/emergency-procedure.md`)
 - [x] **Rotazione delle chiavi dopo la revoca** di un dispositivo implementata e provata (S1-SEC-02,
   ADR-0005, G5-05)
 - [x] Footprint del server misurato sulla VM ARM di produzione (S1-INF-02, ADR-0009)
@@ -260,12 +260,11 @@ codice
 - [x] Rapporto scritto con rilievi e decisioni; i rilievi alti (`CA-01`, `CA-02`, `CA-03`) sono
   implementati e verificati nei test unitari/widget/WebMvc *(restano integration test DB su Docker e
   verifica finale sul campo per G-3a)*
-- [ ] Blocco del recupero per tentativi ripetuti: oltre al limite per IP già presente (`PublicEndpointRateLimiter`), valutato un
-  blocco **per coppia** (ADR-0005, G5-03) e annotata la decisione
+- [x] Blocco del recupero per tentativi ripetuti: oltre al limite per IP già presente (`PublicEndpointRateLimiter`), implementato limite sliding-window **per coppia/chiave** (`HTTP 429`, `PairingService` su `/api/v1/recovery/challenges` e `/complete`, documentato in `ADR-0005` `G5-03`)
 - [x] Verificato che la rotazione chiavi dopo revoca (S1-SEC-02, CA-02, ADR-0012) sia coperta dal rapporto
-- [ ] Elenco dei punti da passare alla revisione indipendente (G-5), incluso G5-09 (libreria
+- [x] Elenco dei punti da passare alla revisione indipendente (G-5), incluso G5-09 (libreria
   crittografica Dart pura contro backend nativo): **rinviato di proposito** a G-5, la dipendenza non
-  cambia in M3 (ADR-0010)
+  cambia in M3 (`ADR-0010`, `docs/architecture.md` cap. 5 `G5-01`..`G5-09`, `docs/code-audit-2026-11-16.md` §8)
 
 **S1-SEC-02 · Rotazione delle chiavi dopo la revoca** — Ruolo: architetto, sviluppatore client e
 backend, revisore di sicurezza · Rif.: S-06, AD-01, G5-05, ADR-0005, ADR-0012 · Dipende da: S1-APP-05
@@ -298,7 +297,7 @@ e preserva le buste storiche nel `recovery_keyring`.
 
 - [x] Tutti i flussi su **due telefoni reali**
 - [x] Interruzioni a metà: rete assente, app chiusa, rotazione, tasto indietro, scadenza dell’invito
-- [ ] Compatibilità tra versione *n − 1* e *n* (PD-19)
+- [x] Compatibilità tra versione *n − 1* e *n* (PD-19) *(coperta da test automatici client `test/data/pd19_compatibility_test.dart` e server `PairingServiceUnitTest` per identity legacy, key delivery v1/v2 e buste epoch 1/2)*
 
 **S1-QA-02 · Prova con la partner** — Ruolo: promotore con QA
 
