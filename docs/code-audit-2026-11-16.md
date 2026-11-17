@@ -1,6 +1,6 @@
 # Code Audit, 2026-11-16
 
-- **Status:** In progress (`CA-01`..`CA-14`, `CA-16`, `CA-17`, `CA-19`..`CA-21`, and `CA-D3` implemented & verified in unit/widget/WebMvc/ArchUnit tests; `CA-15` deferred to `S3-3`/`S3-4`; `CA-18` accepted & documented in `ADR-0005`; `CA-D1`, `CA-D2`, `CA-D4` open; DB integration tests await Docker).
+- **Status:** In progress (`CA-01`..`CA-14`, `CA-16`, `CA-17`, `CA-19`..`CA-21`, `CA-D1`, and `CA-D3` implemented/fixed & verified in unit/widget/WebMvc/ArchUnit tests; `CA-15` deferred to `S3-3`/`S3-4`; `CA-18` accepted & documented in `ADR-0005`; `CA-D2`, `CA-D4` open; DB integration tests await Docker).
 - **Date:** 2026-11-16 (branch `development`)
 - **Reference IDs:** `S-01`, `S-02`, `S-03`, `S-06`, `S-07`, `P-02`, `P-03`, `AD-01`, `AD-02`, `AD-03`, `G5-01`..`G5-09`, `S1-SEC-01`, `S1-SEC-02`, `G-3a`, `ADR-0004`, `ADR-0005`, `ADR-0006`, `ADR-0008`, `ADR-0010`
 
@@ -228,7 +228,7 @@ No XSS was found on the join page: the fragment is only prefixed to a `deepsky:/
 
 | ID | Status | Mismatch | Fix |
 | :-- | :-- | :-- | :-- |
-| CA-D1 | Open | `ADR-0005` lists channels `timeline`, `capsules`, `profile`, `scene`, `countdowns`; the code has only `events` and `snapshots` (`EnvelopeChannel`, `deriveChannelKey`) | Correct `ADR-0005` through a new ADR, or implement the channels when the features land |
+| CA-D1 | Fixed (`ADR-0005`) | `ADR-0005` lists channels `timeline`, `capsules`, `profile`, `scene`, `countdowns`; the code has only `events` and `snapshots` (`EnvelopeChannel`, `deriveChannelKey`) | Correct `ADR-0005` through a new ADR, or implement the channels when the features land |
 | CA-D2 | Open | `ADR-0004` and `architecture.md` `AD-03` describe snapshots with optimistic `version` / `schemaVersion` control; the server stores `SNAPSHOT` as an ordinary envelope with no version check | Implement it, or mark it as planned in both documents |
 | CA-D3 | Fixed (`docs/m3-operative-plan.md` `S1-INF-01`) | `m3-operative-plan.md` `S1-INF-01` says the invite secret does not pass through the server | Fix after `CA-05` is resolved |
 | CA-D4 | Open | `ADR-0004` rule list now matches `ArchitectureTest`, but sibling-module isolation is still not enforced by any rule | Add the rule or keep the ADR note |

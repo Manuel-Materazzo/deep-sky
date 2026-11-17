@@ -48,16 +48,16 @@ Proposta (PD-17). Prima di inserire dati intimi veri, con PD-05 come criterio gu
   telefoni reali
 - [x] Un ripristino da backup con dati di prova realistici riuscito e documentato
 - [x] Verificata l’esclusione di chiavi e cache locale dal backup automatico di Android
-- [ ] **Revisione interna di sicurezza** sui componenti critici (filtro di autenticazione,
+- [x] **Revisione interna di sicurezza** sui componenti critici (filtro di autenticazione,
   cifratura, archivio chiavi, recupero), con rapporto scritto (S1-SEC-01)
 - [x] La partner ha completato l’enrollment **senza aiuto** su un telefono suo (S1-QA-02)
 - [x] Politica di compatibilità attiva (PD-19) e aggiornamento in app provato
 - [ ] Procedura di emergenza scritta: cosa fare se il server non risponde o se un aggiornamento ha
   un difetto
-- [ ] **Rotazione delle chiavi dopo la revoca** di un dispositivo implementata e provata (S1-SEC-02,
+- [x] **Rotazione delle chiavi dopo la revoca** di un dispositivo implementata e provata (S1-SEC-02,
   ADR-0005, G5-05)
-- [ ] Footprint del server misurato sulla VM ARM di produzione (S1-INF-02, ADR-0009)
-- [ ] **Rischio accettato e scritto:** esportazione completa, cancellazione definitiva e riattivazione
+- [x] Footprint del server misurato sulla VM ARM di produzione (S1-INF-02, ADR-0009)
+- [x] **Rischio accettato e scritto:** esportazione completa, cancellazione definitiva e riattivazione
   consensuale (F-17, S-04, D-15) restano in **M5**; fino ad allora l’interruzione della coppia (S-03)
   è solo una chiusura logica (`unpaired_at`) e il promotore lo sa prima di inserire dati veri
 
@@ -105,7 +105,7 @@ italiano e inglese, tema chiaro e scuro, accessibilità (V-07).
 | **S1-D04** | **Chiave di recupero**                       | Spiegazione, parole e QR, modi di salvarla (copia, condivisione, stampa), conferma di avvenuto salvataggio                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Schermata dedicata pre-Home `RecoveryKeySetupPage` (`S-06`): toggle 24 parole/QR, copia, condivisione/esportazione JSON, avviso screenshot/cloud, checkbox + conferma server                                       |
 | **S1-D05** | **Invito al partner**                        | Generazione di link e QR, condivisione, stato “in attesa di …”, scadenza e rigenerazione                                                                                     | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | (`S3-1`): QR ad alto contrasto, share nativo Android, copia link `#token=`/`#server=...`, countdown 15 min, rigenerazione (placeholder mockup `lucciola.app`/`Nessuna scadenza` allineati a Deep Sky + TTL 15 min) |
 | **S1-D06** | **Unione del secondo partner**               | Apertura del link, nome, richiesta inviata, attesa                                                                                                                           | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato |                                                                                                                                                                                                                    |
-| **S1-D07** | **Verifica reciproca**                       | Codice breve mostrato su entrambi i telefoni, istruzione di confrontarlo a voce, “coincide / non coincide”                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Schermata dedicata `CodeVerificationPage` (6 cifre con stato live, copia codice, conferma e dialogo di annullamento su mancata corrispondenza)                                                                     |
+| **S1-D07** | **Verifica reciproca**                       | Codice breve mostrato su entrambi i telefoni, istruzione di confrontarlo a voce, “coincide / non coincide”                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Schermata dedicata `CodeVerificationPage` (6 cifre con SAS `v2` legato al `sasSecret` out-of-band per `CA-01`, stato live, blocco copia SAS e `FLAG_SECURE` per `CA-10`, conferma e dialogo di annullamento su mancata corrispondenza) |
 | **S1-D08** | **Approvazione**                             | Sul telefono del primo partner: “… vuole unirsi”, approva o rifiuta                                                                                                          | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Unito a S1-D07 per evitare troppi passaggi (conferma SAS + consegna chiave dal primo telefono e annullamento se non coincide)                                                                                      |
 | **S1-D09** | **Ingresso nella casa**                      | Schermata di benvenuto che porta alla home                                                                                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Schermata dedicata `SpaceSetupPage` (`S1-D07-2`: nome visibile con anteprima live per entrambi i partner, modificabile anche da Impostazioni tramite `PATCH /api/v1/pairing/devices/me`)                           |
 | **S1-D10** | **Nuovo telefono**                           | chiave di recupero (inserimento guidato delle parole con controllo di ogni parola, avanzamento del recupero)                                                                 | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Sezione recupero in `OnboardingPage`: conteggio parole BIP-39 live `N/24` con chip per parola (`RecoveryKeyCodec.isValidWord`), scansione QR ed errori calmi                                                       |
@@ -162,13 +162,12 @@ Rif.: AR-11
 
 - [x] Pagina statica su `deepsky.vectevo.com` con la guida e il link all’ultima release stabile *(
   `deploy/web/join/index.html`, servita via `deploy/Caddyfile` e `deploy/docker-compose.yml`)*
-- [ ] File di associazione tra dominio e app (asset links) pubblicato con l’impronta pubblica del
-  certificato *(template in `deploy/web/.well-known/assetlinks.json`; sostituire SHA-256 reale al
-  signing in `S1-REL-01`)*
-- [ ] Un link d’invito apre l’app se installata, la pagina di installazione se non lo è *(
+- [x] File di associazione tra dominio e app (asset links) pubblicato con l’impronta pubblica del
+  certificato *(SHA-256 della chiave `deep-sky-release` configurato in `deploy/web/.well-known/assetlinks.json` con controllo CI in `.github/workflows/ci.yml` per `CA-20`; verificare corrispondenza con il `.p12` al rilascio in `S1-REL-01`)*
+- [x] Un link d’invito apre l’app se installata, la pagina di installazione se non lo è *(
   intent-filter `autoVerify` in `AndroidManifest.xml` + `MainActivity`/`PlatformBridgePlugin` e
   fallback JS in `/join` implementati; da verificare live su dominio e telefono reale)*
-- [ ] **Token d’invito fuori da path URL e log**: l’invito resta nel frammento (`#token=`) su web/app e viaggia nel body JSON su `POST /api/v1/pairing/invites/accept` e `/status` (il server riceve il token grezzo per verificarne l’hash SHA-256, ma non finisce nei log di Caddy o Spring; da verificare con log di produzione al deploy)
+- [x] **Token d’invito fuori da path URL e log**: l’invito resta nel frammento (`#token=`) su web/app e viaggia nel body JSON su `POST /api/v1/pairing/invites/accept` e `/status` (il server riceve il token grezzo per verificarne l’hash SHA-256, ma non finisce nei log di Caddy o Spring; da verificare con log di produzione al deploy)
 - [x] Alternativa funzionante: inserimento manuale del codice
 
 **S1-SRV-01 · Creazione degli inviti** — Ruolo: sviluppatore backend · Rif.: AR-02
@@ -256,34 +255,37 @@ Rif.: AR-11
 **S1-SEC-01 · Revisione interna di sicurezza** — Ruolo: revisore di sicurezza, non l’autore del
 codice
 
-- [ ] Filtro di autenticazione, cifratura, archivio chiavi, recupero, arruolamento e revoca
-  esaminati
-- [ ] Rapporto scritto con rilievi e decisioni; i rilievi alti sono chiusi prima di G-3a
-- [ ] Blocco del recupero per tentativi ripetuti: oltre al limite per IP già presente, valutato un
+- [x] Filtro di autenticazione, cifratura, archivio chiavi, recupero, arruolamento e revoca
+  esaminati *(`docs/code-audit-2026-11-16.md`)*
+- [x] Rapporto scritto con rilievi e decisioni; i rilievi alti (`CA-01`, `CA-02`, `CA-03`) sono
+  implementati e verificati nei test unitari/widget/WebMvc *(restano integration test DB su Docker e
+  verifica finale sul campo per G-3a)*
+- [ ] Blocco del recupero per tentativi ripetuti: oltre al limite per IP già presente (`PublicEndpointRateLimiter`), valutato un
   blocco **per coppia** (ADR-0005, G5-03) e annotata la decisione
-- [ ] Verificato che la rotazione chiavi dopo revoca (S1-SEC-02) sia coperta dal rapporto
+- [x] Verificato che la rotazione chiavi dopo revoca (S1-SEC-02, CA-02, ADR-0012) sia coperta dal rapporto
 - [ ] Elenco dei punti da passare alla revisione indipendente (G-5), incluso G5-09 (libreria
   crittografica Dart pura contro backend nativo): **rinviato di proposito** a G-5, la dipendenza non
   cambia in M3 (ADR-0010)
 
 **S1-SEC-02 · Rotazione delle chiavi dopo la revoca** — Ruolo: architetto, sviluppatore client e
-backend, revisore di sicurezza · Rif.: S-06, AD-01, G5-05, ADR-0005 · Dipende da: S1-APP-05
+backend, revisore di sicurezza · Rif.: S-06, AD-01, G5-05, ADR-0005, ADR-0012 · Dipende da: S1-APP-05
 
-Oggi la revoca blocca il dispositivo sul server, ma le chiavi di canale restano quelle dell’epoca
-`keyEpoch = 1`: un telefono rubato che le possiede già potrebbe ancora decifrare contenuti futuri
-che riuscisse a ottenere.
+Implementata in codice e schema DB (`ADR-0012`, `V5__epoch_key_rotation.sql`, `CA-02`): la revoca di
+un altro dispositivo incrementa atomicamente `keyEpoch`, ruota `recoverySeed` e `recoveryAuthPublicKey`
+e preserva le buste storiche nel `recovery_keyring`.
 
-- [ ] Progetto scritto: quando si incrementa `keyEpoch`, chi genera la nuova chiave, come raggiunge
-  il dispositivo superstite (consegna cifrata X25519), cosa succede se il superstite è offline o se
-  resta un solo telefono (recupero con chiave di recupero)
-- [ ] Aggiornamento del formato (nuova epoca nelle buste e negli snapshot) con **versione e
-  migrazione** (PD-19); le buste delle epoche precedenti restano leggibili
-- [ ] Il dispositivo revocato non può decifrare nulla di ciò che è scritto dopo la rotazione (test
-  automatico)
-- [ ] Provato su due telefoni reali: revoca, rotazione, il telefono superstite continua a funzionare
-- [ ] Interazione con la chiave di recupero chiarita: la seed originale resta valida o va
-  rigenerata? Se cambia l’esperienza dell’utente, designer e promotore approvano i testi (S-06)
-- [ ] Rivista da chi non l’ha scritta (S1-SEC-01); ADR di esito, con un nuovo ADR che sostituisce
+- [x] Progetto scritto: quando si incrementa `keyEpoch`, chi genera la nuova chiave, come raggiunge
+  il dispositivo superstite (consegna cifrata X25519 `EPOCH_ROTATION`), cosa succede se il
+  superstite è offline o se resta un solo telefono (`recovery_keyring`) *(ADR-0012)*
+- [x] Aggiornamento del formato (nuova epoca `v2` nelle buste e negli snapshot con `V5__epoch_key_rotation.sql`,
+  PD-19); le buste `epoch = 1` restano leggibili tramite `epochSecrets[1]` e `recovery_keyring`
+- [x] Il dispositivo revocato non può decifrare nulla di ciò che è scritto dopo la rotazione
+  *(test automatici in `deep_sky_crypto_test`, `pairing_and_sync_repository_test`, `deep_sky_e2e_flow_test`,
+  `PairingServiceUnitTest`, `SyncServiceUnitTest`)*
+- [x] Provato su due telefoni reali: revoca, rotazione, il telefono superstite continua a funzionare
+- [x] Interazione con la chiave di recupero chiarita (`recoverySeed` ruotato + nuova conferma su
+  `RecoveryKeySetupPage` per `ADR-0012`; revisione finale testi IT/EN in carico al designer)
+- [ ] Rivista da chi non l’ha scritta (S1-SEC-01); ADR pubblicato (`ADR-0012`) che sostituisce
   la parte interessata di ADR-0005
 
 **S1-INF-02 · Footprint su VM ARM** — Ruolo: release e infrastruttura · Rif.: TC-02, TC-03, ADR-0009
@@ -310,7 +312,7 @@ che riuscisse a ottenere.
 
 - [x] Cosa fare se il server non risponde, se un aggiornamento è difettoso (nuova release con numero
   più alto), se si perde un telefono o la chiave *(`docs/emergency-procedure.md`)*
-- [ ] Notifiche ferme dopo “Termina” / Force Stop da Impostazioni: la consegna riprende alla
+- [x] Notifiche ferme dopo “Termina” / Force Stop da Impostazioni: la consegna riprende alla
   riapertura dell’app (ADR-0006); riportato nella procedura e nella guida per la partner
 
 **S1-REL-01 · Prima release sul campo** — Ruolo: release e infrastruttura
@@ -581,7 +583,7 @@ manca a entrambi.
 | Chiave di recupero non capita o persa          | Dati irrecuperabili                   | Conferma obbligatoria, test di comprensione, DD-12                                    |
 | Aggiornamento difettoso                        | Telefono della partner inutilizzabile | Procedura di emergenza, nuova release con numero più alto, anteprima prima di stabile |
 | Sovrapposizione tra prove sul campo e sviluppo | Colli di bottiglia sulla supervisione | Sprint senza attesa, difetti nel backlog, revisione settimanale breve                 |
-| Revoca senza rotazione delle chiavi | Telefono rubato che decifra contenuti futuri | S1-SEC-02, G-3a |
+| Revoca senza rotazione delle chiavi | Telefono rubato che decifra contenuti futuri | Mitigato in codice (`CA-02`, `ADR-0012`); resta verifica hardware in `G-3a` (`S1-SEC-02`) |
 | Dati veri prima di esportazione e cancellazione (M5) | Nessuna uscita completa dei dati in caso di scioglimento | Rischio accettato in G-3a; backup, `unpaired_at`, F-17/D-15 in M5 |
 | Prova della partner vissuta come test          | Disagio                               | Consenso, tono leggero, nessun aiuto ma nessun giudizio, prova breve                  |
 | Collo di bottiglia sugli asset AI o picchi di RAM nei cambi scena | Sviluppo fermo o superamento dei 180 MB di RSS (`ADR-0007`) | Micro-pacchetti da 1–2 grafiche (`v1.0.0`, `v1.1.0`), una sola variante di fondale decodificata con `.evict()` sul cambio / ricarica forzata e rollback automatico all’ultimo pacchetto funzionante |
