@@ -473,9 +473,10 @@ class Sp02PairingAndSyncIntegrationTest {
 		int purged = cleanupService.purgeExpiredNonces(Instant.now());
 		assertThat(purged).isGreaterThanOrEqualTo(1);
 
-		// 5. Public recovery rate-limit returns 429 after 10 calls from the same IP (ignores forged X-Forwarded-For)
-		String challengePayload = objectMapper.writeValueAsString(new ChallengeBody(rawEd25519B64(recAKp)));
-		for (int i = 0; i < 10; i++) {
+		// 5. Public recovery rate-limit enforces both per-couple (5/15m) and per-IP (10/60s, ignoring X-Forwarded-For)
+		String challengePayloadA = objectMapper.writeValueAsString(new ChallengeBody(rawEd25519B64(recAKp)));
+		String challengePayloadB = objectMapper.writeValueAsString(new ChallengeBody(rawEd25519B64(recBKp)));
+		for (int i = 0; i < 5; i++) {
 			mockMvc.perform(post("/api/v1/recovery/challenges")
 							.with(r -> {
 								r.setRemoteAddr("203.0.113.77");
@@ -483,9 +484,33 @@ class Sp02PairingAndSyncIntegrationTest {
 							})
 							.header("X-Forwarded-For", "192.0.2." + (10 + i))
 							.contentType(MediaType.APPLICATION_JSON)
-							.content(challengePayload))
+							.content(challengePayloadA))
 					.andExpect(status().isOk());
 		}
+		// 6th call for Couple A fails with 429 even from a different IP (per-couple throttle)
+		mockMvc.perform(post("/api/v1/recovery/challenges")
+						.with(r -> {
+							r.setRemoteAddr("198.51.100.88");
+							return r;
+						})
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(challengePayloadA))
+				.andExpect(status().isTooManyRequests())
+				.andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+
+		// Remaining 5 calls for Couple B succeed from 203.0.113.77, exhausting the 10/window IP quota
+		for (int i = 5; i < 10; i++) {
+			mockMvc.perform(post("/api/v1/recovery/challenges")
+							.with(r -> {
+								r.setRemoteAddr("203.0.113.77");
+								return r;
+							})
+							.header("X-Forwarded-For", "192.0.2." + (10 + i))
+							.contentType(MediaType.APPLICATION_JSON)
+							.content(challengePayloadB))
+					.andExpect(status().isOk());
+		}
+		// 11th call from 203.0.113.77 is rejected by the per-IP limiter despite forged X-Forwarded-For
 		mockMvc.perform(post("/api/v1/recovery/challenges")
 						.with(r -> {
 							r.setRemoteAddr("203.0.113.77");
@@ -493,7 +518,7 @@ class Sp02PairingAndSyncIntegrationTest {
 						})
 						.header("X-Forwarded-For", "192.0.2.99")
 						.contentType(MediaType.APPLICATION_JSON)
-						.content(challengePayload))
+						.content(challengePayloadB))
 				.andExpect(status().isTooManyRequests())
 				.andExpect(jsonPath("$.code").value("RATE_LIMITED"));
 
