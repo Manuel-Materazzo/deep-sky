@@ -229,4 +229,38 @@ void main() {
       );
     },
   );
+
+  test(
+    'setSecureScreen and copySensitiveText forward arguments to native bridge',
+    () async {
+      final List<MethodCall> calls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(channel, (MethodCall call) async {
+            calls.add(call);
+            if (call.method == 'copySensitiveText') {
+              return true;
+            }
+            return null;
+          });
+
+      await bridge.setSecureScreen(true);
+      await bridge.copySensitiveText(
+        'twenty four secret words',
+        clearAfterSeconds: 30,
+      );
+      await bridge.setSecureScreen(false);
+
+      expect(calls.map((MethodCall c) => c.method).toList(), <String>[
+        'setSecureScreen',
+        'copySensitiveText',
+        'setSecureScreen',
+      ]);
+      expect(calls[0].arguments, <String, Object?>{'enabled': true});
+      expect(calls[1].arguments, <String, Object?>{
+        'text': 'twenty four secret words',
+        'clearAfterSeconds': 30,
+      });
+      expect(calls[2].arguments, <String, Object?>{'enabled': false});
+    },
+  );
 }

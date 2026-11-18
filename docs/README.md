@@ -27,3 +27,4 @@ This directory contains the project documentation, operational plans, technical 
 | [Backup and Restore Procedure](backup-restore.md) | `INF-05`, `TC-11` | OCI VM backup scope and restore verification checklist |
 | [AI Asset Tools Terms & License Evaluation](ai-asset-tools-terms.md) | `CNT-02`, `D-11`, `A-08` | Candidate AI image generation tools, ToS comparison, and asset license recommendation |
 | [Dependency Licenses Inventory](dependencies-licenses.md) | `SEC-02` | Snapshot of client and server dependency licenses verified for MIT compatibility |
+| [Code Audit 2026-11-16](code-audit-2026-11-16.md) | `S1-SEC-01`, `S1-SEC-02`, `G-3a`, `G5-xx` | Open findings (`CA-xx`) from a manual code review, with fixes and acceptance criteria, and the areas still to be reviewed |

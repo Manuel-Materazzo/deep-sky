@@ -121,6 +121,7 @@ void main() {
         );
 
         const String coupleId = '11111111-1111-4111-8111-111111111111';
+        final Uint8List sasSecret = crypto.generateSasSecret();
         final Uint8List secretA = await crypto.computeSharedSecret(
           myKemKeyPair: kemA,
           peerKemPublicKey: pubB,
@@ -133,12 +134,14 @@ void main() {
 
         final String sasA = await crypto.computeSasCode(
           sharedSecret: secretA,
+          sasSecret: sasSecret,
           coupleId: coupleId,
           localKemPublicKey: pubA,
           peerKemPublicKey: pubB,
         );
         final String sasB = await crypto.computeSasCode(
           sharedSecret: secretB,
+          sasSecret: sasSecret,
           coupleId: coupleId,
           localKemPublicKey: pubB,
           peerKemPublicKey: pubA,
@@ -152,11 +155,22 @@ void main() {
         );
         final String sasMitm = await crypto.computeSasCode(
           sharedSecret: mitmSecret,
+          sasSecret: sasSecret,
           coupleId: coupleId,
           localKemPublicKey: pubA,
           peerKemPublicKey: pubMitm,
         );
         expect(sasMitm, isNot(equals(sasA)));
+
+        // CA-01: server/MITM substituting an unauthenticated sasSecret produces a different SAS
+        final String sasWrongOob = await crypto.computeSasCode(
+          sharedSecret: secretA,
+          sasSecret: crypto.generateSasSecret(),
+          coupleId: coupleId,
+          localKemPublicKey: pubA,
+          peerKemPublicKey: pubB,
+        );
+        expect(sasWrongOob, isNot(equals(sasA)));
       },
     );
 
@@ -314,6 +328,128 @@ void main() {
         ),
         throwsA(isA<SecretBoxAuthenticationError>()),
       );
+    });
+
+    test('CA-02 epoch keys isolate epoch >= 2 from epoch 1, wrapKeyBundle & recoveryKeyring round-trip', () async {
+      const String coupleId = '11111111-1111-4111-8111-111111111111';
+      final Uint8List seed1 = crypto.generateRecoverySeed();
+      final Uint8List root1 = await crypto.deriveCoupleRootKey(seed1);
+      final Uint8List epochSecret2 = crypto.generateEpochSecret();
+      final Uint8List seed2 = crypto.generateRecoverySeed();
+
+      final EncryptedEnvelope envEpoch1 = await crypto.encryptEnvelope(
+        rootKey: root1,
+        coupleId: coupleId,
+        envelopeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
+        senderDeviceId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+        channel: EnvelopeChannel.event,
+        keyEpoch: 1,
+        payload: DecryptedEnvelopePayload(
+          schemaVersion: 1,
+          eventType: 'thinking_of_you',
+          createdAtClient: DateTime.utc(2026, 11, 16),
+          authorDeviceId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+          body: const <String, Object?>{'msg': 'before revocation'},
+        ),
+      );
+      final EncryptedEnvelope envEpoch2 = await crypto.encryptEnvelope(
+        epochSecret: epochSecret2,
+        coupleId: coupleId,
+        envelopeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa2',
+        senderDeviceId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+        channel: EnvelopeChannel.event,
+        keyEpoch: 2,
+        payload: DecryptedEnvelopePayload(
+          schemaVersion: 1,
+          eventType: 'thinking_of_you',
+          createdAtClient: DateTime.utc(2026, 11, 16),
+          authorDeviceId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1',
+          body: const <String, Object?>{'msg': 'after revocation'},
+        ),
+      );
+
+      // Epoch-1 only fails on epoch-2 envelope
+      await expectLater(
+        crypto.decryptEnvelope(
+          rootKey: root1,
+          expectedCoupleId: coupleId,
+          envelope: envEpoch2,
+        ),
+        throwsFormatException,
+      );
+
+      // Keyring + KeyBundle wrap/unwrap preserve epochs 1 + 2
+      final Map<int, Uint8List> epochs = <int, Uint8List>{
+        1: root1,
+        2: epochSecret2,
+      };
+      final keyring = await crypto.encryptRecoveryKeyring(
+        recoverySeed: seed2,
+        coupleId: coupleId,
+        currentKeyEpoch: 2,
+        epochSecrets: epochs,
+      );
+      final Map<int, Uint8List> restoredEpochs = await crypto
+          .decryptRecoveryKeyring(
+            recoverySeed: seed2,
+            coupleId: coupleId,
+            currentKeyEpoch: 2,
+            nonce: keyring.nonce,
+            ciphertextWithTag: keyring.ciphertextWithTag,
+          );
+      expect(restoredEpochs[1], orderedEquals(root1));
+      expect(restoredEpochs[2], orderedEquals(epochSecret2));
+
+      final DecryptedEnvelopePayload p1 = await crypto.decryptEnvelope(
+        rootKey: await crypto.deriveCoupleRootKey(seed2),
+        epochSecrets: restoredEpochs,
+        expectedCoupleId: coupleId,
+        envelope: envEpoch1,
+      );
+      final DecryptedEnvelopePayload p2 = await crypto.decryptEnvelope(
+        rootKey: await crypto.deriveCoupleRootKey(seed2),
+        epochSecrets: restoredEpochs,
+        expectedCoupleId: coupleId,
+        envelope: envEpoch2,
+      );
+      expect(p1.body['msg'], 'before revocation');
+      expect(p2.body['msg'], 'after revocation');
+
+      final SimpleKeyPair kemA = await crypto.generateDeviceKemKeyPair();
+      final SimpleKeyPair kemB = await crypto.generateDeviceKemKeyPair();
+      final Uint8List sharedA = await crypto.computeSharedSecret(
+        myKemKeyPair: kemA,
+        peerKemPublicKey: Uint8List.fromList(
+          (await kemB.extractPublicKey()).bytes,
+        ),
+      );
+      final Uint8List sharedB = await crypto.computeSharedSecret(
+        myKemKeyPair: kemB,
+        peerKemPublicKey: Uint8List.fromList(
+          (await kemA.extractPublicKey()).bytes,
+        ),
+      );
+      final WrappedKeyPackage pkg = await crypto.wrapKeyBundle(
+        bundle: KeyBundle(
+          recoverySeed: seed2,
+          currentKeyEpoch: 2,
+          epochSecrets: epochs,
+        ),
+        sharedSecret: sharedA,
+        coupleId: coupleId,
+        fromDeviceId: 'devA',
+        toDeviceId: 'devB',
+        deliveryKind: 'EPOCH_ROTATION',
+      );
+      final KeyBundle unwrapped = await crypto.unwrapKeyBundle(
+        package: pkg,
+        sharedSecret: sharedB,
+        expectedCoupleId: coupleId,
+        expectedToDeviceId: 'devB',
+      );
+      expect(unwrapped.recoverySeed, orderedEquals(seed2));
+      expect(unwrapped.currentKeyEpoch, 2);
+      expect(unwrapped.epochSecrets[2], orderedEquals(epochSecret2));
     });
   });
 }

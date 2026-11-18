@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:deep_sky/data/apk_update_service.dart';
 import 'package:deep_sky/data/couple_api_client.dart';
@@ -32,7 +33,7 @@ class DeepSkyController extends ChangeNotifier {
     SecureKeyStore? keyStore,
     DeepSkyCrypto? crypto,
     http.Client? httpClient,
-    this._nativeBridge = const NativeBridge(),
+    NativeBridge? nativeBridge,
     this._manifestParser = const SceneManifestParser(),
     this._sceneStateMapper = const SceneStateMapper(),
     Future<String> Function(String path)? loadAssetString,
@@ -43,10 +44,14 @@ class DeepSkyController extends ChangeNotifier {
     this.defaultUpdateSource = 'Manuel-Materazzo/deep-sky',
     this.trustedUpdatePublicKeyB64 =
         'MCowBQYDK2VwAyEAHDblTk6u65qfWgGXDDULNtIsR9JrXd1u4Pc6y7+Z+WM=',
-  }) : _httpClient = httpClient ?? http.Client(),
+    this.inviteAutoPollInterval = const Duration(seconds: 3),
+  }) : _hasCustomNativeBridge = nativeBridge != null,
+       _nativeBridge = nativeBridge ?? const NativeBridge(),
+       _httpClient = httpClient ?? http.Client(),
        _loadAssetString = loadAssetString ?? rootBundle.loadString,
        _loadCapabilitiesOverride = loadCapabilities {
     final SecureKeyStore resolvedKeyStore = keyStore ?? FlutterSecureKeyStore();
+    _keyStore = resolvedKeyStore;
     _crypto = crypto ?? DeepSkyCrypto();
     _repository = PairingAndSyncRepository(
       keyStore: resolvedKeyStore,
@@ -59,12 +64,19 @@ class DeepSkyController extends ChangeNotifier {
     );
   }
 
+  static const String _updateChannelStorageKey = 'deepsky.update.channel';
+  static const String _pushPromptDismissedStorageKey =
+      'deepsky.push.prompt_dismissed';
   static const String pilotManifestPath =
       'content/packs/ds2_pilot/manifest.json';
   static const String pilotAssetRoot = 'content/packs/ds2_pilot';
 
   final http.Client _httpClient;
+  final bool _hasCustomNativeBridge;
   final NativeBridge _nativeBridge;
+
+  bool get _canQueryNativeChannels =>
+      _hasCustomNativeBridge || (!kIsWeb && Platform.isAndroid);
   final SceneManifestParser _manifestParser;
   final SceneStateMapper _sceneStateMapper;
   final Future<String> Function(String path) _loadAssetString;
@@ -74,7 +86,9 @@ class DeepSkyController extends ChangeNotifier {
   final String defaultServerUrl;
   final String defaultUpdateSource;
   final String trustedUpdatePublicKeyB64;
+  final Duration inviteAutoPollInterval;
 
+  late final SecureKeyStore _keyStore;
   late final DeepSkyCrypto _crypto;
   late final PairingAndSyncRepository _repository;
   late final ApkUpdateService _updateService;
@@ -100,6 +114,8 @@ class DeepSkyController extends ChangeNotifier {
   String? activeSasCode;
   PendingJoinSession? pendingJoin;
   String? _lastKnownPeerLabel;
+  bool _autoPollInFlight = false;
+  String? _suppressedAutoPollToken;
   List<CachedEventEntry> events = const <CachedEventEntry>[];
   List<DeviceSummary> devices = const <DeviceSummary>[];
   SceneManifest? sceneManifest;
@@ -117,8 +133,16 @@ class DeepSkyController extends ChangeNotifier {
   );
   CompatibilityPolicy? compatibilityPolicy;
   NativePushStatus? pushStatus;
+  bool pushSupportedOnServer = false;
+  bool pushPromptDismissed = false;
+  String? pushFeedback;
+  bool pushFeedbackIsError = false;
+  UpdateChannel updateChannel = UpdateChannel.stable;
+  bool allowCustomUpdateTrustAnchor = false;
   ApkReleaseManifest? availableUpdate;
+  double? updateDownloadProgress;
   String? updateFeedback;
+  String? pendingDeepLinkInvite;
 
   CoupleApiClient _createApiClient(String baseUrl) {
     return CoupleApiClient(
@@ -139,6 +163,8 @@ class DeepSkyController extends ChangeNotifier {
 
     await _loadPilotScene();
     await _loadCapabilities();
+    await _loadClientPreferences();
+    _nativeBridge.setDeepLinkListener(handleIncomingDeepLink);
     identity = await _repository.loadIdentity();
     activeServerUrl = identity?.serverUrl ?? defaultServerUrl;
     if (identity != null && identity!.deviceLabel.trim().isNotEmpty) {
@@ -153,6 +179,13 @@ class DeepSkyController extends ChangeNotifier {
       await _checkCompatibility(activeServerUrl);
       if (phase != AppBootPhase.upgradeRequired) {
         phase = AppBootPhase.unpaired;
+        if (_canQueryNativeChannels) {
+          final String? launchDeepLink = await _nativeBridge
+              .consumePendingDeepLink();
+          if (launchDeepLink != null) {
+            handleIncomingDeepLink(launchDeepLink);
+          }
+        }
       }
       notifyListeners();
       return;
@@ -188,6 +221,42 @@ class DeepSkyController extends ChangeNotifier {
     } catch (_) {
       sceneManifest = null;
     }
+  }
+
+  Future<void> _loadClientPreferences() async {
+    try {
+      updateChannel = UpdateChannel.fromStorage(
+        await _keyStore.read(_updateChannelStorageKey),
+      );
+      pushPromptDismissed =
+          (await _keyStore.read(_pushPromptDismissedStorageKey)) == 'true';
+    } catch (_) {
+      // Fall back to safe defaults if preferences are unavailable.
+    }
+  }
+
+  /// Parses an incoming invite deep-link (`https://.../join#...` or `deepsky://pair#...`)
+  /// and pre-fills the Join flow without switching [activeServerUrl] until confirmed (`S1-APP-01`, `CA-06`).
+  void handleIncomingDeepLink(String rawUri) {
+    final parsed = InviteLinkCodec.parseInviteInputChecked(rawUri);
+    if (parsed.inviteToken.isEmpty) {
+      return;
+    }
+    if (phase == AppBootPhase.paired || phase == AppBootPhase.waiting) {
+      return;
+    }
+    pendingDeepLinkInvite = rawUri.trim();
+    onboardingTabIndex = 1;
+    errorNotice = parsed.rejectedServerError != null
+        ? DeepSkyStrings(languageCode).customServerInsecureError
+        : null;
+    notifyListeners();
+  }
+
+  String? takePendingDeepLinkInvite() {
+    final String? value = pendingDeepLinkInvite;
+    pendingDeepLinkInvite = null;
+    return value;
   }
 
   Future<void> _loadCapabilities() async {
@@ -234,6 +303,7 @@ class DeepSkyController extends ChangeNotifier {
     try {
       final SyncEventsSnapshot snap = await _repository
           .syncEventsWithOfflineFallback();
+      identity = (await _repository.loadIdentity()) ?? identity;
       events = snap.events;
       isOffline = snap.isOffline;
       if (!isOffline) {
@@ -287,15 +357,25 @@ class DeepSkyController extends ChangeNotifier {
       return;
     }
     try {
-      pushStatus = await _nativeBridge.getPushStatus();
-      final String? rotated = await _nativeBridge.consumePendingPushToken();
-      if (rotated != null && rotated.isNotEmpty) {
-        await PushApiClient(apiClient: _createApiClient(current.serverUrl))
-            .registerToken(identity: current, fcmToken: rotated);
-        pushStatus = await _nativeBridge.getPushStatus();
-      }
+      final RuntimeFirebaseConfig cfg = await PushApiClient(
+        apiClient: _createApiClient(current.serverUrl),
+      ).fetchRuntimeConfig();
+      pushSupportedOnServer = cfg.enabled && cfg.isComplete;
     } catch (_) {
-      // Desktop / test mode or offline: skip quietly.
+      pushSupportedOnServer = false;
+    }
+    if (_canQueryNativeChannels) {
+      try {
+        pushStatus = await _nativeBridge.getPushStatus();
+        final String? rotated = await _nativeBridge.consumePendingPushToken();
+        if (rotated != null && rotated.isNotEmpty) {
+          await PushApiClient(apiClient: _createApiClient(current.serverUrl))
+              .registerToken(identity: current, fcmToken: rotated);
+          pushStatus = await _nativeBridge.getPushStatus();
+        }
+      } catch (_) {
+        // Desktop / test mode or offline: skip quietly.
+      }
     }
   }
 
@@ -320,6 +400,24 @@ class DeepSkyController extends ChangeNotifier {
       identity != null &&
       !identity!.nameSetupCompleted &&
       !isDeviceRevoked;
+
+  bool get needsRecoveryKeySetup =>
+      phase == AppBootPhase.paired &&
+      identity != null &&
+      identity!.nameSetupCompleted &&
+      !identity!.recoverySavedConfirmed &&
+      identity!.recoverySeed != null &&
+      !isDeviceRevoked;
+
+  bool get shouldShowPushOptInPrompt =>
+      phase == AppBootPhase.paired &&
+      !needsSpaceSetup &&
+      !needsRecoveryKeySetup &&
+      !isOffline &&
+      !isDeviceRevoked &&
+      !pushPromptDismissed &&
+      pushSupportedOnServer &&
+      (pushStatus == null || !pushStatus!.firebaseInitialized);
 
   String? get partnerDisplayLabel {
     final String? myId = identity?.deviceId;
@@ -348,6 +446,7 @@ class DeepSkyController extends ChangeNotifier {
     return InviteLinkCodec.buildInviteUri(
       serverUrl: activeServerUrl,
       inviteToken: invite.inviteToken,
+      sasSecret: invite.sasSecret,
       defaultServerUrl: defaultServerUrl,
     );
   }
@@ -360,7 +459,19 @@ class DeepSkyController extends ChangeNotifier {
     return InviteLinkCodec.formatCompactDisplayLink(
       serverUrl: activeServerUrl,
       inviteToken: invite.inviteToken,
+      sasSecret: invite.sasSecret,
       defaultServerUrl: defaultServerUrl,
+    );
+  }
+
+  String? get activeInviteManualCode {
+    final CreateInviteResponse? invite = activeInvite;
+    if (invite == null) {
+      return null;
+    }
+    return InviteLinkCodec.formatManualPairingCode(
+      inviteToken: invite.inviteToken,
+      sasSecret: invite.sasSecret,
     );
   }
 
@@ -406,6 +517,7 @@ class DeepSkyController extends ChangeNotifier {
     activeServerUrl = cleanServer;
     this.deviceLabel = cleanLabel;
     identity = result.identity;
+    _suppressedAutoPollToken = null;
     activeInvite = result.invite;
     activeInviteStatus = null;
     activeSasCode = null;
@@ -413,6 +525,7 @@ class DeepSkyController extends ChangeNotifier {
   });
 
   Future<void> regenerateInitialInvite() => _runGuarded(() async {
+    _suppressedAutoPollToken = null;
     final LocalDeviceIdentity? current = identity;
     if (current != null &&
         current.hasCoupleRoot &&
@@ -452,6 +565,7 @@ class DeepSkyController extends ChangeNotifier {
       await _repository.clearIdentity();
       await _repository.clearPendingInvite();
       identity = null;
+      _suppressedAutoPollToken = null;
       activeInvite = null;
       activeInviteStatus = null;
       activeSasCode = null;
@@ -472,6 +586,7 @@ class DeepSkyController extends ChangeNotifier {
       deviceLabel: cleanLabel,
     );
     identity = result.identity;
+    _suppressedAutoPollToken = null;
     activeInvite = result.invite;
     activeInviteStatus = null;
     activeSasCode = null;
@@ -494,7 +609,7 @@ class DeepSkyController extends ChangeNotifier {
       subject: 'Deep Sky',
     );
     if (!launched) {
-      await Clipboard.setData(ClipboardData(text: uri));
+      await copySensitiveText(uri);
       statusNotice = copiedFallbackNotice;
       notifyListeners();
     }
@@ -529,7 +644,11 @@ class DeepSkyController extends ChangeNotifier {
     if (invite == null) {
       return;
     }
-    final result = await _repository.checkInviteAndSas(invite.inviteToken);
+    _suppressedAutoPollToken = null;
+    final result = await _repository.checkInviteAndSas(
+      invite.inviteToken,
+      sasSecret: invite.sasSecret,
+    );
     activeInviteStatus = result.status;
     activeSasCode = result.sasCode;
     if (result.status.accepted && result.sasCode != null) {
@@ -542,6 +661,75 @@ class DeepSkyController extends ChangeNotifier {
           : 'No device has joined yet. Try again after it enters the code.';
     }
   });
+
+  /// Silently checks whether the active invite was accepted so the inviting
+  /// device advances automatically to SAS verification without manual polling.
+  Future<void> pollActiveInviteSilently() async {
+    if (busy || _autoPollInFlight) {
+      return;
+    }
+    final CreateInviteResponse? invite = activeInvite;
+    final LocalDeviceIdentity? currentIdentity = identity;
+    if (invite == null ||
+        activeSasCode != null ||
+        currentIdentity == null ||
+        !currentIdentity.hasCoupleRoot ||
+        phase == AppBootPhase.unpaired ||
+        phase == AppBootPhase.upgradeRequired ||
+        isDeviceRevoked) {
+      return;
+    }
+    if (invite.inviteToken == _suppressedAutoPollToken) {
+      return;
+    }
+    if (!invite.expiresAt.toUtc().isAfter(DateTime.now().toUtc())) {
+      notifyListeners();
+      return;
+    }
+
+    _autoPollInFlight = true;
+    final String polledToken = invite.inviteToken;
+    try {
+      final result = await _repository.checkInviteAndSas(
+        polledToken,
+        sasSecret: invite.sasSecret,
+      );
+      if (activeInvite?.inviteToken != polledToken ||
+          activeSasCode != null ||
+          phase == AppBootPhase.upgradeRequired ||
+          isDeviceRevoked) {
+        return;
+      }
+      if (result.status.accepted && result.sasCode != null) {
+        activeInviteStatus = result.status;
+        activeSasCode = result.sasCode;
+        errorNotice = null;
+        statusNotice = languageCode == 'it'
+            ? 'Dispositivo collegato! Confronta il codice SAS e conferma.'
+            : 'Device connected! Compare the SAS code and confirm.';
+        notifyListeners();
+      }
+    } on ClientUpgradeRequiredException catch (ex) {
+      compatibilityPolicy = CompatibilityPolicy(
+        minClientVersionCode: ex.minClientVersionCode,
+        minProtocolVersion: ex.minProtocolVersion,
+      );
+      phase = AppBootPhase.upgradeRequired;
+      notifyListeners();
+    } on ApiRequestException catch (ex) {
+      if (ex.isDeviceUnknownOrRevoked && phase == AppBootPhase.paired) {
+        isDeviceRevoked = true;
+        isOffline = false;
+        errorNotice = null;
+        await _loadCachedEventsBestEffort();
+        notifyListeners();
+      }
+    } catch (_) {
+      // Transient network errors are ignored during silent background polling.
+    } finally {
+      _autoPollInFlight = false;
+    }
+  }
 
   Future<void> confirmSasAndDeliverRootKey() => _runGuarded(() async {
     final InviteStatusResponse? status = activeInviteStatus;
@@ -557,6 +745,7 @@ class DeepSkyController extends ChangeNotifier {
       targetKemPublicKey: status.acceptedKemPublicKey!,
     );
     identity = identity?.copyWith(pairingCompleted: true);
+    _suppressedAutoPollToken = null;
     activeInvite = null;
     activeInviteStatus = null;
     activeSasCode = null;
@@ -572,8 +761,36 @@ class DeepSkyController extends ChangeNotifier {
     required String inviteToken,
     required String deviceLabel,
   }) => _runGuarded(() async {
-    final parsed = InviteLinkCodec.parseInviteInput(inviteToken);
-    final String resolvedServer = (parsed.serverUrl ?? serverUrl).trim();
+    final parsed = InviteLinkCodec.parseInviteInputChecked(inviteToken);
+    if (parsed.rejectedServerError != null) {
+      throw _CalmUserException(
+        DeepSkyStrings(languageCode).customServerInsecureError,
+      );
+    }
+    final String? sasSecret = parsed.sasSecret;
+    if (sasSecret == null || sasSecret.isEmpty) {
+      throw _CalmUserException(
+        DeepSkyStrings(languageCode).inviteMissingSasSecretError,
+      );
+    }
+    try {
+      DeepSkyCrypto.decodeSasSecretB64(sasSecret);
+    } catch (_) {
+      throw _CalmUserException(
+        DeepSkyStrings(languageCode).inviteMissingSasSecretError,
+      );
+    }
+    final String rawServer = (parsed.serverUrl ?? serverUrl).trim();
+    final String resolvedServer;
+    try {
+      resolvedServer = InviteLinkCodec.normalizeServerUrl(rawServer);
+    } on FormatException catch (ex) {
+      throw _CalmUserException(
+        ex.message.contains('HTTPS')
+            ? DeepSkyStrings(languageCode).customServerInsecureError
+            : DeepSkyStrings(languageCode).invalidServerAddress,
+      );
+    }
     activeServerUrl = resolvedServer;
     final String cleanLabel = deviceLabel.trim().isEmpty
         ? DeepSkyStrings(languageCode).defaultDeviceLabel
@@ -583,6 +800,7 @@ class DeepSkyController extends ChangeNotifier {
     pendingJoin = await _repository.acceptInvite(
       serverUrl: resolvedServer,
       inviteToken: parsed.inviteToken,
+      sasSecret: sasSecret,
       deviceLabel: cleanLabel,
     );
     _lastKnownPeerLabel = pendingJoin!.peerLabel;
@@ -628,6 +846,7 @@ class DeepSkyController extends ChangeNotifier {
     identity = null;
     pendingJoin = null;
     _lastKnownPeerLabel = null;
+    _suppressedAutoPollToken = null;
     activeInvite = null;
     activeInviteStatus = null;
     activeSasCode = null;
@@ -637,6 +856,7 @@ class DeepSkyController extends ChangeNotifier {
   });
 
   void returnToInviteScreen() {
+    _suppressedAutoPollToken = activeInvite?.inviteToken;
     activeSasCode = null;
     activeInviteStatus = null;
     statusNotice = null;
@@ -687,12 +907,14 @@ class DeepSkyController extends ChangeNotifier {
         deviceLabel: cleanLabel,
       );
       identity = result.identity;
+      _suppressedAutoPollToken = null;
       activeInvite = result.invite;
       phase = AppBootPhase.waiting;
       statusNotice = notice;
       return;
     }
 
+    _suppressedAutoPollToken = null;
     activeInvite = null;
     activeInviteStatus = null;
     activeSasCode = null;
@@ -752,14 +974,27 @@ class DeepSkyController extends ChangeNotifier {
     final String cleanLabel = deviceLabel.trim().isEmpty
         ? DeepSkyStrings(languageCode).defaultDeviceLabel
         : deviceLabel.trim();
-    identity = await _repository.recoverWithRecoveryKey(
-      serverUrl: serverUrl.trim(),
-      recoveryInput: recoveryInput.trim(),
-      deviceLabel: cleanLabel,
-    );
+    try {
+      identity = await _repository.recoverWithRecoveryKey(
+        serverUrl: serverUrl.trim(),
+        recoveryInput: recoveryInput.trim(),
+        deviceLabel: cleanLabel,
+      );
+    } on ClientUpgradeRequiredException {
+      rethrow;
+    } on FormatException {
+      throw _CalmUserException(
+        DeepSkyStrings(languageCode).recoverCalmFailureMessage,
+      );
+    } on ApiRequestException {
+      throw _CalmUserException(
+        DeepSkyStrings(languageCode).recoverCalmFailureMessage,
+      );
+    }
     this.deviceLabel = cleanLabel;
     phase = AppBootPhase.paired;
     await _refreshPairedState();
+    await _syncPendingRotatedPushToken();
   });
 
   Future<void> confirmRecoveryKeySaved() => _runGuarded(() async {
@@ -805,15 +1040,15 @@ class DeepSkyController extends ChangeNotifier {
   });
 
   Future<void> createEnrollmentInvite() => _runGuarded(() async {
+    _suppressedAutoPollToken = null;
     activeInvite = await _repository.createEnrollmentInvite();
     activeInviteStatus = null;
     activeSasCode = null;
-    statusNotice = languageCode == 'it'
-        ? 'Invito pronto: inseriscilo dal nuovo telefono e poi premi Verifica.'
-        : 'Invite ready: enter it on the new phone and then tap Verify.';
+    statusNotice = DeepSkyStrings(languageCode).enrollmentInviteReadyNotice;
   });
 
   void cancelActiveInvite() {
+    _suppressedAutoPollToken = null;
     activeInvite = null;
     activeInviteStatus = null;
     activeSasCode = null;
@@ -823,7 +1058,7 @@ class DeepSkyController extends ChangeNotifier {
   }
 
   Future<void> revokeDevice(String targetDeviceId) => _runGuarded(() async {
-    await _repository.revokeDevice(targetDeviceId);
+    identity = await _repository.revokeDevice(targetDeviceId);
     devices = await _repository.listDevices();
   });
 
@@ -867,12 +1102,15 @@ class DeepSkyController extends ChangeNotifier {
     identity = null;
     events = const <CachedEventEntry>[];
     devices = const <DeviceSummary>[];
+    _suppressedAutoPollToken = null;
     activeInvite = null;
     activeInviteStatus = null;
     activeSasCode = null;
     pendingJoin = null;
     _lastKnownPeerLabel = null;
     pushStatus = null;
+    pushFeedback = null;
+    pushFeedbackIsError = false;
     isOffline = false;
     isDeviceRevoked = false;
     autoInviteAttempted = false;
@@ -889,23 +1127,130 @@ class DeepSkyController extends ChangeNotifier {
     if (current == null) {
       return;
     }
-    final PushApiClient pushApi = PushApiClient(
-      apiClient: _createApiClient(current.serverUrl),
-    );
-    final RuntimeFirebaseConfig config = await pushApi.fetchRuntimeConfig();
-    if (!config.enabled || !config.isComplete) {
-      throw StateError(
-        'Le notifiche push runtime non sono attive su questo server.',
+    final DeepSkyStrings s = DeepSkyStrings(languageCode);
+    pushFeedback = null;
+    pushFeedbackIsError = false;
+    try {
+      final PushApiClient pushApi = PushApiClient(
+        apiClient: _createApiClient(current.serverUrl),
       );
+      final RuntimeFirebaseConfig config = await pushApi
+          .fetchRuntimeConfig()
+          .timeout(const Duration(seconds: 15));
+      if (!config.enabled || !config.isComplete) {
+        throw _CalmUserException(s.pushServerDisabledError);
+      }
+      final bool granted = await _nativeBridge.requestNotificationPermission();
+      await _refreshNativePushStatusBestEffort();
+      if (!granted) {
+        throw _CalmUserException(s.pushPermissionDeniedError);
+      }
+      final String fcmToken = await _nativeBridge.configureRuntimePush(config);
+      await pushApi
+          .registerToken(identity: current, fcmToken: fcmToken)
+          .timeout(const Duration(seconds: 15));
+      await _refreshNativePushStatusBestEffort();
+      pushPromptDismissed = true;
+      await _keyStore.write(_pushPromptDismissedStorageKey, 'true');
+      final String okMessage = languageCode == 'it'
+          ? 'Notifiche discrete attivate su questo dispositivo.'
+          : 'Quiet notifications enabled on this device.';
+      pushFeedback = okMessage;
+      pushFeedbackIsError = false;
+      statusNotice = okMessage;
+    } on _CalmUserException catch (ex) {
+      pushFeedback = ex.message;
+      pushFeedbackIsError = true;
+      rethrow;
+    } on PlatformException catch (ex) {
+      await _refreshNativePushStatusBestEffort();
+      final String msg = switch (ex.code) {
+        'gms_unavailable' => s.pushGmsUnavailableError,
+        'fcm_token_timeout' => s.pushTimeoutError,
+        _ => s.pushTokenFailedError(
+          (ex.message?.trim().isNotEmpty ?? false)
+              ? ex.message!.trim()
+              : ex.code,
+        ),
+      };
+      pushFeedback = msg;
+      pushFeedbackIsError = true;
+      throw _CalmUserException(msg);
+    } on TimeoutException {
+      await _refreshNativePushStatusBestEffort();
+      final String msg = s.pushTimeoutError;
+      pushFeedback = msg;
+      pushFeedbackIsError = true;
+      throw _CalmUserException(msg);
+    } catch (ex) {
+      await _refreshNativePushStatusBestEffort();
+      final String msg = s.pushTokenFailedError(ex.toString());
+      pushFeedback = msg;
+      pushFeedbackIsError = true;
+      throw _CalmUserException(msg);
     }
-    await _nativeBridge.requestNotificationPermission();
-    final String fcmToken = await _nativeBridge.configureRuntimePush(config);
-    await pushApi.registerToken(identity: current, fcmToken: fcmToken);
-    pushStatus = await _nativeBridge.getPushStatus();
-    statusNotice = languageCode == 'it'
-        ? 'Notifiche discrete attivate su questo dispositivo.'
-        : 'Quiet notifications enabled on this device.';
   });
+
+  Future<void> _refreshNativePushStatusBestEffort() async {
+    if (!_canQueryNativeChannels) {
+      return;
+    }
+    try {
+      pushStatus = await _nativeBridge.getPushStatus();
+    } catch (_) {
+      // Ignore on unsupported hosts or transient channel errors.
+    }
+  }
+
+  Future<void> refreshPushStatus() async {
+    if (!_canQueryNativeChannels || phase != AppBootPhase.paired) {
+      return;
+    }
+    await _refreshNativePushStatusBestEffort();
+    notifyListeners();
+  }
+
+  Future<bool> openNotificationSettings() =>
+      _nativeBridge.openNotificationSettings();
+
+  Future<void> dismissPushPrompt() async {
+    pushPromptDismissed = true;
+    await _keyStore.write(_pushPromptDismissedStorageKey, 'true');
+    notifyListeners();
+  }
+
+  Future<void> setUpdateChannel(UpdateChannel channel) async {
+    if (updateChannel == channel) {
+      return;
+    }
+    updateChannel = channel;
+    availableUpdate = null;
+    updateFeedback = null;
+    await _keyStore.write(_updateChannelStorageKey, channel.storageValue);
+    notifyListeners();
+  }
+
+  Future<bool> shareText({required String text, String? subject}) =>
+      _nativeBridge.shareText(text: text, subject: subject);
+
+  Future<void> setSecureScreen(bool enabled) =>
+      _nativeBridge.setSecureScreen(enabled);
+
+  Future<void> copySensitiveText(String text, {int clearAfterSeconds = 45}) =>
+      _nativeBridge.copySensitiveText(
+        text,
+        clearAfterSeconds: clearAfterSeconds,
+      );
+
+  void setAllowCustomUpdateTrustAnchor(bool enabled) {
+    if (allowCustomUpdateTrustAnchor == enabled) {
+      return;
+    }
+    allowCustomUpdateTrustAnchor = enabled;
+    availableUpdate = null;
+    updateFeedback = null;
+    notifyListeners();
+  }
 
   Future<void> checkForUpdates({
     required String source,
@@ -913,20 +1258,34 @@ class DeepSkyController extends ChangeNotifier {
     bool force = true,
   }) => _runGuarded(() async {
     updateFeedback = null;
-    final String keyToUse = trustedKeyB64.trim().isNotEmpty
+    final String effectiveSource =
+        (allowCustomUpdateTrustAnchor && source.trim().isNotEmpty)
+        ? source.trim()
+        : defaultUpdateSource;
+    final String keyToUse =
+        (allowCustomUpdateTrustAnchor && trustedKeyB64.trim().isNotEmpty)
         ? trustedKeyB64.trim()
         : trustedUpdatePublicKeyB64.trim();
     if (keyToUse.isEmpty) {
-      const String message =
-          'Inserisci la chiave pubblica Ed25519 delle release firmate.';
+      final String message = languageCode == 'it'
+          ? 'Inserisci la chiave pubblica Ed25519 delle release firmate.'
+          : 'Enter the Ed25519 public key for signed releases.';
       updateFeedback = message;
-      throw StateError(message);
+      throw _CalmUserException(message);
     }
     final Uri sourceBaseUri;
     try {
-      sourceBaseUri = ApkUpdateService.resolveSourceBaseUri(source);
+      sourceBaseUri = await _updateService.resolveChannelBaseUri(
+        sourceInput: effectiveSource,
+        channel: updateChannel,
+      );
     } on FormatException catch (ex) {
-      updateFeedback = 'Sorgente aggiornamenti non valida (${ex.message}).';
+      updateFeedback = languageCode == 'it'
+          ? 'Sorgente aggiornamenti non valida (${ex.message}).'
+          : 'Invalid update source (${ex.message}).';
+      rethrow;
+    } on ApkUpdateException catch (ex) {
+      updateFeedback = ex.localizedMessage(languageCode);
       rethrow;
     }
     final ApkUpdateCheckResult res;
@@ -938,22 +1297,34 @@ class DeepSkyController extends ChangeNotifier {
         force: force,
       );
     } on FormatException catch (ex) {
-      updateFeedback = 'Chiave pubblica Ed25519 non valida (${ex.message}).';
+      updateFeedback = languageCode == 'it'
+          ? 'Chiave pubblica Ed25519 non valida (${ex.message}).'
+          : 'Invalid Ed25519 public key (${ex.message}).';
       rethrow;
     }
     availableUpdate = res.manifest;
+    final bool isIt = languageCode == 'it';
     switch (res.status) {
       case ApkUpdateCheckStatus.updateAvailable:
-        updateFeedback =
-            'Nuova versione disponibile: ${res.manifest!.versionName} (${res.manifest!.versionCode}).';
+        updateFeedback = isIt
+            ? 'Nuova versione disponibile (${updateChannel.localizedLabel(languageCode)}): ${res.manifest!.versionName} (${res.manifest!.versionCode}).'
+            : 'Update available (${updateChannel.localizedLabel(languageCode)}): ${res.manifest!.versionName} (${res.manifest!.versionCode}).';
       case ApkUpdateCheckStatus.upToDate:
-        updateFeedback = 'Hai già l\'ultima versione disponibile.';
+        updateFeedback = isIt
+            ? 'Hai già l\'ultima versione disponibile.'
+            : 'You already have the latest version.';
       case ApkUpdateCheckStatus.notModified304:
         updateFeedback = res.manifest != null
-            ? 'Aggiornamento già pronto: ${res.manifest!.versionName}.'
-            : 'Nessun nuovo rilascio rispetto all\'ultimo controllo.';
+            ? (isIt
+                  ? 'Aggiornamento già pronto: ${res.manifest!.versionName}.'
+                  : 'Update already ready: ${res.manifest!.versionName}.')
+            : (isIt
+                  ? 'Nessun nuovo rilascio rispetto all\'ultimo controllo.'
+                  : 'No new release since the last check.');
       case ApkUpdateCheckStatus.throttledByCooldown:
-        updateFeedback = 'Controllo recente già eseguito.';
+        updateFeedback = isIt
+            ? 'Controllo recente già eseguito.'
+            : 'Already checked recently.';
     }
   });
 
@@ -966,20 +1337,43 @@ class DeepSkyController extends ChangeNotifier {
         final bool canInstall = await _nativeBridge.canRequestPackageInstalls();
         if (!canInstall) {
           await _nativeBridge.openInstallPermissionSettings();
-          updateFeedback =
-              'Abilita "Installa app sconosciute" per Deep Sky e riprova.';
+          updateFeedback = languageCode == 'it'
+              ? 'Abilita "Installa app sconosciute" per Deep Sky e riprova.'
+              : 'Enable "Install unknown apps" for Deep Sky and try again.';
           return;
         }
         final UpdateStorageInfo storage = await _nativeBridge
             .getUpdateStorageInfo();
-        final file = await _updateService.downloadAndVerifyApk(
-          sourceBaseUri: ApkUpdateService.resolveSourceBaseUri(source),
-          manifest: manifest,
-          stagingDir: storage.stagingDir,
-          availableBytes: storage.availableBytes,
-        );
-        final String result = await _updateService.installApkFile(file);
-        updateFeedback = 'Installazione avviata ($result).';
+        updateDownloadProgress = 0.0;
+        notifyListeners();
+        try {
+          final String effectiveSource =
+              (allowCustomUpdateTrustAnchor && source.trim().isNotEmpty)
+              ? source.trim()
+              : defaultUpdateSource;
+          final Uri sourceBaseUri = await _updateService.resolveChannelBaseUri(
+            sourceInput: effectiveSource,
+            channel: updateChannel,
+          );
+          final file = await _updateService.downloadAndVerifyApk(
+            sourceBaseUri: sourceBaseUri,
+            manifest: manifest,
+            stagingDir: storage.stagingDir,
+            availableBytes: storage.availableBytes,
+            onProgress: (int received, int total) {
+              if (total > 0) {
+                updateDownloadProgress = (received / total).clamp(0.0, 1.0);
+                notifyListeners();
+              }
+            },
+          );
+          final String result = await _updateService.installApkFile(file);
+          updateFeedback = languageCode == 'it'
+              ? 'Installazione avviata ($result).'
+              : 'Installation started ($result).';
+        } finally {
+          updateDownloadProgress = null;
+        }
       });
 
   void toggleNightMode() {
@@ -1018,6 +1412,11 @@ class DeepSkyController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setErrorNotice(String message) {
+    errorNotice = message;
+    notifyListeners();
+  }
+
   void clearNotices() {
     statusNotice = null;
     errorNotice = null;
@@ -1038,8 +1437,11 @@ class DeepSkyController extends ChangeNotifier {
       );
       phase = AppBootPhase.upgradeRequired;
     } on ApkUpdateException catch (ex) {
-      errorNotice = ex.friendlyMessage;
-      updateFeedback = ex.friendlyMessage;
+      final String msg = ex.localizedMessage(languageCode);
+      errorNotice = msg;
+      updateFeedback = msg;
+    } on _CalmUserException catch (ex) {
+      errorNotice = ex.message;
     } on ApiRequestException catch (ex) {
       if (ex.isDeviceUnknownOrRevoked && phase == AppBootPhase.paired) {
         isDeviceRevoked = true;
@@ -1058,4 +1460,13 @@ class DeepSkyController extends ChangeNotifier {
   }
 
   Uint8List? get recoverySeed => identity?.recoverySeed;
+}
+
+class _CalmUserException implements Exception {
+  const _CalmUserException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
 }

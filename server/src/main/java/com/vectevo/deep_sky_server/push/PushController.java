@@ -65,6 +65,6 @@ public class PushController {
 			@AuthenticationPrincipal DevicePrincipal principal,
 			@RequestBody(required = false) SendWakeupRequest request) {
 		String key = request != null ? request.localizationKey() : "wakeup.thinking_of_you";
-		return pushService.dispatchPartnerWakeup(principal.coupleId(), principal.deviceId(), key);
+		return pushService.dispatchClientWakeup(principal.coupleId(), principal.deviceId(), key);
 	}
 }

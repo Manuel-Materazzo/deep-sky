@@ -3,14 +3,23 @@ package com.vectevo.deep_sky_server.pairing;
 import com.vectevo.deep_sky_server.push.PushService;
 import com.vectevo.deep_sky_server.shared.DevicePrincipal;
 import com.vectevo.deep_sky_server.shared.Ed25519SignatureVerifier;
+import com.vectevo.deep_sky_server.shared.PartnerWakeupRequestedEvent;
+import com.vectevo.deep_sky_server.shared.RateLimitExceededException;
+import com.vectevo.deep_sky_server.shared.SlidingWindowLimiter;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Set;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +38,9 @@ public class PairingService {
 	private final KeyDeliveryRepository keyDeliveryRepository;
 	private final RecoveryChallengeRepository challengeRepository;
 	private final PushService pushService;
+	private final ApplicationEventPublisher eventPublisher;
+	private final Clock clock;
+	private final SlidingWindowLimiter coupleRecoveryLimiter;
 	private final SecureRandom secureRandom = new SecureRandom();
 
 	public PairingService(
@@ -37,13 +49,45 @@ public class PairingService {
 			PairingInviteRepository inviteRepository,
 			KeyDeliveryRepository keyDeliveryRepository,
 			RecoveryChallengeRepository challengeRepository,
-			PushService pushService) {
+			PushService pushService,
+			ApplicationEventPublisher eventPublisher) {
+		this(
+				coupleRepository,
+				deviceRepository,
+				inviteRepository,
+				keyDeliveryRepository,
+				challengeRepository,
+				pushService,
+				eventPublisher,
+				Clock.systemUTC(),
+				5,
+				15);
+	}
+
+	@Autowired
+	public PairingService(
+			CoupleRepository coupleRepository,
+			DeviceRepository deviceRepository,
+			PairingInviteRepository inviteRepository,
+			KeyDeliveryRepository keyDeliveryRepository,
+			RecoveryChallengeRepository challengeRepository,
+			PushService pushService,
+			ApplicationEventPublisher eventPublisher,
+			Clock clock,
+			@Value("${deepsky.rate-limit.couple-recovery-max:5}") int coupleRecoveryMaxAttempts,
+			@Value("${deepsky.rate-limit.couple-recovery-window-minutes:15}") int coupleRecoveryWindowMinutes) {
 		this.coupleRepository = coupleRepository;
 		this.deviceRepository = deviceRepository;
 		this.inviteRepository = inviteRepository;
 		this.keyDeliveryRepository = keyDeliveryRepository;
 		this.challengeRepository = challengeRepository;
 		this.pushService = pushService;
+		this.eventPublisher = eventPublisher;
+		this.clock = clock;
+		this.coupleRecoveryLimiter = new SlidingWindowLimiter(
+				clock,
+				Duration.ofMinutes(Math.max(1, coupleRecoveryWindowMinutes)),
+				coupleRecoveryMaxAttempts);
 	}
 
 	public record CreateInviteResult(UUID coupleId, UUID deviceId, String inviteToken, Instant expiresAt) {}
@@ -69,18 +113,61 @@ public class PairingService {
 			UUID toDeviceId,
 			String nonceB64,
 			String ciphertextB64,
-			Instant createdAt) {}
+			Instant createdAt,
+			String deliveryKind,
+			int keyEpoch) {
+		public KeyDeliveryView(
+				UUID coupleId,
+				UUID fromDeviceId,
+				UUID toDeviceId,
+				String nonceB64,
+				String ciphertextB64,
+				Instant createdAt) {
+			this(coupleId, fromDeviceId, toDeviceId, nonceB64, ciphertextB64, createdAt, "PAIRING_SEED", 1);
+		}
+	}
 
 	public record DeviceView(
 			UUID deviceId,
 			String label,
 			String enrolledVia,
 			Instant createdAt,
-			Instant revokedAt) {}
+			Instant revokedAt,
+			String kemPublicKeyB64,
+			boolean approved) {
+		public DeviceView(
+				UUID deviceId,
+				String label,
+				String enrolledVia,
+				Instant createdAt,
+				Instant revokedAt) {
+			this(deviceId, label, enrolledVia, createdAt, revokedAt, null, false);
+		}
+	}
 
 	public record RecoveryChallengeResult(UUID challengeId, UUID coupleId, String nonceB64, Instant expiresAt) {}
 
-	public record RecoveryCompleteResult(UUID coupleId, UUID deviceId) {}
+	public record RecoveryCompleteResult(
+			UUID coupleId,
+			UUID deviceId,
+			int currentKeyEpoch,
+			String recoveryKeyringNonceB64,
+			String recoveryKeyringCiphertextB64) {
+		public RecoveryCompleteResult(UUID coupleId, UUID deviceId) {
+			this(coupleId, deviceId, 1, null, null);
+		}
+	}
+
+	public record EpochKeyDeliveryInput(UUID toDeviceId, String nonceB64, String ciphertextB64) {}
+
+	public record EpochRotationRequestData(
+			int targetEpoch,
+			String newRecoveryAuthPublicKeyB64,
+			String recoveryKeyringNonceB64,
+			String recoveryKeyringCiphertextB64,
+			List<EpochKeyDeliveryInput> deliveries) {}
+
+	public record EpochRotationStateView(int currentKeyEpoch, KeyDeliveryView pendingDelivery) {}
 
 	public record PairingVisibilityAudit(
 			UUID coupleId,
@@ -151,6 +238,7 @@ public class PairingService {
 		device.setKemPublicKey(kemPub);
 		device.setEnrolledVia("INVITE_INIT");
 		device.setCreatedAt(now);
+		device.setApprovedAt(now);
 		deviceRepository.save(device);
 
 		String rawToken = generateToken();
@@ -190,26 +278,23 @@ public class PairingService {
 		byte[] authPub = Ed25519SignatureVerifier.decodeBase64Url(deviceAuthPublicKeyB64, 32, "deviceAuthPublicKeyB64");
 		byte[] kemPub = Ed25519SignatureVerifier.decodeBase64Url(deviceKemPublicKeyB64, 32, "deviceKemPublicKeyB64");
 
-		PairingInviteEntity invite = inviteRepository.findByTokenHash(hashToken(rawToken))
-				.orElseThrow(() -> new NoSuchElementException("Invite not found"));
+		PairingInviteEntity invite = inviteRepository.findByTokenHashForUpdate(hashToken(rawToken))
+				.orElseThrow(() -> new IllegalStateException("Invite is invalid, expired, or already used"));
 
 		Instant now = Instant.now();
-		if (invite.getExpiresAt().isBefore(now)) {
-			throw new IllegalStateException("Invite has expired");
-		}
-		if (invite.getAcceptedAt() != null) {
-			throw new IllegalStateException("Invite has already been accepted");
+		if (!invite.getExpiresAt().isAfter(now) || invite.getAcceptedAt() != null) {
+			throw new IllegalStateException("Invite is invalid, expired, or already used");
 		}
 		CoupleEntity couple = coupleRepository.findById(invite.getCoupleId())
-				.orElseThrow(() -> new NoSuchElementException("Couple not found"));
+				.orElseThrow(() -> new IllegalStateException("Invite is invalid, expired, or already used"));
 		if (couple.getUnpairedAt() != null) {
-			throw new IllegalStateException("Couple is unpaired");
+			throw new IllegalStateException("Invite is invalid, expired, or already used");
 		}
 
 		DeviceEntity creatorDevice = deviceRepository.findById(invite.getCreatorDeviceId())
-				.orElseThrow(() -> new NoSuchElementException("Creator device not found"));
+				.orElseThrow(() -> new IllegalStateException("Invite is invalid, expired, or already used"));
 		if (creatorDevice.getRevokedAt() != null) {
-			throw new IllegalStateException("Creator device has been revoked");
+			throw new IllegalStateException("Invite is invalid, expired, or already used");
 		}
 
 		UUID newDeviceId = UUID.randomUUID();
@@ -221,11 +306,16 @@ public class PairingService {
 		newDevice.setKemPublicKey(kemPub);
 		newDevice.setEnrolledVia("INITIAL_PAIRING".equals(invite.getInviteKind()) ? "INVITE_JOIN" : "ENROLLMENT");
 		newDevice.setCreatedAt(now);
+		newDevice.setApprovedAt(null);
 		deviceRepository.save(newDevice);
 
 		invite.setAcceptedAt(now);
 		invite.setAcceptedDeviceId(newDeviceId);
 		inviteRepository.save(invite);
+
+		// Notify the approving/inviting device after commit with a generic data-only wakeup (`S-02`, `S1-SRV-02`, `CA-07`).
+		eventPublisher.publishEvent(new PartnerWakeupRequestedEvent(
+				invite.getCoupleId(), newDeviceId, "wakeup.pairing_request"));
 
 		return new AcceptInviteResult(
 				invite.getCoupleId(),
@@ -262,6 +352,16 @@ public class PairingService {
 			UUID toDeviceId,
 			String nonceB64,
 			String ciphertextB64) {
+		storeKeyDelivery(principal, toDeviceId, nonceB64, ciphertextB64, null);
+	}
+
+	@Transactional
+	public void storeKeyDelivery(
+			DevicePrincipal principal,
+			UUID toDeviceId,
+			String nonceB64,
+			String ciphertextB64,
+			Integer requestedKeyEpoch) {
 		DeviceEntity target = deviceRepository.findById(toDeviceId)
 				.orElseThrow(() -> new NoSuchElementException("Target device not found"));
 		if (!target.getCoupleId().equals(principal.coupleId()) || target.getRevokedAt() != null) {
@@ -272,6 +372,20 @@ public class PairingService {
 		if (ciphertext.length <= 16) {
 			throw new IllegalArgumentException("Wrapped key ciphertext too short");
 		}
+		int keyEpoch = requestedKeyEpoch != null
+				? requestedKeyEpoch
+				: coupleRepository.findById(principal.coupleId())
+						.map(CoupleEntity::getCurrentKeyEpoch)
+						.orElse(1);
+		if (keyEpoch < 1) {
+			throw new IllegalArgumentException("keyEpoch must be >= 1");
+		}
+
+		Instant now = Instant.now();
+		if (target.getApprovedAt() == null) {
+			target.setApprovedAt(now);
+			deviceRepository.save(target);
+		}
 
 		KeyDeliveryEntity entity = new KeyDeliveryEntity();
 		entity.setId(UUID.randomUUID());
@@ -280,32 +394,60 @@ public class PairingService {
 		entity.setToDeviceId(toDeviceId);
 		entity.setNonce(nonce);
 		entity.setCiphertext(ciphertext);
-		entity.setCreatedAt(Instant.now());
+		entity.setCreatedAt(now);
+		entity.setDeliveryKind("PAIRING_SEED");
+		entity.setKeyEpoch(keyEpoch);
 		keyDeliveryRepository.save(entity);
 	}
 
 	@Transactional
 	public KeyDeliveryView fetchPendingKeyDelivery(DevicePrincipal principal) {
 		KeyDeliveryEntity entity = keyDeliveryRepository
-				.findFirstByToDeviceIdOrderByCreatedAtDesc(principal.deviceId())
+				.findFirstByToDeviceIdAndDeliveryKindOrderByKeyEpochDescCreatedAtDesc(
+						principal.deviceId(), "PAIRING_SEED")
+				.or(() -> keyDeliveryRepository.findFirstByToDeviceIdOrderByCreatedAtDesc(principal.deviceId()))
 				.orElseThrow(() -> new NoSuchElementException("No key delivery ready for this device"));
 		if (entity.getDeliveredAt() == null) {
 			entity.setDeliveredAt(Instant.now());
 			keyDeliveryRepository.save(entity);
 		}
+		return toKeyDeliveryView(entity);
+	}
+
+	@Transactional
+	public EpochRotationStateView fetchPendingEpochRotation(DevicePrincipal principal) {
+		CoupleEntity couple = coupleRepository.findById(principal.coupleId())
+				.orElseThrow(() -> new NoSuchElementException("Couple not found"));
+		KeyDeliveryView pending = keyDeliveryRepository
+				.findFirstByToDeviceIdAndDeliveryKindOrderByKeyEpochDescCreatedAtDesc(
+						principal.deviceId(), "EPOCH_ROTATION")
+				.map(entity -> {
+					if (entity.getDeliveredAt() == null) {
+						entity.setDeliveredAt(Instant.now());
+						keyDeliveryRepository.save(entity);
+					}
+					return toKeyDeliveryView(entity);
+				})
+				.orElse(null);
+		return new EpochRotationStateView(couple.getCurrentKeyEpoch(), pending);
+	}
+
+	private static KeyDeliveryView toKeyDeliveryView(KeyDeliveryEntity entity) {
 		return new KeyDeliveryView(
 				entity.getCoupleId(),
 				entity.getFromDeviceId(),
 				entity.getToDeviceId(),
 				Ed25519SignatureVerifier.encodeBase64Url(entity.getNonce()),
 				Ed25519SignatureVerifier.encodeBase64Url(entity.getCiphertext()),
-				entity.getCreatedAt());
+				entity.getCreatedAt(),
+				entity.getDeliveryKind(),
+				entity.getKeyEpoch());
 	}
 
 	@Transactional(readOnly = true)
 	public List<DeviceView> listDevices(DevicePrincipal principal) {
 		return deviceRepository.findAllByCoupleIdOrderByCreatedAtAsc(principal.coupleId()).stream()
-				.map(d -> new DeviceView(d.getId(), d.getLabel(), d.getEnrolledVia(), d.getCreatedAt(), d.getRevokedAt()))
+				.map(PairingService::toDeviceView)
 				.toList();
 	}
 
@@ -318,26 +460,130 @@ public class PairingService {
 		}
 		device.setLabel(sanitizeLabel(deviceLabel));
 		deviceRepository.save(device);
+		return toDeviceView(device);
+	}
+
+	private static DeviceView toDeviceView(DeviceEntity device) {
 		return new DeviceView(
 				device.getId(),
 				device.getLabel(),
 				device.getEnrolledVia(),
 				device.getCreatedAt(),
-				device.getRevokedAt());
+				device.getRevokedAt(),
+				device.getKemPublicKey() == null
+						? null
+						: Ed25519SignatureVerifier.encodeBase64Url(device.getKemPublicKey()),
+				device.getApprovedAt() != null);
 	}
 
 	@Transactional
 	public void revokeDevice(DevicePrincipal principal, UUID targetDeviceId) {
+		revokeDevice(principal, targetDeviceId, null);
+	}
+
+	@Transactional
+	public void revokeDevice(DevicePrincipal principal, UUID targetDeviceId, EpochRotationRequestData rotation) {
 		DeviceEntity target = deviceRepository.findById(targetDeviceId)
 				.orElseThrow(() -> new NoSuchElementException("Device not found"));
 		if (!target.getCoupleId().equals(principal.coupleId())) {
 			throw new NoSuchElementException("Device not found");
 		}
+		Instant now = Instant.now();
 		if (target.getRevokedAt() == null) {
-			target.setRevokedAt(Instant.now());
+			target.setRevokedAt(now);
 			deviceRepository.save(target);
 		}
 		pushService.unregisterDevice(target.getId());
+		if (rotation != null) {
+			applyEpochRotation(principal, rotation, now);
+		}
+	}
+
+	@Transactional
+	public int rotateEpoch(DevicePrincipal principal, EpochRotationRequestData rotation) {
+		return applyEpochRotation(principal, rotation, Instant.now());
+	}
+
+	private int applyEpochRotation(DevicePrincipal principal, EpochRotationRequestData rotation, Instant now) {
+		CoupleEntity couple = coupleRepository.findByIdForUpdate(principal.coupleId())
+				.orElseThrow(() -> new NoSuchElementException("Couple not found"));
+		if (couple.getUnpairedAt() != null) {
+			throw new IllegalStateException("Couple has been unpaired");
+		}
+		int expectedEpoch = couple.getCurrentKeyEpoch() + 1;
+		if (rotation.targetEpoch() != expectedEpoch) {
+			throw new IllegalStateException("Expected targetEpoch " + expectedEpoch);
+		}
+		byte[] newRecoveryAuthPub = Ed25519SignatureVerifier.decodeBase64Url(
+				rotation.newRecoveryAuthPublicKeyB64(), 32, "newRecoveryAuthPublicKeyB64");
+		byte[] keyringNonce = Ed25519SignatureVerifier.decodeBase64Url(
+				rotation.recoveryKeyringNonceB64(), 24, "recoveryKeyringNonceB64");
+		byte[] keyringCiphertext = Ed25519SignatureVerifier.decodeBase64UrlVariable(
+				rotation.recoveryKeyringCiphertextB64(), "recoveryKeyringCiphertextB64");
+		if (keyringCiphertext.length <= 16) {
+			throw new IllegalArgumentException("Recovery keyring ciphertext too short");
+		}
+		coupleRepository.findByRecoveryAuthPublicKey(newRecoveryAuthPub)
+				.filter(other -> !other.getId().equals(couple.getId()))
+				.ifPresent(other -> {
+					throw new IllegalStateException("Recovery key already registered to another couple");
+				});
+
+		List<EpochKeyDeliveryInput> deliveries =
+				rotation.deliveries() == null ? List.of() : rotation.deliveries();
+		Set<UUID> deliveredTargets = new HashSet<>();
+		for (EpochKeyDeliveryInput item : deliveries) {
+			if (item.toDeviceId() == null) {
+				throw new IllegalArgumentException("Delivery target deviceId required");
+			}
+			if (item.toDeviceId().equals(principal.deviceId())) {
+				throw new IllegalArgumentException("Cannot target initiating device for epoch rotation delivery");
+			}
+			if (!deliveredTargets.add(item.toDeviceId())) {
+				throw new IllegalArgumentException("Duplicate epoch rotation delivery target");
+			}
+			DeviceEntity recipient = deviceRepository.findById(item.toDeviceId())
+					.orElseThrow(() -> new NoSuchElementException("Delivery recipient device not found"));
+			if (!recipient.getCoupleId().equals(principal.coupleId())
+					|| recipient.getRevokedAt() != null
+					|| recipient.getApprovedAt() == null) {
+				throw new IllegalArgumentException("Epoch rotation recipient must be active and approved in couple");
+			}
+			byte[] nonce = Ed25519SignatureVerifier.decodeBase64Url(item.nonceB64(), 24, "nonceB64");
+			byte[] ciphertext = Ed25519SignatureVerifier.decodeBase64UrlVariable(
+					item.ciphertextB64(), "ciphertextB64");
+			if (ciphertext.length <= 16) {
+				throw new IllegalArgumentException("Wrapped epoch key ciphertext too short");
+			}
+			KeyDeliveryEntity entity = new KeyDeliveryEntity();
+			entity.setId(UUID.randomUUID());
+			entity.setCoupleId(principal.coupleId());
+			entity.setFromDeviceId(principal.deviceId());
+			entity.setToDeviceId(recipient.getId());
+			entity.setNonce(nonce);
+			entity.setCiphertext(ciphertext);
+			entity.setCreatedAt(now);
+			entity.setDeliveryKind("EPOCH_ROTATION");
+			entity.setKeyEpoch(rotation.targetEpoch());
+			keyDeliveryRepository.save(entity);
+		}
+
+		List<DeviceEntity> coupleDevices = deviceRepository.findAllByCoupleIdOrderByCreatedAtAsc(principal.coupleId());
+		for (DeviceEntity d : coupleDevices) {
+			if (!d.getId().equals(principal.deviceId())
+					&& d.getRevokedAt() == null
+					&& d.getApprovedAt() != null
+					&& !deliveredTargets.contains(d.getId())) {
+				throw new IllegalArgumentException("Missing epoch rotation delivery for active device " + d.getId());
+			}
+		}
+
+		couple.setCurrentKeyEpoch(rotation.targetEpoch());
+		couple.setRecoveryAuthPublicKey(newRecoveryAuthPub);
+		couple.setRecoveryKeyringNonce(keyringNonce);
+		couple.setRecoveryKeyringCiphertext(keyringCiphertext);
+		coupleRepository.save(couple);
+		return couple.getCurrentKeyEpoch();
 	}
 
 	@Transactional
@@ -361,6 +607,7 @@ public class PairingService {
 	public RecoveryChallengeResult createRecoveryChallenge(String recoveryAuthPublicKeyB64) {
 		byte[] recoveryAuthPub = Ed25519SignatureVerifier.decodeBase64Url(
 				recoveryAuthPublicKeyB64, 32, "recoveryAuthPublicKeyB64");
+		enforceCoupleRecoveryLimit("challenge:" + Ed25519SignatureVerifier.encodeBase64Url(recoveryAuthPub));
 		CoupleEntity couple = coupleRepository.findByRecoveryAuthPublicKey(recoveryAuthPub)
 				.orElseThrow(() -> new NoSuchElementException("Couple not found for recovery key"));
 		if (couple.getUnpairedAt() != null) {
@@ -369,7 +616,7 @@ public class PairingService {
 
 		byte[] nonce = new byte[32];
 		secureRandom.nextBytes(nonce);
-		Instant expiresAt = Instant.now().plus(CHALLENGE_TTL);
+		Instant expiresAt = clock.instant().plus(CHALLENGE_TTL);
 		RecoveryChallengeEntity challenge = new RecoveryChallengeEntity();
 		challenge.setId(UUID.randomUUID());
 		challenge.setCoupleId(couple.getId());
@@ -391,13 +638,13 @@ public class PairingService {
 			String newDeviceAuthPublicKeyB64,
 			String newDeviceKemPublicKeyB64,
 			String recoverySignatureB64) {
-		RecoveryChallengeEntity challenge = challengeRepository.findById(challengeId)
+		RecoveryChallengeEntity challenge = challengeRepository.findByIdForUpdate(challengeId)
 				.orElseThrow(() -> new NoSuchElementException("Recovery challenge not found"));
-		Instant now = Instant.now();
+		Instant now = clock.instant();
 		if (challenge.getUsedAt() != null) {
 			throw new IllegalStateException("Recovery challenge already used");
 		}
-		if (challenge.getExpiresAt().isBefore(now)) {
+		if (!challenge.getExpiresAt().isAfter(now)) {
 			throw new IllegalStateException("Recovery challenge expired");
 		}
 
@@ -406,6 +653,7 @@ public class PairingService {
 		if (couple.getUnpairedAt() != null) {
 			throw new IllegalStateException("Couple has been unpaired");
 		}
+		enforceCoupleRecoveryLimit("complete:" + couple.getId());
 
 		byte[] authPub = Ed25519SignatureVerifier.decodeBase64Url(
 				newDeviceAuthPublicKeyB64, 32, "newDeviceAuthPublicKeyB64");
@@ -439,9 +687,28 @@ public class PairingService {
 		newDevice.setKemPublicKey(kemPub);
 		newDevice.setEnrolledVia("RECOVERY_KEY");
 		newDevice.setCreatedAt(now);
+		newDevice.setApprovedAt(now);
 		deviceRepository.save(newDevice);
 
-		return new RecoveryCompleteResult(couple.getId(), newDeviceId);
+		return new RecoveryCompleteResult(
+				couple.getId(),
+				newDeviceId,
+				couple.getCurrentKeyEpoch(),
+				couple.getRecoveryKeyringNonce() == null
+						? null
+						: Ed25519SignatureVerifier.encodeBase64Url(couple.getRecoveryKeyringNonce()),
+				couple.getRecoveryKeyringCiphertext() == null
+						? null
+						: Ed25519SignatureVerifier.encodeBase64Url(couple.getRecoveryKeyringCiphertext()));
+	}
+
+	private void enforceCoupleRecoveryLimit(String bucketKey) {
+		SlidingWindowLimiter.Decision decision = coupleRecoveryLimiter.tryConsume(bucketKey);
+		if (!decision.allowed()) {
+			throw new RateLimitExceededException(
+					"Too many recovery attempts for this couple; please wait before retrying.",
+					decision.retryAfterSeconds());
+		}
 	}
 
 	@Transactional(readOnly = true)

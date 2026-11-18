@@ -33,7 +33,7 @@ class DeepSkyStrings {
 
   String get scanQrTitle => isIt ? 'Inquadra codice QR' : 'Scan QR code';
   String get scanQrDescription => isIt
-      ? 'Rileva all\'istante la chiave della casa e il server senza dover scrivere nulla.'
+      ? 'Rileva la chiave della casa e il server senza dover scrivere nulla.'
       : 'Detects your home invite and server right away with zero typing.';
   String get openCameraButton => isIt ? 'Apri fotocamera' : 'Open camera';
   String get scanQrActionLabel => isIt ? 'Scansiona QR' : 'Scan QR';
@@ -91,8 +91,13 @@ class DeepSkyStrings {
   String get inviteExpiredMessage => isIt
       ? 'Questo invito è scaduto per sicurezza.'
       : 'This invite expired for your safety.';
-  String get checkPartnerJoinedButton =>
-      isIt ? 'Verifica se si è unito' : 'Check if partner joined';
+  String get checkPartnerJoinedButton => isIt ? 'Controlla ora' : 'Check now';
+  String get waitingForNewDeviceAutoDetect => isIt
+      ? 'In attesa del nuovo telefono · Rilevamento automatico'
+      : 'Waiting for new phone · Detecting automatically';
+  String get enrollmentInviteReadyNotice => isIt
+      ? 'Invito pronto: scansionalo o inseriscilo dal nuovo telefono. Il collegamento verrà rilevato automaticamente.'
+      : 'Invite ready: scan or enter it on the new phone. Connection will be detected automatically.';
   String get regenerateInviteButton => isIt ? 'Rigenera' : 'Regenerate';
   String get generateNewInviteButton =>
       isIt ? 'Genera nuovo invito' : 'Generate new invite';
@@ -106,8 +111,8 @@ class DeepSkyStrings {
   String get customizeServerAction => isIt ? 'Personalizza' : 'Customize';
   String get closeDrawerAction => isIt ? 'Chiudi' : 'Close';
   String get serverDrawerDescription => isIt
-      ? 'La vostra casa risiede al sicuro sul cloud ufficiale. Se desiderate ospitarla sul vostro server personale o IP privato, inseritelo qui sotto.'
-      : 'Your home lives safely on the official cloud. If you prefer to host it on your personal server or private IP, enter it below.';
+      ? 'La vostra casa risiede al sicuro sul cloud ufficiale. Se volete usarne un altro, inserite l\'indirizzo qui sotto.'
+      : 'Your home is safe on the official cloud. If you prefer to host it somewhere else, enter the address below.';
   String get customServerFieldLabel => isIt
       ? 'Indirizzo IP o Dominio dedicato'
       : 'Dedicated domain or IP address';
@@ -123,6 +128,16 @@ class DeepSkyStrings {
   String get serverSyncNote => isIt
       ? 'Il link d\'invito e il QR code si sincronizzeranno in automatico.'
       : 'Your invite link and QR code will update automatically.';
+  String get customServerConfirmTitle =>
+      isIt ? 'Conferma server personalizzato' : 'Confirm custom server';
+  String customServerConfirmBody(String host, String fullUrl) => isIt
+      ? 'Questo invito punta a un server diverso da quello ufficiale Deep Sky:\n\n$host\n($fullUrl)\n\nI metadati di abbinamento e i pacchetti cifrati passeranno da questo server. Vuoi continuare?'
+      : 'This invite points to a server other than the official Deep Sky server:\n\n$host\n($fullUrl)\n\nPairing metadata and encrypted envelopes will go through this server. Do you want to continue?';
+  String get customServerConfirmAction =>
+      isIt ? 'Usa questo server' : 'Use this server';
+  String get customServerInsecureError => isIt
+      ? 'Per sicurezza i server esterni devono usare HTTPS. HTTP è consentito solo per indirizzi locali o privati.'
+      : 'For safety, external servers must use HTTPS. HTTP is only allowed for local or private addresses.';
   String get welcomeFooterNote => isIt
       ? 'Crittografia punto a punto • Solo per voi due'
       : 'End-to-end encrypted • Just for the two of you';
@@ -145,7 +160,7 @@ class DeepSkyStrings {
   String get helpPointPrivacyTitle =>
       isIt ? 'Cifratura end-to-end' : 'End-to-end encryption';
   String get helpPointPrivacyBody => isIt
-      ? 'Le chiavi restano sui vostri telefoni: nemmeno chi gestisce il server può leggere i vostri ricordi.'
+      ? 'Le chiavi restano sui vostri telefoni: nessuno può leggere i vostri ricordi.'
       : 'Keys stay on your phones: not even the server operator can read your memories.';
 
   String get preferencesTooltip =>
@@ -241,8 +256,8 @@ class DeepSkyStrings {
   String get verificationHeadline =>
       isIt ? 'Conferma con l\'altro telefono' : 'Confirm with the other phone';
   String get verificationSubtitle => isIt
-      ? 'Chiedi al tuo partner di controllare se sullo schermo legge la stessa combinazione luminosa.'
-      : 'Ask your partner to check if their screen shows the same luminous code.';
+      ? 'Chiedi al tuo partner di controllare se sullo schermo legge la stessa combinazione.'
+      : 'Ask your partner to check if their screen shows the same code.';
   String verificationConnectedPeer(String label) =>
       isIt ? '$label vuole unirsi a voi' : '$label wants to join you';
   String verificationInvitedBy(String label) =>
@@ -283,8 +298,6 @@ class DeepSkyStrings {
   // Space & Name Setup (`S1-D07-2` / `S1-D09`)
   String get spaceSetupAppBarTitle =>
       isIt ? 'Il vostro spazio' : 'Our Space Setup';
-  String get spaceSetupBadge =>
-      isIt ? 'Fase finale di accoglienza' : 'Final welcome step';
   String get spaceSetupHeadline => isIt
       ? 'Come vi chiamate nei vostri momenti?'
       : 'How should your partner see you?';
@@ -314,4 +327,151 @@ class DeepSkyStrings {
   String get settingsSaveNameButton => isIt ? 'Aggiorna nome' : 'Update name';
   String get deviceNameUpdatedNotice =>
       isIt ? 'Nome aggiornato.' : 'Name updated.';
+
+  // Recovery Key Setup (`S1-D04` / `S1-APP-02`)
+  String get recoverySetupAppBarTitle =>
+      isIt ? 'Chiave di recupero' : 'Recovery Key';
+  String get recoverySetupHeadline => isIt
+      ? 'Conserva la tua chiave di recupero'
+      : 'Save your recovery key safely';
+  String get recoverySetupSubtitle => isIt
+      ? 'Queste 24 parole sono l\'unico modo per riaccendere la vostra casa se perdi o cambi entrambi i telefoni. Nessun server le conosce.'
+      : 'These 24 words are the only way to restore your home if both phones are lost or replaced. No server knows them.';
+  String get recoveryShowWordsTab => isIt ? '24 Parole' : '24 Words';
+  String get recoveryShowQrTab => isIt ? 'Codice QR' : 'QR Code';
+  String get recoveryCopyWordsButton =>
+      isIt ? 'Copia frase (24 parole)' : 'Copy phrase (24 words)';
+  String get recoveryCopiedNotice => isIt
+      ? 'Frase di recupero copiata negli appunti.'
+      : 'Recovery phrase copied to clipboard.';
+  String get recoveryExportButton =>
+      isIt ? 'Esporta promemoria offline' : 'Export offline reminder';
+  String get recoveryWarningTitle =>
+      isIt ? 'Come proteggerla davvero' : 'How to keep it truly safe';
+  String get recoveryWarningBody => isIt
+      ? '• Evita screenshot o foto che finiscono su cloud non cifrati.\n• Scrivila su carta o salvala in un gestore password cifrato offline.'
+      : '• Avoid screenshots or photos synced to unencrypted cloud backups.\n• Write it on paper or save it in an offline encrypted password vault.';
+
+  // Guided 24-word Recovery (`S1-D10` / `S1-APP-04`)
+  String get recoverSectionHeadline =>
+      isIt ? 'Ritrova la tua stanza' : 'Find your room again';
+  String get recoverSectionSubtitle => isIt
+      ? 'Inserisci le 24 parole di recupero nell\'ordine esatto, oppure inquadra il QR di recupero.'
+      : 'Enter the 24 recovery words in exact order, or scan your saved recovery QR code.';
+  String get recoverFieldPlaceholder => isIt
+      ? 'Scrivi o incolla qui le tue 24 parole (es. abandon ability ...)'
+      : 'Type or paste your 24 words here (e.g. abandon ability ...)';
+  String recoverMissingWordsCounter(int missing) =>
+      isIt ? '... $missing parole mancanti' : '... $missing words remaining';
+  String get recoverWordsComplete =>
+      isIt ? '✓ 24 parole complete' : '✓ All 24 words entered';
+  String recoverInvalidWordsHint(int count) => isIt
+      ? 'Controlla $count ${count == 1 ? 'parola non riconosciuta' : 'parole non riconosciute'} nel dizionario BIP-39.'
+      : 'Check $count unrecognized ${count == 1 ? 'word' : 'words'} against the BIP-39 dictionary.';
+  String get recoverSubmitButton =>
+      isIt ? 'Ripristina e riaccendi la casa' : 'Restore and relight your home';
+  String get recoverCalmFailureMessage => isIt
+      ? 'Non siamo riusciti a sbloccare la stanza con questa chiave e questo server. Controlla l\'ordine delle 24 parole o l\'indirizzo del server e riprova.'
+      : 'We could not unlock a room with this key and server. Check the 24 words order or server address and try again.';
+
+  // Devices Tab & Calm Revocation (`S1-D11` / `S1-APP-05`)
+  String devicesSectionTitle(int count) =>
+      isIt ? 'Dispositivi collegati ($count)' : 'Connected devices ($count)';
+  String get deviceStatusRevoked => isIt ? 'Revocato' : 'Revoked';
+  String get deviceStatusThisPhone =>
+      isIt ? 'Attivo · questo telefono' : 'Active · this phone';
+  String get deviceStatusActive => isIt ? 'Attivo' : 'Active';
+  String get revokeDeviceAction => isIt ? 'Revoca' : 'Revoke';
+  String get revokeDialogTitle =>
+      isIt ? 'Revocare questo dispositivo?' : 'Revoke this device?';
+  String revokeDialogBody(String label) => isIt
+      ? '«$label» perderà subito l\'accesso ai vostri ricordi su questo telefono. I dati cifrati condivisi restano al sicuro per gli altri dispositivi attivi.'
+      : '"$label" will immediately lose access to your memories on that device. Your shared encrypted home remains intact on active devices.';
+  String get revokeDialogConfirm => isIt ? 'Revoca accesso' : 'Revoke access';
+
+  // Contextual Push Opt-in (`S1-D12` / `S1-APP-05`) & Settings (`S1-D13`/`S1-D14`)
+  String get pushPromptTitle => isIt
+      ? 'Avvisi discreti sul telefono'
+      : 'Quiet notifications on this phone';
+  String get pushPromptBody => isIt
+      ? 'Ricevi un semplice risveglio anonimo quando il tuo partner ti pensa o chiede accesso: il server non invia mai testi o nomi.'
+      : 'Receive a quiet anonymous nudge when your partner thinks of you or requests device approval—no names or message content ever leave your phones.';
+  String get pushPromptEnableButton =>
+      isIt ? 'Attiva notifiche discrete' : 'Enable quiet notifications';
+  String get pushPromptLaterButton => isIt ? 'Non ora' : 'Not now';
+  String get settingsPrefsTitle =>
+      isIt ? 'Preferenze stanza e lingua' : 'Room & language preferences';
+  String get settingsNightMode =>
+      isIt ? 'Atmosfera notturna' : 'Night atmosphere';
+  String get settingsReduceMotion =>
+      isIt ? 'Riduci movimento' : 'Reduce motion';
+  String get settingsLanguageLabel => 'Lingua / Language';
+  String get settingsPushTitle => isIt
+      ? 'Notifiche push discrete (FCM runtime)'
+      : 'Quiet push notifications (runtime FCM)';
+  String settingsPushActiveCount(int count) => isIt
+      ? 'Attive (risvegli ricevuti: $count)'
+      : 'Active (wakeups received: $count)';
+  String get settingsPushInactive => isIt
+      ? 'Non ancora attivate su questo telefono.'
+      : 'Not yet enabled on this device.';
+  String get settingsPushEnableButton => isIt
+      ? 'Attiva notifiche su questo telefono'
+      : 'Enable notifications on this phone';
+  String get settingsOpenNotificationSettingsButton =>
+      isIt ? 'Apri impostazioni notifiche' : 'Open notification settings';
+  String get settingsPushPermissionGranted =>
+      isIt ? 'Permesso di sistema: consentito' : 'System permission: allowed';
+  String get settingsPushPermissionMissing => isIt
+      ? 'Permesso di sistema: disattivato nelle impostazioni del telefono'
+      : 'System permission: disabled in phone settings';
+  String get pushServerDisabledError => isIt
+      ? 'Le notifiche push non risultano attive su questo server.'
+      : 'Push notifications are not enabled on this server.';
+  String get pushPermissionDeniedError => isIt
+      ? 'Il telefono blocca ancora le notifiche per Deep Sky. Apri le impostazioni per consentirle.'
+      : 'Phone notification permission is still blocked. Open settings to allow it.';
+  String get pushGmsUnavailableError => isIt
+      ? 'Google Play Services non è disponibile o è limitato su questo telefono: le notifiche push richiedono Play Services attivi.'
+      : 'Google Play Services is unavailable or restricted on this phone: push notifications require active Play Services.';
+  String get pushTimeoutError => isIt
+      ? 'Tempo scaduto durante la registrazione push con Google Play Services. Controlla rete o risparmio energetico e riprova.'
+      : 'Timed out registering push notifications with Google Play Services. Check network or battery restrictions and try again.';
+  String pushTokenFailedError(String detail) => isIt
+      ? 'Impossibile attivare le notifiche su questo telefono ($detail).'
+      : 'Unable to enable notifications on this phone ($detail).';
+  String get settingsUpdatesTitle => isIt
+      ? 'Aggiornamenti app (APK firmato offline)'
+      : 'App updates (offline-signed APK)';
+  String settingsVersionLine(String name, int code) =>
+      isIt ? 'Versione: $name ($code)' : 'Version: $name ($code)';
+  String get updateChannelLabel =>
+      isIt ? 'Canale aggiornamenti' : 'Update channel';
+  String get updateSourceFieldLabel => isIt
+      ? 'Sorgente release (owner/repo o URL)'
+      : 'Release source (owner/repo or URL)';
+  String get updatePublicKeyFieldLabel =>
+      isIt ? 'Chiave pubblica Ed25519 (base64)' : 'Ed25519 public key (base64)';
+  String get advancedUpdateOptionsLabel =>
+      isIt ? 'Opzioni avanzate sviluppatore' : 'Advanced developer options';
+  String get allowCustomUpdateAnchorLabel => isIt
+      ? 'Consenti sorgente o chiave personalizzata'
+      : 'Allow custom update source or trust key';
+  String get allowCustomUpdateAnchorHint => isIt
+      ? 'Usa solo per test locali o fork fidati.'
+      : 'Use only for local testing or trusted forks.';
+  String updateDownloadProgress(int percent) => isIt
+      ? 'Scaricamento aggiornamento… $percent%'
+      : 'Downloading update… $percent%';
+  String upgradeVersionSummary(
+    String installedName,
+    int installedCode,
+    int? minCode,
+  ) => isIt
+      ? 'Versione installata: $installedName (codice $installedCode) · Minima server: ${minCode ?? '?'}'
+      : 'Installed version: $installedName (code $installedCode) · Server minimum: ${minCode ?? '?'}';
+
+  String get inviteMissingSasSecretError => isIt
+      ? 'Questo codice è incompleto: incolla l\'intero link d\'invito o il codice completo ricevuto dal partner, oppure scansiona il QR.'
+      : 'This invite code is incomplete: paste the full invite link or full pairing code from your partner, or scan the QR.';
 }

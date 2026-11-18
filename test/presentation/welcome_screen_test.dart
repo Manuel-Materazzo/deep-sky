@@ -129,8 +129,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         copiedClipboardText,
-        'https://deepsky.vectevo.com/join#token=tok-welcome-1',
+        startsWith('https://deepsky.vectevo.com/join#token=tok-welcome-1&sas='),
       );
+      expect(copiedClipboardText, equals(controller.activeInviteUri));
       expect(find.text('Copiato!'), findsOneWidget);
 
       // Expand server drawer and save custom LAN IP
@@ -159,7 +160,9 @@ void main() {
       );
       expect(
         controller.activeInviteUri,
-        'https://deepsky.vectevo.com/join#server=http%3A%2F%2F192.168.1.50%3A8080&token=tok-welcome-2',
+        startsWith(
+          'https://deepsky.vectevo.com/join#server=http%3A%2F%2F192.168.1.50%3A8080&token=tok-welcome-2&sas=',
+        ),
       );
       expect(find.text('Personalizzato (192.168.1.50:8080)'), findsOneWidget);
 
@@ -275,7 +278,7 @@ void main() {
                 );
               }
               if (scanMode == 'invite') {
-                return 'https://deepsky.vectevo.com/join#server=http%3A%2F%2F192.168.1.99%3A8080&token=tok_qr_joined';
+                return 'https://deepsky.vectevo.com/join#server=http%3A%2F%2F192.168.1.99%3A8080&token=tok_qr_joined&sas=AQIDBAUGBwgJCgsMDQ4PEA';
               }
               if (scanMode == 'recovery') {
                 return 'stella notte cammino lanterna';
@@ -311,7 +314,12 @@ void main() {
           );
         }
         if (req.method == 'POST' &&
-            req.url.path == '/api/v1/pairing/invites/tok_qr_joined/accept') {
+            req.url.path == '/api/v1/pairing/invites/accept') {
+          final Map<String, Object?> body =
+              jsonDecode(req.body) as Map<String, Object?>;
+          if (body['inviteToken'] != 'tok_qr_joined') {
+            return http.Response('{}', 409);
+          }
           acceptRequests.add(req.url);
           return http.Response(
             jsonEncode(<String, Object?>{
@@ -378,17 +386,26 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('Permesso fotocamera'), findsOneWidget);
 
-      // Valid QR scan parses server + token and transitions to SAS verification
+      // Valid QR scan for custom server shows blocking confirmation naming host (CA-06)
       scanMode = 'invite';
       await tester.ensureVisible(
         find.byKey(const Key('scan-invite-qr-button')),
       );
       await tester.tap(find.byKey(const Key('scan-invite-qr-button')));
       await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('custom-server-confirm-dialog')),
+        findsOneWidget,
+      );
+      expect(find.textContaining('192.168.1.99:8080'), findsWidgets);
+      expect(acceptRequests, isEmpty);
+
+      await tester.tap(find.byKey(const Key('custom-server-confirm-button')));
+      await tester.pumpAndSettle();
       expect(acceptRequests, hasLength(1));
       expect(
         acceptRequests.first.toString(),
-        'http://192.168.1.99:8080/api/v1/pairing/invites/tok_qr_joined/accept',
+        'http://192.168.1.99:8080/api/v1/pairing/invites/accept',
       );
       expect(find.byKey(const Key('joiner-sas-code')), findsOneWidget);
     },

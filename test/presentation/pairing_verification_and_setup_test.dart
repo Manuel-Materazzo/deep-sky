@@ -85,11 +85,12 @@ void main() {
       await tester.pumpAndSettle();
 
       final String firstInviteToken = server.lastInviteToken!;
+      final String firstInviteUri = ctrlA.activeInviteUri!;
 
       await ctrlB.initialize();
       await ctrlB.acceptInvite(
         serverUrl: 'https://couple.example.test',
-        inviteToken: firstInviteToken,
+        inviteToken: firstInviteUri,
         deviceLabel: 'Telefono B',
       );
       final String expectedSas = ctrlB.pendingJoin!.sasCode;
@@ -98,10 +99,9 @@ void main() {
       expect(find.byKey(const Key('code-verification-page')), findsOneWidget);
       expect(find.byKey(const Key('inviter-sas-code')), findsOneWidget);
       expect(find.bySemanticsLabel('SAS $expectedSas'), findsOneWidget);
-
-      await tapVisible(tester, find.byKey(const Key('copy-sas-button')));
-      expect(copiedClipboard, expectedSas);
-      expect(find.text('Copiato!'), findsOneWidget);
+      // CA-10: SAS code must not be copyable to clipboard
+      expect(find.byKey(const Key('copy-sas-button')), findsNothing);
+      expect(copiedClipboard, isNull);
 
       // Mismatch button opens confirmation dialog and then resets with a calm notice & fresh invite.
       await tapVisible(tester, find.byKey(const Key('mismatch-sas-button')));
@@ -153,7 +153,7 @@ void main() {
       await ctrlB.initialize();
       await ctrlB.acceptInvite(
         serverUrl: 'https://couple.example.test',
-        inviteToken: server.lastInviteToken!,
+        inviteToken: ctrlA.activeInviteUri!,
         deviceLabel: 'Telefono B',
       );
 
@@ -218,7 +218,7 @@ void main() {
       await ctrlB.initialize();
       await ctrlB.acceptInvite(
         serverUrl: 'https://couple.example.test',
-        inviteToken: server.lastInviteToken!,
+        inviteToken: ctrlA.activeInviteUri!,
         deviceLabel: 'Sofia',
       );
       await ctrlA.pollActiveInvite();
@@ -270,6 +270,15 @@ void main() {
         tester,
         find.byKey(const Key('space-setup-submit-button')),
       );
+      expect(find.byKey(const Key('recovery-key-setup-page')), findsOneWidget);
+      await tapVisible(
+        tester,
+        find.byKey(const Key('recovery-saved-checkbox')),
+      );
+      await tapVisible(
+        tester,
+        find.byKey(const Key('confirm-recovery-button')),
+      );
       expect(find.byKey(const Key('home-shell-page')), findsOneWidget);
       expect(ctrlA.deviceLabel, 'Marco');
       expect(server.deviceLabels[ctrlA.identity!.deviceId], 'Marco');
@@ -289,6 +298,209 @@ void main() {
 
       await tapVisible(tester, find.text('Dispositivi'));
       expect(find.text('Marco P.'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'S1-D05/S1-D07 auto-detects partner join without pressing poll button, respects back, and resumes after regenerate',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final _MiniPairingServer server = _MiniPairingServer();
+      final MockClient httpClient = MockClient(server.handle);
+
+      final DeepSkyController ctrlA = DeepSkyController(
+        keyStore: InMemorySecureKeyStore(),
+        httpClient: httpClient,
+        loadAssetString: (_) async => pilotManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+        inviteAutoPollInterval: const Duration(milliseconds: 250),
+      );
+      ctrlA.reduceMotion = true;
+
+      final DeepSkyController ctrlB = DeepSkyController(
+        keyStore: InMemorySecureKeyStore(),
+        httpClient: httpClient,
+        loadAssetString: (_) async => pilotManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+      );
+      ctrlB.reduceMotion = true;
+
+      await tester.pumpWidget(DeepSkyApp(controller: ctrlA));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
+      final String firstToken = server.lastInviteToken!;
+      final String firstInviteUri = ctrlA.activeInviteUri!;
+
+      // Before partner joins, automatic poll ticks quietly without errors or busy lock.
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
+      expect(ctrlA.errorNotice, isNull);
+      expect(ctrlA.statusNotice, isNull);
+      expect(server.statusPollCount, greaterThanOrEqualTo(1));
+
+      // Partner B joins -> next automatic poll moves Partner A to CodeVerificationPage.
+      await ctrlB.initialize();
+      await ctrlB.acceptInvite(
+        serverUrl: 'https://couple.example.test',
+        inviteToken: firstInviteUri,
+        deviceLabel: 'Telefono B',
+      );
+      final String firstSas = ctrlB.pendingJoin!.sasCode;
+
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('code-verification-page')), findsOneWidget);
+      expect(find.bySemanticsLabel('SAS $firstSas'), findsOneWidget);
+
+      // Going back suppresses auto-reentry on the dismissed token.
+      await tapVisible(
+        tester,
+        find.byKey(const Key('verification-back-button')),
+      );
+      expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
+
+      // Regenerating creates a new invite and resumes automatic detection.
+      await tapVisible(
+        tester,
+        find.byKey(const Key('regenerate-invite-button')),
+      );
+      final String secondToken = server.lastInviteToken!;
+      expect(secondToken, isNot(firstToken));
+
+      final DeepSkyController ctrlB2 = DeepSkyController(
+        keyStore: InMemorySecureKeyStore(),
+        httpClient: httpClient,
+        loadAssetString: (_) async => pilotManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+      );
+      ctrlB2.reduceMotion = true;
+      await ctrlB2.initialize();
+      await ctrlB2.acceptInvite(
+        serverUrl: 'https://couple.example.test',
+        inviteToken: ctrlA.activeInviteUri!,
+        deviceLabel: 'Telefono B2',
+      );
+
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('code-verification-page')), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('SAS ${ctrlB2.pendingJoin!.sasCode}'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'Enrollment in Devices tab auto-detects new phone and app resume checks immediately',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final _MiniPairingServer server = _MiniPairingServer();
+      final MockClient httpClient = MockClient(server.handle);
+
+      final DeepSkyController ctrlA = DeepSkyController(
+        keyStore: InMemorySecureKeyStore(),
+        httpClient: httpClient,
+        loadAssetString: (_) async => pilotManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+        inviteAutoPollInterval: const Duration(seconds: 5),
+      );
+      ctrlA.reduceMotion = true;
+
+      final DeepSkyController ctrlB = DeepSkyController(
+        keyStore: InMemorySecureKeyStore(),
+        httpClient: httpClient,
+        loadAssetString: (_) async => pilotManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+      );
+      ctrlB.reduceMotion = true;
+
+      // Test immediate check on AppLifecycleState.resumed during initial pairing.
+      await tester.pumpWidget(DeepSkyApp(controller: ctrlA));
+      await tester.pumpAndSettle();
+
+      await ctrlB.initialize();
+      await ctrlB.acceptInvite(
+        serverUrl: 'https://couple.example.test',
+        inviteToken: ctrlA.activeInviteUri!,
+        deviceLabel: 'Telefono B',
+      );
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('code-verification-page')), findsOneWidget);
+      await tapVisible(tester, find.byKey(const Key('confirm-sas-button')));
+      await tapVisible(
+        tester,
+        find.byKey(const Key('space-setup-skip-button')),
+      );
+      await tapVisible(
+        tester,
+        find.byKey(const Key('recovery-saved-checkbox')),
+      );
+      await tapVisible(
+        tester,
+        find.byKey(const Key('confirm-recovery-button')),
+      );
+      expect(find.byKey(const Key('home-shell-page')), findsOneWidget);
+
+      // Switch to Devices tab and create an enrollment invite.
+      await tapVisible(tester, find.text('Dispositivi'));
+      await tapVisible(
+        tester,
+        find.byKey(const Key('create-enrollment-invite-button')),
+      );
+      expect(find.byKey(const Key('enroll-invite-token')), findsOneWidget);
+      final String enrollCode = ctrlA.activeInviteManualCode!;
+
+      // New phone C accepts the enrollment invite.
+      final DeepSkyController ctrlC = DeepSkyController(
+        keyStore: InMemorySecureKeyStore(),
+        httpClient: httpClient,
+        loadAssetString: (_) async => pilotManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+      );
+      ctrlC.reduceMotion = true;
+      await ctrlC.initialize();
+      await ctrlC.acceptInvite(
+        serverUrl: 'https://couple.example.test',
+        inviteToken: enrollCode,
+        deviceLabel: 'Telefono C',
+      );
+      final String expectedEnrollSas = ctrlC.pendingJoin!.sasCode;
+
+      // Advance past the 5s auto-poll interval without pressing enroll-poll-invite-button.
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('enroll-sas-code')), findsOneWidget);
+      expect(
+        find.text('Codice di verifica SAS: $expectedEnrollSas'),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('enroll-confirm-sas-button')),
+        findsOneWidget,
+      );
     },
   );
 }
@@ -319,9 +531,12 @@ class _MiniInviteRecord {
 class _MiniPairingServer {
   String? lastInviteToken;
   int _counter = 0;
+  int statusPollCount = 0;
 
   final Map<String, Map<String, Object?>> _devices =
       <String, Map<String, Object?>>{};
+  final Map<String, ({String authB64, String kemB64})> _deviceKeys =
+      <String, ({String authB64, String kemB64})>{};
   final Map<String, String> deviceLabels = <String, String>{};
   final Map<String, _MiniInviteRecord> _invites = <String, _MiniInviteRecord>{};
   final Map<String, Map<String, Object?>> _keyDeliveries =
@@ -348,6 +563,9 @@ class _MiniPairingServer {
         'revokedAt': null,
       };
       deviceLabels[inviterId] = label;
+      final String authB64 = body['deviceAuthPublicKeyB64'] as String;
+      final String kemB64 = body['deviceKemPublicKeyB64'] as String;
+      _deviceKeys[inviterId] = (authB64: authB64, kemB64: kemB64);
 
       final String inviteToken = 'TOK$_counter';
       lastInviteToken = inviteToken;
@@ -356,8 +574,8 @@ class _MiniPairingServer {
         coupleId: coupleId,
         inviterDeviceId: inviterId,
         inviterLabel: label,
-        inviterAuthB64: body['deviceAuthPublicKeyB64'] as String,
-        inviterKemB64: body['deviceKemPublicKeyB64'] as String,
+        inviterAuthB64: authB64,
+        inviterKemB64: kemB64,
       );
       return _json(<String, Object?>{
         'coupleId': coupleId,
@@ -370,11 +588,33 @@ class _MiniPairingServer {
       }, status: 201);
     }
 
-    final RegExpMatch? acceptMatch = RegExp(
-      r'^/api/v1/pairing/invites/([^/]+)/accept$',
-    ).firstMatch(path);
-    if (req.method == 'POST' && acceptMatch != null) {
-      final _MiniInviteRecord invite = _invites[acceptMatch.group(1)!]!;
+    if (req.method == 'POST' && path == '/api/v1/pairing/enrollment-invites') {
+      _counter += 1;
+      final String inviterId = deviceId!;
+      final String inviteToken = 'ENROLL$_counter';
+      lastInviteToken = inviteToken;
+      final keys = _deviceKeys[inviterId]!;
+      _invites[inviteToken] = _MiniInviteRecord(
+        token: inviteToken,
+        coupleId: 'couple-1',
+        inviterDeviceId: inviterId,
+        inviterLabel: deviceLabels[inviterId] ?? 'Device',
+        inviterAuthB64: keys.authB64,
+        inviterKemB64: keys.kemB64,
+      );
+      return _json(<String, Object?>{
+        'coupleId': 'couple-1',
+        'deviceId': inviterId,
+        'inviteToken': inviteToken,
+        'expiresAt': DateTime.now()
+            .toUtc()
+            .add(const Duration(minutes: 15))
+            .toIso8601String(),
+      }, status: 201);
+    }
+
+    if (req.method == 'POST' && path == '/api/v1/pairing/invites/accept') {
+      final _MiniInviteRecord invite = _invites[body['inviteToken'] as String]!;
       _counter += 1;
       final String joinerId = 'dev-$_counter';
       final String label = body['deviceLabel'] as String? ?? 'Device';
@@ -400,11 +640,9 @@ class _MiniPairingServer {
       });
     }
 
-    final RegExpMatch? statusMatch = RegExp(
-      r'^/api/v1/pairing/invites/([^/]+)/status$',
-    ).firstMatch(path);
-    if (req.method == 'GET' && statusMatch != null) {
-      final _MiniInviteRecord invite = _invites[statusMatch.group(1)!]!;
+    if (req.method == 'POST' && path == '/api/v1/pairing/invites/status') {
+      statusPollCount += 1;
+      final _MiniInviteRecord invite = _invites[body['inviteToken'] as String]!;
       return _json(<String, Object?>{
         'accepted': invite.acceptedDeviceId != null,
         'acceptedDeviceId': invite.acceptedDeviceId,
@@ -454,7 +692,11 @@ class _MiniPairingServer {
     }
 
     if (req.method == 'GET' && path == '/api/v1/sync/envelopes') {
-      return _json(<Object?>[]);
+      return _json(<String, Object?>{
+        'items': const <Object?>[],
+        'nextAfterSeq': 0,
+        'hasMore': false,
+      });
     }
 
     return _json(<String, Object?>{

@@ -113,7 +113,7 @@ class EncryptedEnvelope {
   }
 }
 
-/// X25519 + XChaCha20-Poly1305 wrapped `recoverySeed` delivered between partner devices.
+/// X25519 + XChaCha20-Poly1305 wrapped key package delivered between partner devices.
 class WrappedKeyPackage {
   const WrappedKeyPackage({
     required this.coupleId,
@@ -121,6 +121,8 @@ class WrappedKeyPackage {
     required this.toDeviceId,
     required this.nonce,
     required this.ciphertextWithTag,
+    this.keyEpoch = 1,
+    this.deliveryKind = 'PAIRING_SEED',
   });
 
   final String coupleId;
@@ -128,11 +130,14 @@ class WrappedKeyPackage {
   final String toDeviceId;
   final Uint8List nonce;
   final Uint8List ciphertextWithTag;
+  final int keyEpoch;
+  final String deliveryKind;
 
   Map<String, Object?> toJson() => <String, Object?>{
     'toDeviceId': toDeviceId,
     'nonceB64': base64UrlEncode(nonce),
     'ciphertextB64': base64UrlEncode(ciphertextWithTag),
+    if (keyEpoch > 1) 'keyEpoch': keyEpoch,
   };
 
   factory WrappedKeyPackage.fromJson(Map<String, Object?> json) {
@@ -146,6 +151,56 @@ class WrappedKeyPackage {
       ciphertextWithTag: Uint8List.fromList(
         base64Url.decode(_padB64(json['ciphertextB64'] as String)),
       ),
+      keyEpoch: json['keyEpoch'] as int? ?? 1,
+      deliveryKind: json['deliveryKind'] as String? ?? 'PAIRING_SEED',
+    );
+  }
+}
+
+/// Versioned key bundle (`CA-02`, `ADR-0012`) carrying the active `recoverySeed`,
+/// `currentKeyEpoch`, historical `epoch1` root key (key `1` when rotated), and `epoch >= 2` secrets.
+class KeyBundle {
+  const KeyBundle({
+    required this.recoverySeed,
+    required this.currentKeyEpoch,
+    required this.epochSecrets,
+  });
+
+  final Uint8List recoverySeed;
+  final int currentKeyEpoch;
+  final Map<int, Uint8List> epochSecrets;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'schemaVersion': 2,
+    'recoverySeedB64': base64UrlEncode(recoverySeed),
+    'currentKeyEpoch': currentKeyEpoch,
+    'epochSecretsB64': <String, String>{
+      for (final MapEntry<int, Uint8List> entry in epochSecrets.entries)
+        entry.key.toString(): base64UrlEncode(entry.value),
+    },
+  };
+
+  factory KeyBundle.fromJson(Map<String, Object?> json) {
+    final int schema = json['schemaVersion'] as int? ?? 0;
+    if (schema != 2) {
+      throw FormatException('Unsupported KeyBundle schemaVersion=$schema');
+    }
+    final Map<int, Uint8List> epochs = <int, Uint8List>{};
+    final Object? rawMap = json['epochSecretsB64'];
+    if (rawMap is Map) {
+      for (final MapEntry<Object?, Object?> entry in rawMap.entries) {
+        final int epoch = int.parse(entry.key.toString());
+        epochs[epoch] = Uint8List.fromList(
+          base64Url.decode(_padB64(entry.value! as String)),
+        );
+      }
+    }
+    return KeyBundle(
+      recoverySeed: Uint8List.fromList(
+        base64Url.decode(_padB64(json['recoverySeedB64'] as String)),
+      ),
+      currentKeyEpoch: json['currentKeyEpoch'] as int,
+      epochSecrets: Map<int, Uint8List>.unmodifiable(epochs),
     );
   }
 }
@@ -162,6 +217,8 @@ class LocalDeviceIdentity {
     required this.kemPrivateKey,
     required this.kemPublicKey,
     this.recoverySeed,
+    this.currentKeyEpoch = 1,
+    this.epochSecrets = const <int, Uint8List>{},
     this.recoverySavedConfirmed = false,
     this.pairingCompleted = true,
     this.nameSetupCompleted = true,
@@ -176,6 +233,8 @@ class LocalDeviceIdentity {
   final Uint8List kemPrivateKey;
   final Uint8List kemPublicKey;
   final Uint8List? recoverySeed;
+  final int currentKeyEpoch;
+  final Map<int, Uint8List> epochSecrets;
   final bool recoverySavedConfirmed;
   final bool pairingCompleted;
   final bool nameSetupCompleted;
@@ -192,6 +251,8 @@ class LocalDeviceIdentity {
     Uint8List? kemPrivateKey,
     Uint8List? kemPublicKey,
     Uint8List? recoverySeed,
+    int? currentKeyEpoch,
+    Map<int, Uint8List>? epochSecrets,
     bool? recoverySavedConfirmed,
     bool? pairingCompleted,
     bool? nameSetupCompleted,
@@ -206,6 +267,8 @@ class LocalDeviceIdentity {
       kemPrivateKey: kemPrivateKey ?? this.kemPrivateKey,
       kemPublicKey: kemPublicKey ?? this.kemPublicKey,
       recoverySeed: recoverySeed ?? this.recoverySeed,
+      currentKeyEpoch: currentKeyEpoch ?? this.currentKeyEpoch,
+      epochSecrets: epochSecrets ?? this.epochSecrets,
       recoverySavedConfirmed:
           recoverySavedConfirmed ?? this.recoverySavedConfirmed,
       pairingCompleted: pairingCompleted ?? this.pairingCompleted,
@@ -225,6 +288,12 @@ class LocalDeviceIdentity {
     'recoverySeedB64': recoverySeed == null
         ? null
         : base64UrlEncode(recoverySeed!),
+    'currentKeyEpoch': currentKeyEpoch,
+    if (epochSecrets.isNotEmpty)
+      'epochSecretsB64': <String, String>{
+        for (final MapEntry<int, Uint8List> entry in epochSecrets.entries)
+          entry.key.toString(): base64UrlEncode(entry.value),
+      },
     'recoverySavedConfirmed': recoverySavedConfirmed,
     'pairingCompleted': pairingCompleted,
     'nameSetupCompleted': nameSetupCompleted,
@@ -232,6 +301,16 @@ class LocalDeviceIdentity {
 
   factory LocalDeviceIdentity.fromJson(Map<String, Object?> json) {
     final String? recoveryB64 = json['recoverySeedB64'] as String?;
+    final Map<int, Uint8List> epochs = <int, Uint8List>{};
+    final Object? rawEpochs = json['epochSecretsB64'];
+    if (rawEpochs is Map) {
+      for (final MapEntry<Object?, Object?> entry in rawEpochs.entries) {
+        final int epoch = int.parse(entry.key.toString());
+        epochs[epoch] = Uint8List.fromList(
+          base64Url.decode(_padB64(entry.value! as String)),
+        );
+      }
+    }
     return LocalDeviceIdentity(
       serverUrl: json['serverUrl'] as String,
       coupleId: json['coupleId'] as String,
@@ -252,6 +331,8 @@ class LocalDeviceIdentity {
       recoverySeed: recoveryB64 == null
           ? null
           : Uint8List.fromList(base64Url.decode(_padB64(recoveryB64))),
+      currentKeyEpoch: json['currentKeyEpoch'] as int? ?? 1,
+      epochSecrets: Map<int, Uint8List>.unmodifiable(epochs),
       recoverySavedConfirmed: json['recoverySavedConfirmed'] as bool? ?? false,
       pairingCompleted: json['pairingCompleted'] as bool? ?? true,
       nameSetupCompleted: json['nameSetupCompleted'] as bool? ?? true,

@@ -5,7 +5,6 @@ import 'package:deep_sky/presentation/deep_sky_controller.dart';
 import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
 import 'package:deep_sky/presentation/theme/deep_sky_theme.dart';
 import 'package:deep_sky/presentation/widgets/invite_verification_section.dart';
-import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -29,26 +28,80 @@ class _WelcomeInvitePanelState extends State<WelcomeInvitePanel> {
   bool _copied = false;
   Timer? _copiedResetTimer;
   Timer? _expiryTicker;
+  Timer? _autoPollTimer;
+  String? _polledInviteToken;
 
   @override
   void initState() {
     super.initState();
+    widget.controller.addListener(_syncAutoPollTimer);
+    unawaited(widget.controller.setSecureScreen(true));
     _expiryTicker = Timer.periodic(const Duration(seconds: 30), (_) {
       if (mounted) {
+        _syncAutoPollTimer();
         setState(() {});
       }
     });
+    _syncAutoPollTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant WelcomeInvitePanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_syncAutoPollTimer);
+      widget.controller.addListener(_syncAutoPollTimer);
+    }
+    _syncAutoPollTimer();
   }
 
   @override
   void dispose() {
+    unawaited(widget.controller.setSecureScreen(false));
+    widget.controller.removeListener(_syncAutoPollTimer);
     _copiedResetTimer?.cancel();
     _expiryTicker?.cancel();
+    _autoPollTimer?.cancel();
     super.dispose();
   }
 
+  void _syncAutoPollTimer() {
+    final DeepSkyController c = widget.controller;
+    final CreateInviteResponse? invite = c.activeInvite;
+    final bool shouldPoll =
+        invite != null &&
+        c.activeSasCode == null &&
+        c.phase == AppBootPhase.waiting &&
+        invite.expiresAt.toUtc().isAfter(DateTime.now().toUtc());
+
+    if (!shouldPoll) {
+      _autoPollTimer?.cancel();
+      _autoPollTimer = null;
+      _polledInviteToken = null;
+      return;
+    }
+
+    if (_autoPollTimer != null && _polledInviteToken == invite.inviteToken) {
+      return;
+    }
+
+    _autoPollTimer?.cancel();
+    _polledInviteToken = invite.inviteToken;
+    _autoPollTimer = Timer.periodic(c.inviteAutoPollInterval, (_) {
+      if (!mounted) {
+        return;
+      }
+      if (!invite.expiresAt.toUtc().isAfter(DateTime.now().toUtc())) {
+        _syncAutoPollTimer();
+        setState(() {});
+        return;
+      }
+      unawaited(c.pollActiveInviteSilently());
+    });
+  }
+
   Future<void> _copyInviteLink(String inviteUri) async {
-    await Clipboard.setData(ClipboardData(text: inviteUri));
+    await widget.controller.copySensitiveText(inviteUri);
     _copiedResetTimer?.cancel();
     if (!mounted) {
       return;

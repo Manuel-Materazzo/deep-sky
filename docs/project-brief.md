@@ -1,6 +1,6 @@
 # Project Brief: Deep Sky
 
-**Versione:** 0.2 (bozza per revisione) · **Data:** 12 novembre 2026 · **Stato:** in attesa di approvazione del promotore
+**Versione:** 0.2 (bozza per revisione) · **Data:** 12 novembre 2026 (D-08 aggiornata il 16 novembre 2026) · **Stato:** in attesa di approvazione del promotore
 
 **Destinatari:** promotore del progetto e team di agenti AI incaricati di produrre i documenti successivi (design system, documento architetturale, piano di sviluppo, specifiche, test plan).
 
@@ -230,7 +230,7 @@ Gli agenti non le risolvono: le segnalano e propongono alternative con pro e con
 | **D-05** | Licenza e momento di apertura del codice | Decisione dopo il dogfooding. |
 | **D-06** | Stack tecnologico e architettura | Deciso: Flutter per l’app; Java con Spring Boot e PostgreSQL per il backend; tutto in Docker Compose, con immagini per ARM e AMD. Il documento architetturale ne dettaglia l’uso. |
 | **D-07** | Piattaforme al lancio | Deciso: Android per primo, distribuito come APK dalle release GitHub, senza Play Store né App Store per ora. iOS rimandato. |
-| **D-08** | Notifiche push | Proposta: FCM con credenziali Firebase fornite a runtime dal server del self-hoster, senza relay; da validare con un prototipo. UnifiedPush come opzione futura. |
+| **D-08** | Notifiche push | **[Deciso]** FCM con credenziali Firebase fornite a runtime dal server del self-hoster, senza relay e senza `google-services.json` nell'APK. Validato con il prototipo SP-01 su hardware reale (app aperta, in background, chiusa dal task switcher, dopo riavvio, in Doze; ADR-0006). Il Force Stop da Impostazioni sospende la consegna fino alla riapertura dell'app. UnifiedPush resta opzione futura (Piano B, non attivato). |
 | **D-09** | Verifica indipendente delle alternative | Una prova pratica di Kehai e OnePair con due dispositivi reali non è stata ancora svolta. Il promotore ha già valutato i progetti; decidere se serve altro. |
 | **D-10** | Modello di hosting gestito | Se e quando offrirlo, a quale costo e con quali garanzie. |
 | D-11 | Strumento di generazione e licenza degli asset AI | I termini d’uso dello strumento devono consentire la redistribuzione degli asset in un progetto open source. La licenza degli asset può differire da quella del codice. |

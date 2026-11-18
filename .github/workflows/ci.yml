@@ -81,6 +81,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Verify assetlinks.json has no placeholder fingerprint (CA-20)
+        run: |
+          if grep -q "00:00:00:00:00:00:00:00" deploy/web/.well-known/assetlinks.json; then
+            echo "deploy/web/.well-known/assetlinks.json still contains placeholder fingerprint"
+            exit 1
+          fi
+
       - name: Validate development compose file
         run: docker compose -f server/docker-compose.yaml config --quiet
 

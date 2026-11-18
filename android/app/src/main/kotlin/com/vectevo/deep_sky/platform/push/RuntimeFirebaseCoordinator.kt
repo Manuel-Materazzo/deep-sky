@@ -1,15 +1,25 @@
 package com.vectevo.deep_sky.platform.push
 
+import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import android.util.Log
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import com.google.android.gms.common.ConnectionResult
+import com.google.android.gms.common.GoogleApiAvailabilityLight
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Runtime Firebase configuration and token/wakeup coordinator (SP-01, TC-04, AD-04).
@@ -45,6 +55,7 @@ class RuntimeFirebaseCoordinator(private val context: Context) {
         private const val KEY_LAST_WAKEUP_KEY = "last_wakeup_key"
         private const val KEY_LAST_WAKEUP_TS = "last_wakeup_ts"
         private const val KEY_RECEIVED_COUNT = "received_count"
+        private const val TOKEN_FETCH_TIMEOUT_MS = 15_000L
 
         const val UPDATES_CHANNEL_ID = "deep_sky_updates"
     }
@@ -90,6 +101,18 @@ class RuntimeFirebaseCoordinator(private val context: Context) {
             return
         }
 
+        val gmsStatus = checkGooglePlayServicesStatus()
+        if (gmsStatus == ConnectionResult.SERVICE_MISSING ||
+            gmsStatus == ConnectionResult.SERVICE_DISABLED ||
+            gmsStatus == ConnectionResult.SERVICE_INVALID
+        ) {
+            onError(
+                "gms_unavailable",
+                "Google Play Services is unavailable on this device (status=$gmsStatus).",
+            )
+            return
+        }
+
         ensureNotificationChannel()
         saveConfig(config)
         val initialized = applyFirebaseOptions(config)
@@ -98,21 +121,94 @@ class RuntimeFirebaseCoordinator(private val context: Context) {
             return
         }
 
+        val mainHandler = Handler(Looper.getMainLooper())
+        val settled = AtomicBoolean(false)
+        val timeoutRunnable = Runnable {
+            if (settled.compareAndSet(false, true)) {
+                onError(
+                    "fcm_token_timeout",
+                    "Timed out waiting for Firebase registration token.",
+                )
+            }
+        }
+        mainHandler.postDelayed(timeoutRunnable, TOKEN_FETCH_TIMEOUT_MS)
+
+        fun finishSuccess(token: String) {
+            if (settled.compareAndSet(false, true)) {
+                mainHandler.removeCallbacks(timeoutRunnable)
+                mainHandler.post { onSuccess(token) }
+            }
+        }
+
+        fun finishError(code: String, message: String) {
+            if (settled.compareAndSet(false, true)) {
+                mainHandler.removeCallbacks(timeoutRunnable)
+                mainHandler.post { onError(code, message) }
+            }
+        }
+
         try {
-            FirebaseMessaging.getInstance().token
+            val messaging = FirebaseMessaging.getInstance()
+            messaging.isAutoInitEnabled = true
+            messaging.token
                 .addOnSuccessListener { token ->
                     if (token.isNullOrBlank()) {
-                        onError("empty_token", "FirebaseMessaging returned an empty registration token.")
+                        finishError("empty_token", "FirebaseMessaging returned an empty registration token.")
                     } else {
                         saveLastKnownToken(token)
-                        onSuccess(token)
+                        finishSuccess(token)
                     }
                 }
                 .addOnFailureListener { error ->
-                    onError("fcm_token_error", error.message ?: "Failed to obtain FCM registration token.")
+                    finishError("fcm_token_error", error.message ?: "Failed to obtain FCM registration token.")
+                }
+                .addOnCanceledListener {
+                    finishError("fcm_token_cancelled", "Firebase registration token request was cancelled.")
                 }
         } catch (ex: Exception) {
-            onError("fcm_token_exception", ex.message ?: "Exception requesting FCM token.")
+            finishError("fcm_token_exception", ex.message ?: "Exception requesting FCM token.")
+        }
+    }
+
+    private fun checkGooglePlayServicesStatus(): Int {
+        return try {
+            GoogleApiAvailabilityLight.getInstance().isGooglePlayServicesAvailable(context)
+        } catch (ex: Throwable) {
+            Log.w(TAG, "Unable to query GoogleApiAvailabilityLight", ex)
+            ConnectionResult.SUCCESS
+        }
+    }
+
+    fun openNotificationSettings(activity: Activity?): Boolean {
+        val launchContext = activity ?: context
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            }
+        } else {
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+            }
+        }
+        if (activity == null) {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return try {
+            launchContext.startActivity(intent)
+            true
+        } catch (_: Exception) {
+            try {
+                val fallback = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                    if (activity == null) {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                }
+                launchContext.startActivity(fallback)
+                true
+            } catch (_: Exception) {
+                false
+            }
         }
     }
 
@@ -166,13 +262,15 @@ class RuntimeFirebaseCoordinator(private val context: Context) {
     }
 
     fun hasNotificationPermission(): Boolean {
+        val osNotificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            return true
+            return osNotificationsEnabled
         }
-        return ContextCompat.checkSelfPermission(
+        val runtimeGranted = ContextCompat.checkSelfPermission(
             context,
             android.Manifest.permission.POST_NOTIFICATIONS,
         ) == PackageManager.PERMISSION_GRANTED
+        return runtimeGranted && osNotificationsEnabled
     }
 
     fun statusMap(): Map<String, Any?> {

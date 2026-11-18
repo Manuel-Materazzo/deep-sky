@@ -4,7 +4,6 @@ import 'package:deep_sky/data/pairing_and_sync_repository.dart';
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
 import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
 import 'package:deep_sky/presentation/theme/deep_sky_theme.dart';
-import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Dedicated two-way SAS code verification screen (`S1-D07`, `S1-D08`, `S1-APP-02`, `S1-APP-03`).
@@ -22,27 +21,16 @@ class CodeVerificationPage extends StatefulWidget {
 }
 
 class _CodeVerificationPageState extends State<CodeVerificationPage> {
-  bool _copied = false;
-  Timer? _copiedTimer;
+  @override
+  void initState() {
+    super.initState();
+    unawaited(widget.controller.setSecureScreen(true));
+  }
 
   @override
   void dispose() {
-    _copiedTimer?.cancel();
+    unawaited(widget.controller.setSecureScreen(false));
     super.dispose();
-  }
-
-  Future<void> _copySasCode(String sasCode) async {
-    await Clipboard.setData(ClipboardData(text: sasCode));
-    _copiedTimer?.cancel();
-    if (!mounted) {
-      return;
-    }
-    setState(() => _copied = true);
-    _copiedTimer = Timer(const Duration(milliseconds: 2200), () {
-      if (mounted) {
-        setState(() => _copied = false);
-      }
-    });
   }
 
   Future<void> _confirmMismatchDialog(
@@ -306,63 +294,6 @@ class _CodeVerificationPageState extends State<CodeVerificationPage> {
                                               ),
                                             ),
                                           ],
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Material(
-                                        color: tokens.elevatedSurface,
-                                        borderRadius: BorderRadius.circular(
-                                          DeepSkyTheme.radiusFull,
-                                        ),
-                                        child: InkWell(
-                                          key: const Key('copy-sas-button'),
-                                          borderRadius: BorderRadius.circular(
-                                            DeepSkyTheme.radiusFull,
-                                          ),
-                                          onTap: () => _copySasCode(sasCode),
-                                          child: ConstrainedBox(
-                                            constraints: const BoxConstraints(
-                                              minWidth: 44,
-                                              minHeight: 32,
-                                            ),
-                                            child: Padding(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 4,
-                                                  ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: <Widget>[
-                                                  Icon(
-                                                    _copied
-                                                        ? Icons.check_rounded
-                                                        : Icons
-                                                              .content_copy_rounded,
-                                                    size: 14,
-                                                    color: _copied
-                                                        ? tokens.warmGlow
-                                                        : tokens.blushPetal,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    _copied
-                                                        ? s.copiedButton
-                                                        : s.copyButton,
-                                                    style: textTheme.labelSmall
-                                                        ?.copyWith(
-                                                          color: _copied
-                                                              ? tokens.warmGlow
-                                                              : tokens
-                                                                    .blushPetal,
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                        ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                          ),
                                         ),
                                       ),
                                     ],

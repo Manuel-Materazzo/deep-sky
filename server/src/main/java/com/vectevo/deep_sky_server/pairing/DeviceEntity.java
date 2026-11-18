@@ -38,6 +38,9 @@ public class DeviceEntity {
 	@Column(name = "created_at", nullable = false)
 	private Instant createdAt;
 
+	@Column(name = "approved_at")
+	private Instant approvedAt;
+
 	@Column(name = "revoked_at")
 	private Instant revokedAt;
 }

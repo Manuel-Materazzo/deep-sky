@@ -24,7 +24,7 @@ management:
 
 server:
   shutdown: graceful
-  forward-headers-strategy: framework
+  forward-headers-strategy: native
 
 deepsky:
   domain: ${DEEPSKY_DOMAIN:localhost}

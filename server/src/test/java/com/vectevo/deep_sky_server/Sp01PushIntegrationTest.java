@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.vectevo.deep_sky_server.config.PublicEndpointRateLimiter;
 import com.vectevo.deep_sky_server.push.PushProvider;
 import com.vectevo.deep_sky_server.push.PushRegistrationRepository;
+import com.vectevo.deep_sky_server.push.PushService;
 import com.vectevo.deep_sky_server.push.PushTokenUnregisteredException;
 import com.vectevo.deep_sky_server.shared.Ed25519SignatureVerifier;
 import java.nio.charset.StandardCharsets;
@@ -100,6 +102,9 @@ class Sp01PushIntegrationTest {
 	@Autowired
 	private PublicEndpointRateLimiter rateLimiter;
 
+	@Autowired
+	private PushService pushService;
+
 	@MockitoBean
 	private PushProvider pushProvider;
 
@@ -107,6 +112,7 @@ class Sp01PushIntegrationTest {
 	void cleanDb() {
 		registrationRepository.deleteAll();
 		rateLimiter.reset();
+		pushService.resetClientWakeupRateLimit();
 	}
 
 	@Test
@@ -171,14 +177,19 @@ class Sp01PushIntegrationTest {
 						couple.devAId(), couple.devAKp(), envBody))
 				.andExpect(status().isCreated());
 
-		verify(pushProvider).sendWakeup("token-b-v2-rotated-9876", "wakeup.thinking_of_you");
+		verify(pushProvider, timeout(2000)).sendWakeup("token-b-v2-rotated-9876", "wakeup.thinking_of_you");
 		verify(pushProvider, never()).sendWakeup("token-a-initial-123456", "wakeup.thinking_of_you");
 
-		// Reject arbitrary localization keys or intimate text (S-02)
+		// Reject arbitrary localization keys, intimate text, or wakeup.pairing_request from client endpoint (S-02, CA-09)
 		String badWakeup = "{\"localizationKey\":\"raw intimate message text\"}";
 		mockMvc.perform(signed(
 						post("/api/v1/push/wakeup").contentType(MediaType.APPLICATION_JSON).content(badWakeup),
 						couple.devAId(), couple.devAKp(), badWakeup))
+				.andExpect(status().isBadRequest());
+		String pairingWakeup = "{\"localizationKey\":\"wakeup.pairing_request\"}";
+		mockMvc.perform(signed(
+						post("/api/v1/push/wakeup").contentType(MediaType.APPLICATION_JSON).content(pairingWakeup),
+						couple.devAId(), couple.devAKp(), pairingWakeup))
 				.andExpect(status().isBadRequest());
 
 		// When FCM reports UNREGISTERED, stale token is evicted from Postgres
@@ -197,13 +208,31 @@ class Sp01PushIntegrationTest {
 		mockMvc.perform(signed(get("/api/v1/push/register"), couple.devBId(), couple.devBKp(), ""))
 				.andExpect(status().isNotFound());
 
-		// Re-register B, then revoke B -> push token is removed cleanly
+		// Re-register B, then accept a new enrollment invite -> approver device A receives wakeup.pairing_request
 		mockMvc.perform(signed(
 						post("/api/v1/push/register").contentType(MediaType.APPLICATION_JSON).content(regB2),
 						couple.devBId(), couple.devBKp(), regB2))
 				.andExpect(status().isOk());
 		assertThat(registrationRepository.findByDeviceId(couple.devBId())).isPresent();
 
+		doNothing().when(pushProvider).sendWakeup("token-a-initial-123456", "wakeup.pairing_request");
+		MvcResult enrollRes = mockMvc.perform(signed(
+						post("/api/v1/pairing/enrollment-invites"),
+						couple.devAId(), couple.devAKp(), ""))
+				.andExpect(status().isCreated())
+				.andReturn();
+		String enrollToken = objectMapper.readTree(enrollRes.getResponse().getContentAsString())
+				.get("inviteToken").asText();
+		KeyPair devCKp = generateEd25519();
+		String acceptEnrollBody = objectMapper.writeValueAsString(new AcceptInviteBody(
+				enrollToken, "Tablet C", rawEd25519B64(devCKp), b64(randomBytes32())));
+		mockMvc.perform(post("/api/v1/pairing/invites/accept")
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(acceptEnrollBody))
+				.andExpect(status().isOk());
+		verify(pushProvider, timeout(2000)).sendWakeup("token-a-initial-123456", "wakeup.pairing_request");
+
+		// Revoke B -> push token is removed cleanly
 		mockMvc.perform(signed(
 						post("/api/v1/pairing/devices/" + couple.devBId() + "/revoke"),
 						couple.devAId(), couple.devAKp(), ""))
@@ -234,14 +263,31 @@ class Sp01PushIntegrationTest {
 		String token = inviteJson.get("inviteToken").asText();
 
 		String acceptBody = objectMapper.writeValueAsString(new AcceptInviteBody(
-				"Pixel B", rawEd25519B64(devBKp), b64(randomBytes32())));
-		MvcResult acceptRes = mockMvc.perform(post("/api/v1/pairing/invites/" + token + "/accept")
+				token, "Pixel B", rawEd25519B64(devBKp), b64(randomBytes32())));
+		MvcResult acceptRes = mockMvc.perform(post("/api/v1/pairing/invites/accept")
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(acceptBody))
 				.andExpect(status().isOk())
 				.andReturn();
 		String devBId = objectMapper.readTree(acceptRes.getResponse().getContentAsString())
 				.get("deviceId").asText();
+
+		// Approve device B via key delivery from device A (CA-03)
+		byte[] wrapNonce = new byte[24];
+		byte[] wrapCipher = new byte[48];
+		Arrays.fill(wrapNonce, (byte) 0x11);
+		Arrays.fill(wrapCipher, (byte) 0x22);
+		String deliveryBody = objectMapper.writeValueAsString(new KeyDeliveryBody(
+				devBId, b64(wrapNonce), b64(wrapCipher)));
+		mockMvc.perform(signed(
+						post("/api/v1/pairing/key-deliveries")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(deliveryBody),
+						devAId,
+						devAKp,
+						deliveryBody))
+				.andExpect(status().isCreated());
+
 		return new PairedCouple(coupleId, devAId, devAKp, devBId, devBKp);
 	}
 
@@ -294,7 +340,9 @@ class Sp01PushIntegrationTest {
 			String deviceLabel, String deviceAuthPublicKeyB64, String deviceKemPublicKeyB64, String recoveryAuthPublicKeyB64) {}
 
 	private record AcceptInviteBody(
-			String deviceLabel, String deviceAuthPublicKeyB64, String deviceKemPublicKeyB64) {}
+			String inviteToken, String deviceLabel, String deviceAuthPublicKeyB64, String deviceKemPublicKeyB64) {}
+
+	private record KeyDeliveryBody(String toDeviceId, String nonceB64, String ciphertextB64) {}
 
 	private record UploadEnvBody(
 			String envelopeId, String channel, int keyEpoch, String nonceB64, String ciphertextB64) {}

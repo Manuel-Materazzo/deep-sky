@@ -65,6 +65,32 @@ class ApkReleaseManifest {
   }
 }
 
+/// Release distribution channel (`S1-D13`, `S1-UPD-01`).
+enum UpdateChannel {
+  stable('stable'),
+  preview('preview');
+
+  const UpdateChannel(this.storageValue);
+
+  final String storageValue;
+
+  static UpdateChannel fromStorage(String? raw) {
+    return raw?.trim().toLowerCase() == 'preview'
+        ? UpdateChannel.preview
+        : UpdateChannel.stable;
+  }
+
+  String localizedLabel(String languageCode) {
+    final bool isIt = languageCode == 'it';
+    switch (this) {
+      case UpdateChannel.stable:
+        return isIt ? 'Stabile (consigliato)' : 'Stable (recommended)';
+      case UpdateChannel.preview:
+        return isIt ? 'Anteprima (pre-release)' : 'Preview (pre-release)';
+    }
+  }
+}
+
 class UpdateStorageInfo {
   const UpdateStorageInfo({
     required this.stagingDir,
@@ -134,28 +160,51 @@ class ApkUpdateException implements Exception {
   final ApkUpdateErrorCode code;
   final String technicalDetail;
 
-  String get friendlyMessage {
+  String get friendlyMessage => localizedMessage('it');
+
+  String localizedMessage(String languageCode) {
+    final bool isIt = languageCode == 'it';
     switch (code) {
       case ApkUpdateErrorCode.signatureInvalid:
-        return 'Aggiornamento rifiutato: la firma di sicurezza del manifest non è valida.';
+        return isIt
+            ? 'Aggiornamento rifiutato: la firma di sicurezza del manifest non è valida.'
+            : 'Update rejected: release manifest signature is invalid.';
       case ApkUpdateErrorCode.manifestInvalid:
-        return 'Aggiornamento non riuscito: il file di descrizione rilascio è danneggiato.';
+        return isIt
+            ? 'Aggiornamento non riuscito: il file di descrizione rilascio è danneggiato.'
+            : 'Update failed: release metadata file is damaged.';
       case ApkUpdateErrorCode.packageMismatch:
-        return 'Aggiornamento rifiutato: il pacchetto appartiene a una app diversa.';
+        return isIt
+            ? 'Aggiornamento rifiutato: il pacchetto appartiene a una app diversa.'
+            : 'Update rejected: package ID does not match Deep Sky.';
       case ApkUpdateErrorCode.versionNotHigher:
-        return 'Nessun aggiornamento più recente disponibile (la versione remota non è superiore a quella installata).';
+        return isIt
+            ? 'Nessun aggiornamento più recente disponibile (la versione remota non è superiore a quella installata).'
+            : 'No newer update available (remote version is not higher than installed).';
       case ApkUpdateErrorCode.insufficientStorage:
-        return 'Spazio libero insufficiente sul telefono per scaricare questo aggiornamento. Libera spazio e riprova.';
+        return isIt
+            ? 'Spazio libero insufficiente sul telefono per scaricare questo aggiornamento. Libera spazio e riprova.'
+            : 'Not enough free storage on this phone to download this update.';
       case ApkUpdateErrorCode.permissionDenied:
-        return 'Permesso richiesto: abilita "Installa app sconosciute" per Deep Sky nelle impostazioni Android e riprova.';
+        return isIt
+            ? 'Permesso richiesto: abilita "Installa app sconosciute" per Deep Sky nelle impostazioni Android e riprova.'
+            : 'Permission required: allow "Install unknown apps" for Deep Sky in Android settings and try again.';
       case ApkUpdateErrorCode.downloadInterrupted:
-        return 'Scarico interrotto dalla rete. Tocca Riprova per continuare dal punto interrotto.';
+        return isIt
+            ? 'Scarico interrotto dalla rete. Tocca Riprova per continuare dal punto interrotto.'
+            : 'Download interrupted by network. Tap retry to resume cleanly.';
       case ApkUpdateErrorCode.apkHashMismatch:
-        return 'Aggiornamento rifiutato: il file APK scaricato è corrotto o alterato.';
+        return isIt
+            ? 'Aggiornamento rifiutato: il file APK scaricato è corrotto o alterato.'
+            : 'Update rejected: downloaded APK file is corrupted or altered.';
       case ApkUpdateErrorCode.apkCertificateMismatch:
-        return 'Aggiornamento rifiutato: il file APK è firmato con una chiave diversa; i tuoi dati non sono stati toccati.';
+        return isIt
+            ? 'Aggiornamento rifiutato: il file APK è firmato con una chiave diversa; i tuoi dati non sono stati toccati.'
+            : 'Update rejected: APK is signed with a different key; your data is untouched.';
       case ApkUpdateErrorCode.networkError:
-        return 'Impossibile contattare il server degli aggiornamenti al momento.';
+        return isIt
+            ? 'Impossibile contattare il server degli aggiornamenti al momento.'
+            : 'Unable to reach the update server right now.';
     }
   }
 

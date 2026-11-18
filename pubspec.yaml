@@ -61,7 +61,9 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icon/app_icon.jpg"
-  # Optional: adaptive_icon_background / adaptive_icon_foreground for Android 8+
+  adaptive_icon_background: "assets/icon/app_icon_background.png"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  adaptive_icon_foreground_inset: 16
   # Optional: web, windows, macos sections
 
 # For information on the generic Dart part of this file, see the

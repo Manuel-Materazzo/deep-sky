@@ -12,6 +12,15 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         platformBridge = PlatformBridgePlugin(applicationContext, activity = this)
         platformBridge.register(flutterEngine)
+        platformBridge.handleIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (::platformBridge.isInitialized) {
+            platformBridge.handleIntent(intent)
+        }
     }
 
     override fun onRequestPermissionsResult(

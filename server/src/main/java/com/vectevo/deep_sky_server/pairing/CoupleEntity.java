@@ -28,4 +28,13 @@ public class CoupleEntity {
 
 	@Column(name = "unpaired_at")
 	private Instant unpairedAt;
+
+	@Column(name = "current_key_epoch", nullable = false)
+	private int currentKeyEpoch = 1;
+
+	@Column(name = "recovery_keyring_nonce")
+	private byte[] recoveryKeyringNonce;
+
+	@Column(name = "recovery_keyring_ciphertext")
+	private byte[] recoveryKeyringCiphertext;
 }

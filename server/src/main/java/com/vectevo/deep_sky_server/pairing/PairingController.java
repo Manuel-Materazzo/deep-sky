@@ -2,6 +2,7 @@ package com.vectevo.deep_sky_server.pairing;
 
 import com.vectevo.deep_sky_server.shared.DevicePrincipal;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
@@ -37,14 +38,47 @@ public class PairingController {
 			@NotBlank String recoveryAuthPublicKeyB64) {}
 
 	public record AcceptInviteRequest(
+			@NotBlank String inviteToken,
 			@NotBlank String deviceLabel,
 			@NotBlank String deviceAuthPublicKeyB64,
 			@NotBlank String deviceKemPublicKeyB64) {}
 
+	public record InviteStatusRequest(@NotBlank String inviteToken) {}
+
 	public record KeyDeliveryRequest(
 			@NotNull UUID toDeviceId,
 			@NotBlank String nonceB64,
+			@NotBlank String ciphertextB64,
+			@Min(1) Integer keyEpoch) {}
+
+	public record EpochRotationDeliveryRequest(
+			@NotNull UUID toDeviceId,
+			@NotBlank String nonceB64,
 			@NotBlank String ciphertextB64) {}
+
+	public record EpochRotationRequest(
+			@Min(2) int targetEpoch,
+			@NotBlank String newRecoveryAuthPublicKeyB64,
+			@NotBlank String recoveryKeyringNonceB64,
+			@NotBlank String recoveryKeyringCiphertextB64,
+			@Valid List<EpochRotationDeliveryRequest> deliveries) {
+		PairingService.EpochRotationRequestData toServiceData() {
+			List<PairingService.EpochKeyDeliveryInput> items = deliveries == null
+					? List.of()
+					: deliveries.stream()
+							.map(d -> new PairingService.EpochKeyDeliveryInput(
+									d.toDeviceId(), d.nonceB64(), d.ciphertextB64()))
+							.toList();
+			return new PairingService.EpochRotationRequestData(
+					targetEpoch,
+					newRecoveryAuthPublicKeyB64,
+					recoveryKeyringNonceB64,
+					recoveryKeyringCiphertextB64,
+					items);
+		}
+	}
+
+	public record EpochRotationResponse(int currentKeyEpoch) {}
 
 	public record UpdateDeviceLabelRequest(@NotBlank String deviceLabel) {}
 
@@ -58,22 +92,21 @@ public class PairingController {
 				req.recoveryAuthPublicKeyB64());
 	}
 
-	@PostMapping("/invites/{token}/accept")
+	@PostMapping("/invites/accept")
 	public PairingService.AcceptInviteResult acceptInvite(
-			@PathVariable String token,
 			@Valid @RequestBody AcceptInviteRequest req) {
 		return pairingService.acceptInvite(
-				token,
+				req.inviteToken(),
 				req.deviceLabel(),
 				req.deviceAuthPublicKeyB64(),
 				req.deviceKemPublicKeyB64());
 	}
 
-	@GetMapping("/invites/{token}/status")
+	@PostMapping("/invites/status")
 	public PairingService.InviteStatusResult getInviteStatus(
 			@AuthenticationPrincipal DevicePrincipal principal,
-			@PathVariable String token) {
-		return pairingService.getInviteStatus(principal, token);
+			@Valid @RequestBody InviteStatusRequest req) {
+		return pairingService.getInviteStatus(principal, req.inviteToken());
 	}
 
 	@PostMapping("/enrollment-invites")
@@ -88,12 +121,27 @@ public class PairingController {
 	public void storeKeyDelivery(
 			@AuthenticationPrincipal DevicePrincipal principal,
 			@Valid @RequestBody KeyDeliveryRequest req) {
-		pairingService.storeKeyDelivery(principal, req.toDeviceId(), req.nonceB64(), req.ciphertextB64());
+		pairingService.storeKeyDelivery(
+				principal, req.toDeviceId(), req.nonceB64(), req.ciphertextB64(), req.keyEpoch());
 	}
 
 	@GetMapping("/key-deliveries/me")
 	public PairingService.KeyDeliveryView fetchMyKeyDelivery(@AuthenticationPrincipal DevicePrincipal principal) {
 		return pairingService.fetchPendingKeyDelivery(principal);
+	}
+
+	@PostMapping("/epoch-rotations")
+	public EpochRotationResponse rotateEpoch(
+			@AuthenticationPrincipal DevicePrincipal principal,
+			@Valid @RequestBody EpochRotationRequest req) {
+		int updatedEpoch = pairingService.rotateEpoch(principal, req.toServiceData());
+		return new EpochRotationResponse(updatedEpoch);
+	}
+
+	@GetMapping("/epoch-rotations/me")
+	public PairingService.EpochRotationStateView fetchMyEpochRotation(
+			@AuthenticationPrincipal DevicePrincipal principal) {
+		return pairingService.fetchPendingEpochRotation(principal);
 	}
 
 	@GetMapping("/devices")
@@ -112,19 +160,17 @@ public class PairingController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void revokeDevice(
 			@AuthenticationPrincipal DevicePrincipal principal,
-			@PathVariable UUID deviceId) {
-		pairingService.revokeDevice(principal, deviceId);
+			@PathVariable UUID deviceId,
+			@Valid @RequestBody(required = false) EpochRotationRequest rotation) {
+		pairingService.revokeDevice(
+				principal,
+				deviceId,
+				rotation == null ? null : rotation.toServiceData());
 	}
 
 	@PostMapping("/unpair")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void unpairCouple(@AuthenticationPrincipal DevicePrincipal principal) {
 		pairingService.unpairCouple(principal);
-	}
-
-	@GetMapping("/visibility")
-	public PairingService.PairingVisibilityAudit getVisibilityAudit(
-			@AuthenticationPrincipal DevicePrincipal principal) {
-		return pairingService.getVisibilityAudit(principal);
 	}
 }

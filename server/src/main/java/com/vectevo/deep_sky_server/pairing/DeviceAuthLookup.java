@@ -25,7 +25,7 @@ public class DeviceAuthLookup {
 		this.requestNonceRepository = requestNonceRepository;
 	}
 
-	public record ActiveDeviceKey(UUID coupleId, UUID deviceId, byte[] authPublicKey) {}
+	public record ActiveDeviceKey(UUID coupleId, UUID deviceId, byte[] authPublicKey, boolean approved) {}
 
 	@Transactional(readOnly = true)
 	public Optional<ActiveDeviceKey> findActiveDevice(UUID deviceId) {
@@ -34,11 +34,21 @@ public class DeviceAuthLookup {
 				.flatMap(device -> coupleRepository.findById(device.getCoupleId())
 						.filter(couple -> couple.getUnpairedAt() == null)
 						.map(couple -> new ActiveDeviceKey(
-								device.getCoupleId(), device.getId(), device.getAuthPublicKey())));
+								device.getCoupleId(),
+								device.getId(),
+								device.getAuthPublicKey(),
+								device.getApprovedAt() != null)));
 	}
 
 	@Transactional
 	public boolean consumeNonceIfUnused(UUID deviceId, String nonce, Instant expiresAt) {
 		return requestNonceRepository.insertIfAbsent(deviceId, nonce, expiresAt) == 1;
+	}
+
+	@Transactional(readOnly = true)
+	public int getCurrentKeyEpoch(UUID coupleId) {
+		return coupleRepository.findById(coupleId)
+				.map(CoupleEntity::getCurrentKeyEpoch)
+				.orElse(1);
 	}
 }

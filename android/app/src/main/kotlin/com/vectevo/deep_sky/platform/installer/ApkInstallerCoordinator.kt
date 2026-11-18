@@ -93,7 +93,7 @@ class ApkInstallerCoordinator(private val context: Context) {
 
         val currentSigners = signingDigests(currentInfo)
         val archiveSigners = signingDigests(archiveInfo)
-        if (currentSigners.isEmpty() || archiveSigners.isEmpty() || currentSigners != archiveSigners) {
+        if (currentSigners.isEmpty() || archiveSigners.isEmpty() || currentSigners.none { it in archiveSigners }) {
             return Result.failure(
                 SecurityException("apk_certificate_mismatch:APK signing certificate does not match the installed app."),
             )

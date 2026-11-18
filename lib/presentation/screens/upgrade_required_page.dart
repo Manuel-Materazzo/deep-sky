@@ -63,27 +63,75 @@ class _UpgradeRequiredPageState extends State<UpgradeRequiredPage> {
                     Text(s.upgradeRequiredBody),
                     const SizedBox(height: 12),
                     Text(
-                      'Versione installata: ${c.capabilities.versionName} '
-                      '(codice ${c.capabilities.versionCode}) · '
-                      'Minima server: ${c.compatibilityPolicy?.minClientVersionCode ?? '?'}',
+                      s.upgradeVersionSummary(
+                        c.capabilities.versionName,
+                        c.capabilities.versionCode,
+                        c.compatibilityPolicy?.minClientVersionCode,
+                      ),
                       style: Theme.of(context).textTheme.bodySmall
                           ?.copyWith(color: tokens.mutedInk),
                     ),
                     const SizedBox(height: 16),
-                    TextField(
-                      controller: _sourceController,
-                      decoration: const InputDecoration(
-                        labelText: 'Sorgente release (owner/repo o URL)',
-                        border: OutlineInputBorder(),
+                    DropdownButtonFormField<UpdateChannel>(
+                      initialValue: c.updateChannel,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: s.updateChannelLabel,
+                        border: const OutlineInputBorder(),
                       ),
+                      items: <DropdownMenuItem<UpdateChannel>>[
+                        for (final UpdateChannel ch in UpdateChannel.values)
+                          DropdownMenuItem<UpdateChannel>(
+                            value: ch,
+                            child: Text(
+                              ch.localizedLabel(c.languageCode),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged: c.busy
+                          ? null
+                          : (UpdateChannel? ch) {
+                              if (ch != null) {
+                                c.setUpdateChannel(ch);
+                              }
+                            },
                     ),
                     const SizedBox(height: 12),
-                    TextField(
-                      controller: _keyController,
-                      decoration: const InputDecoration(
-                        labelText: 'Chiave pubblica Ed25519 (base64)',
-                        border: OutlineInputBorder(),
-                      ),
+                    ExpansionTile(
+                      key: const Key('upgrade-advanced-update-options-tile'),
+                      tilePadding: EdgeInsets.zero,
+                      childrenPadding: const EdgeInsets.only(top: 8, bottom: 8),
+                      title: Text(s.advancedUpdateOptionsLabel),
+                      children: <Widget>[
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(s.allowCustomUpdateAnchorLabel),
+                          subtitle: Text(s.allowCustomUpdateAnchorHint),
+                          value: c.allowCustomUpdateTrustAnchor,
+                          onChanged: c.busy
+                              ? null
+                              : c.setAllowCustomUpdateTrustAnchor,
+                        ),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _sourceController,
+                          enabled: c.allowCustomUpdateTrustAnchor && !c.busy,
+                          decoration: InputDecoration(
+                            labelText: s.updateSourceFieldLabel,
+                            border: const OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _keyController,
+                          enabled: c.allowCustomUpdateTrustAnchor && !c.busy,
+                          decoration: InputDecoration(
+                            labelText: s.updatePublicKeyFieldLabel,
+                            border: const OutlineInputBorder(),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     FilledButton.icon(
@@ -110,6 +158,17 @@ class _UpgradeRequiredPageState extends State<UpgradeRequiredPage> {
                         label: Text(
                           '${s.installUpdateButton} (${manifest.versionName})',
                         ),
+                      ),
+                    ],
+                    if (c.updateDownloadProgress != null) ...<Widget>[
+                      const SizedBox(height: 12),
+                      LinearProgressIndicator(value: c.updateDownloadProgress),
+                      const SizedBox(height: 4),
+                      Text(
+                        s.updateDownloadProgress(
+                          (c.updateDownloadProgress! * 100).round(),
+                        ),
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
                     if (c.updateFeedback != null || c.errorNotice != null)

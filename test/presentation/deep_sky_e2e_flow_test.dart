@@ -71,7 +71,8 @@ void main() {
       expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
       expect(find.byKey(const Key('invite-qr-view')), findsOneWidget);
       expect(find.byKey(const Key('active-invite-token')), findsOneWidget);
-      final String inviteToken = server.lastInviteToken!;
+      final String inviteUri = ctrlA.activeInviteUri!;
+      expect(inviteUri, contains('&sas='));
 
       // 2) Partner B joins via controller B + computes matching SAS code.
       final DeepSkyController ctrlB = DeepSkyController(
@@ -85,7 +86,7 @@ void main() {
       await ctrlB.initialize();
       await ctrlB.acceptInvite(
         serverUrl: 'https://couple.example.test',
-        inviteToken: inviteToken,
+        inviteToken: inviteUri,
         deviceLabel: 'Telefono B',
       );
       expect(ctrlB.pendingJoin?.sasCode, isNotEmpty);
@@ -104,6 +105,7 @@ void main() {
       // Complete Partner B join too.
       await ctrlB.completeJoinDelivery();
       await ctrlB.skipNameSetup();
+      await ctrlB.confirmRecoveryKeySaved();
 
       // Partner A now lands on S1-D07-2 SpaceSetupPage -> names their space/self and proceeds to Home.
       expect(find.byKey(const Key('space-setup-page')), findsOneWidget);
@@ -118,21 +120,20 @@ void main() {
       );
       await tapVisible(find.byKey(const Key('space-setup-submit-button')));
 
-      // 3) Partner A lands on Home with mandatory Recovery Key confirmation gate (S-06).
-      expect(find.byKey(const Key('home-shell-page')), findsOneWidget);
-      expect(find.byKey(const Key('recovery-gate-card')), findsOneWidget);
-
-      final FilledButton disabledSend = tester.widget<FilledButton>(
-        find.byKey(const Key('send-thought-button')),
+      // 3) Partner A lands on dedicated pre-Home Recovery Key setup screen (S1-D04, S-06).
+      expect(find.byKey(const Key('recovery-key-setup-page')), findsOneWidget);
+      final FilledButton disabledConfirm = tester.widget<FilledButton>(
+        find.byKey(const Key('confirm-recovery-button')),
       );
-      expect(disabledSend.onPressed, isNull);
+      expect(disabledConfirm.onPressed, isNull);
 
       final String recoverySentence = RecoveryKeyCodec.toSentence(
         ctrlA.recoverySeed!,
       );
       await tapVisible(find.byKey(const Key('recovery-saved-checkbox')));
       await tapVisible(find.byKey(const Key('confirm-recovery-button')));
-      expect(find.byKey(const Key('recovery-gate-card')), findsNothing);
+      expect(find.byKey(const Key('recovery-key-setup-page')), findsNothing);
+      expect(find.byKey(const Key('home-shell-page')), findsOneWidget);
 
       // 4) Partner A sends "Ti penso" -> Partner B receives "Hai un pensiero in arrivo." + lit window.
       await tester.ensureVisible(find.byKey(const Key('thought-note-field')));
@@ -196,7 +197,8 @@ void main() {
         find.byKey(const Key('create-enrollment-invite-button')),
       );
       expect(find.byKey(const Key('enroll-invite-token')), findsOneWidget);
-      final String enrollToken = server.lastInviteToken!;
+      final String enrollCode = ctrlA.activeInviteManualCode!;
+      expect(enrollCode, contains('.'));
 
       // Phone D opens Onboarding -> Unisciti tab and accepts the enrollment invite.
       final DeepSkyController ctrlD = DeepSkyController(
@@ -212,7 +214,7 @@ void main() {
       await tapVisible(find.text('Unisciti'));
       await tester.enterText(
         find.byKey(const Key('join-token-field')),
-        enrollToken,
+        enrollCode,
       );
       await tapVisible(find.byKey(const Key('accept-invite-button')));
       expect(find.byKey(const Key('joiner-sas-code')), findsOneWidget);
@@ -247,6 +249,9 @@ void main() {
       await tapVisible(find.byKey(const Key('complete-join-button')));
       expect(find.byKey(const Key('space-setup-page')), findsOneWidget);
       await tapVisible(find.byKey(const Key('space-setup-skip-button')));
+      expect(find.byKey(const Key('recovery-key-setup-page')), findsOneWidget);
+      await tapVisible(find.byKey(const Key('recovery-saved-checkbox')));
+      await tapVisible(find.byKey(const Key('confirm-recovery-button')));
       expect(find.byKey(const Key('home-shell-page')), findsOneWidget);
       expect(find.textContaining('Pensiero della sera'), findsWidgets);
 
@@ -341,7 +346,7 @@ void main() {
       await ctrlB.initialize();
       await ctrlB.acceptInvite(
         serverUrl: 'https://couple.example.test',
-        inviteToken: server.lastInviteToken!,
+        inviteToken: ctrlA.activeInviteUri!,
         deviceLabel: 'Telefono B',
       );
       await ctrlA.pollActiveInvite();
@@ -349,6 +354,7 @@ void main() {
       await ctrlA.skipNameSetup();
       await ctrlB.completeJoinDelivery();
       await ctrlB.skipNameSetup();
+      await ctrlB.confirmRecoveryKeySaved();
       await ctrlB.confirmRecoveryKeySaved();
       await ctrlA.confirmRecoveryKeySaved();
 
@@ -410,22 +416,37 @@ void main() {
       expect(ctrlC.identity?.pairingCompleted, isFalse);
       expect(ctrlC.identity?.coupleId, isNot('couple-1'));
 
-      // 3) Re-recover Phone D, then Phone A invokes S-03 "Interrompi abbinamento per entrambi"
+      // 3) Old recoverySentence is rejected after rotation; rotated recovery key recovers Phone D
       final InMemorySecureKeyStore storeD = InMemorySecureKeyStore();
       final DeepSkyController ctrlD = makeController(storeD);
       await ctrlD.initialize();
       await ctrlD.recoverWithKey(
         serverUrl: 'https://couple.example.test',
         recoveryInput: recoverySentence,
+        deviceLabel: 'Telefono D Stale',
+      );
+      expect(ctrlD.phase, AppBootPhase.unpaired);
+      expect(ctrlD.errorNotice, isNotNull);
+
+      final String rotatedSentence = RecoveryKeyCodec.toSentence(
+        ctrlA.recoverySeed!,
+      );
+      await ctrlD.recoverWithKey(
+        serverUrl: 'https://couple.example.test',
+        recoveryInput: rotatedSentence,
         deviceLabel: 'Telefono D',
       );
       await ctrlD.skipNameSetup();
       expect(ctrlD.phase, AppBootPhase.paired);
 
+      // Revoking Phone C rotated the couple key so Phone A confirms backup of new 24 words first
       await tester.pumpWidget(
         DeepSkyApp(controller: ctrlA, autoInitialize: false),
       );
       await tester.pumpAndSettle();
+      expect(find.byKey(const Key('recovery-key-setup-page')), findsOneWidget);
+      await tapVisible(find.byKey(const Key('recovery-saved-checkbox')));
+      await tapVisible(find.byKey(const Key('confirm-recovery-button')));
       await tapVisible(find.text('Dispositivi'));
       await tapVisible(find.byKey(const Key('unpair-couple-button')));
       await tapVisible(find.byKey(const Key('confirm-unpair-couple-button')));
@@ -456,13 +477,18 @@ class _FakeCouple {
   _FakeCouple({required this.coupleId, required this.recoveryAuthKeyB64});
 
   final String coupleId;
-  final String recoveryAuthKeyB64;
+  String recoveryAuthKeyB64;
+  int currentKeyEpoch = 1;
+  String? recoveryKeyringNonceB64;
+  String? recoveryKeyringCiphertextB64;
   bool unpaired = false;
   final Map<String, Map<String, Object?>> devices =
       <String, Map<String, Object?>>{};
   final Map<String, ({String authB64, String kemB64})> deviceKeys =
       <String, ({String authB64, String kemB64})>{};
   final Map<String, Map<String, Object?>> keyDeliveries =
+      <String, Map<String, Object?>>{};
+  final Map<String, Map<String, Object?>> epochDeliveries =
       <String, Map<String, Object?>>{};
   final List<Map<String, Object?>> envelopes = <Map<String, Object?>>[];
 }
@@ -555,6 +581,8 @@ class _FakeM2Server {
         'label': inviterLabel,
         'enrolledVia': 'PAIRING_INVITER',
         'createdAt': DateTime.now().toUtc().toIso8601String(),
+        'kemPublicKeyB64': body['deviceKemPublicKeyB64'],
+        'approved': true,
         'revokedAt': null,
       };
       couple.deviceKeys[inviterDeviceId] = (
@@ -585,11 +613,8 @@ class _FakeM2Server {
       }, status: 201);
     }
 
-    final RegExpMatch? acceptMatch = RegExp(
-      r'^/api/v1/pairing/invites/([^/]+)/accept$',
-    ).firstMatch(path);
-    if (req.method == 'POST' && acceptMatch != null) {
-      final String token = acceptMatch.group(1)!;
+    if (req.method == 'POST' && path == '/api/v1/pairing/invites/accept') {
+      final String token = body['inviteToken'] as String;
       final _FakeInviteRecord? invite = _invites[token];
       final _FakeCouple? couple = invite == null
           ? null
@@ -611,6 +636,8 @@ class _FakeM2Server {
         'label': acceptedLabel,
         'enrolledVia': isInitialPairing ? 'PAIRING_JOINER' : 'ENROLLMENT',
         'createdAt': DateTime.now().toUtc().toIso8601String(),
+        'kemPublicKeyB64': body['deviceKemPublicKeyB64'],
+        'approved': false,
         'revokedAt': null,
       };
       couple.deviceKeys[acceptedId] = (
@@ -674,6 +701,8 @@ class _FakeM2Server {
         'label': body['deviceLabel'],
         'enrolledVia': 'RECOVERY_KEY',
         'createdAt': DateTime.now().toUtc().toIso8601String(),
+        'kemPublicKeyB64': body['newDeviceKemPublicKeyB64'],
+        'approved': true,
         'revokedAt': null,
       };
       couple.deviceKeys[devId] = (
@@ -684,6 +713,9 @@ class _FakeM2Server {
       return _json(<String, Object?>{
         'coupleId': couple.coupleId,
         'deviceId': devId,
+        'currentKeyEpoch': couple.currentKeyEpoch,
+        'recoveryKeyringNonceB64': couple.recoveryKeyringNonceB64,
+        'recoveryKeyringCiphertextB64': couple.recoveryKeyringCiphertextB64,
       }, status: 201);
     }
 
@@ -735,11 +767,8 @@ class _FakeM2Server {
       }, status: 201);
     }
 
-    final RegExpMatch? statusMatch = RegExp(
-      r'^/api/v1/pairing/invites/([^/]+)/status$',
-    ).firstMatch(path);
-    if (req.method == 'GET' && statusMatch != null) {
-      final _FakeInviteRecord? invite = _invites[statusMatch.group(1)!];
+    if (req.method == 'POST' && path == '/api/v1/pairing/invites/status') {
+      final _FakeInviteRecord? invite = _invites[body['inviteToken'] as String];
       if (invite == null) {
         return _json(<String, Object?>{
           'message': 'Invite not found',
@@ -757,12 +786,15 @@ class _FakeM2Server {
     if (req.method == 'POST' && path == '/api/v1/pairing/key-deliveries') {
       final _FakeCouple couple = callerCouple!;
       final String target = body['toDeviceId'] as String;
+      couple.devices[target]?['approved'] = true;
       couple.keyDeliveries[target] = <String, Object?>{
         'coupleId': couple.coupleId,
         'fromDeviceId': callerId,
         'toDeviceId': target,
         'nonceB64': body['nonceB64'],
         'ciphertextB64': body['ciphertextB64'],
+        'deliveryKind': 'PAIRING_SEED',
+        'keyEpoch': body['keyEpoch'] ?? couple.currentKeyEpoch,
       };
       return _json(<String, Object?>{'status': 'DELIVERED'}, status: 201);
     }
@@ -800,7 +832,20 @@ class _FakeM2Server {
     }
 
     if (req.method == 'GET' && path == '/api/v1/sync/envelopes') {
-      return _json(callerCouple!.envelopes);
+      final List<Map<String, Object?>> items = callerCouple!.envelopes;
+      return _json(<String, Object?>{
+        'items': items,
+        'nextAfterSeq': items.isEmpty ? 0 : items.last['seq'],
+        'hasMore': false,
+        'coupleKeyEpoch': callerCouple.currentKeyEpoch,
+      });
+    }
+
+    if (req.method == 'GET' && path == '/api/v1/pairing/epoch-rotations/me') {
+      return _json(<String, Object?>{
+        'currentKeyEpoch': callerCouple!.currentKeyEpoch,
+        'pendingDelivery': callerCouple.epochDeliveries[callerId!],
+      });
     }
 
     if (req.method == 'GET' && path == '/api/v1/pairing/devices') {
@@ -827,6 +872,31 @@ class _FakeM2Server {
         }, status: 404);
       }
       target['revokedAt'] ??= DateTime.now().toUtc().toIso8601String();
+      if (body.isNotEmpty) {
+        final int nextEpoch = body['targetEpoch']! as int;
+        callerCouple.currentKeyEpoch = nextEpoch;
+        callerCouple.recoveryAuthKeyB64 =
+            body['newRecoveryAuthPublicKeyB64']! as String;
+        callerCouple.recoveryKeyringNonceB64 =
+            body['recoveryKeyringNonceB64'] as String?;
+        callerCouple.recoveryKeyringCiphertextB64 =
+            body['recoveryKeyringCiphertextB64'] as String?;
+        final List<Object?> deliveries =
+            body['deliveries'] as List<Object?>? ?? const <Object?>[];
+        for (final Object? rawItem in deliveries) {
+          final Map<String, Object?> item = rawItem! as Map<String, Object?>;
+          final String toId = item['toDeviceId']! as String;
+          callerCouple.epochDeliveries[toId] = <String, Object?>{
+            'coupleId': callerCouple.coupleId,
+            'fromDeviceId': callerId,
+            'toDeviceId': toId,
+            'nonceB64': item['nonceB64'],
+            'ciphertextB64': item['ciphertextB64'],
+            'deliveryKind': 'EPOCH_ROTATION',
+            'keyEpoch': nextEpoch,
+          };
+        }
+      }
       return http.Response('', 204);
     }
 

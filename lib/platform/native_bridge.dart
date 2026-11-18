@@ -82,10 +82,9 @@ class NativeBridge {
 
   /// Initializes Android FirebaseApp at runtime and returns the active FCM token (SP-01).
   Future<String> configureRuntimePush(RuntimeFirebaseConfig config) async {
-    final String? token = await _channel.invokeMethod<String>(
-      'configureRuntimePush',
-      config.toChannelArgs(),
-    );
+    final String? token = await _channel
+        .invokeMethod<String>('configureRuntimePush', config.toChannelArgs())
+        .timeout(const Duration(seconds: 20));
     if (token == null || token.isEmpty) {
       throw PlatformException(
         code: 'null_reply',
@@ -126,10 +125,24 @@ class NativeBridge {
 
   /// Requests Android 13+ POST_NOTIFICATIONS runtime permission when needed.
   Future<bool> requestNotificationPermission() async {
-    final bool? granted = await _channel.invokeMethod<bool>(
-      'requestNotificationPermission',
-    );
+    final bool? granted = await _channel
+        .invokeMethod<bool>('requestNotificationPermission')
+        .timeout(const Duration(seconds: 25));
     return granted ?? false;
+  }
+
+  /// Opens the Android system notification settings screen for Deep Sky.
+  Future<bool> openNotificationSettings() async {
+    try {
+      final bool? opened = await _channel.invokeMethod<bool>(
+        'openNotificationSettings',
+      );
+      return opened ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
   }
 
   /// Opens the native Android share sheet with [text] and optional [subject].
@@ -179,5 +192,73 @@ class NativeBridge {
     } on MissingPluginException {
       return null;
     }
+  }
+
+  /// Registers a listener for deep-link invite URIs arriving while the app is open (`S1-APP-01`).
+  void setDeepLinkListener(void Function(String uri)? listener) {
+    if (listener == null) {
+      _channel.setMethodCallHandler(null);
+      return;
+    }
+    _channel.setMethodCallHandler((MethodCall call) async {
+      if (call.method == 'onDeepLink') {
+        final String? uri = call.arguments as String?;
+        if (uri != null && uri.trim().isNotEmpty) {
+          listener(uri.trim());
+        }
+      }
+    });
+  }
+
+  /// Reads and clears any pending deep-link invite URI captured at app launch (`S1-APP-01`).
+  Future<String?> consumePendingDeepLink() async {
+    try {
+      final String? uri = await _channel.invokeMethod<String>(
+        'consumePendingDeepLink',
+      );
+      if (uri == null || uri.trim().isEmpty) {
+        return null;
+      }
+      return uri.trim();
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  /// Enables or disables `FLAG_SECURE` on the host Android window (`CA-10`).
+  Future<void> setSecureScreen(bool enabled) async {
+    try {
+      await _channel.invokeMethod<void>('setSecureScreen', <String, Object?>{
+        'enabled': enabled,
+      });
+    } on MissingPluginException {
+      // Desktop / headless widget tests run without Android platform channels.
+    } on PlatformException {
+      // Best-effort window protection.
+    }
+  }
+
+  /// Copies [text] marked as sensitive (`EXTRA_IS_SENSITIVE`) and clears it
+  /// from the Android clipboard after [clearAfterSeconds] (`CA-10`).
+  Future<void> copySensitiveText(
+    String text, {
+    int clearAfterSeconds = 45,
+  }) async {
+    try {
+      final bool? handled = await _channel.invokeMethod<bool>(
+        'copySensitiveText',
+        <String, Object?>{'text': text, 'clearAfterSeconds': clearAfterSeconds},
+      );
+      if (handled == true) {
+        return;
+      }
+    } on MissingPluginException {
+      // Fall back to standard Clipboard in headless tests / non-Android hosts.
+    } on PlatformException {
+      // Fall back to standard Clipboard if native helper fails.
+    }
+    await Clipboard.setData(ClipboardData(text: text));
   }
 }

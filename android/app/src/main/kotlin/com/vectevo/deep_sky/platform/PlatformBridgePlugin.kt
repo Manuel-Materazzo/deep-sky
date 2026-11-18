@@ -1,15 +1,23 @@
 package com.vectevo.deep_sky.platform
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipDescription
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.os.PersistableBundle
+import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import com.vectevo.deep_sky.platform.installer.ApkInstallerCoordinator
 import com.vectevo.deep_sky.platform.push.RuntimeFirebaseCoordinator
 import com.vectevo.deep_sky.platform.scanner.QrScannerActivity
 import com.vectevo.deep_sky.platform.widget.HomeWidgetCoordinator
+import java.util.concurrent.Executors
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -33,19 +41,42 @@ class PlatformBridgePlugin(
         private const val REQ_SCAN_QR = 4104
     }
 
+    private var methodChannel: MethodChannel? = null
     private var pendingPermissionResult: MethodChannel.Result? = null
     private var pendingScanResult: MethodChannel.Result? = null
+    private var pendingDeepLink: String? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val ioExecutor = Executors.newSingleThreadExecutor()
+    private var pendingClipboardClear: Runnable? = null
 
     fun register(flutterEngine: FlutterEngine) {
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
-            .setMethodCallHandler(this)
+        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME).also {
+            it.setMethodCallHandler(this)
+        }
+    }
+
+    fun handleIntent(intent: Intent?) {
+        if (intent?.action != Intent.ACTION_VIEW) {
+            return
+        }
+        val data = intent.data ?: return
+        val scheme = data.scheme?.lowercase() ?: return
+        val isInviteUri = (scheme == "https" && (data.path?.startsWith("/join") == true)) ||
+            (scheme == "deepsky" && data.host == "pair")
+        if (!isInviteUri) {
+            return
+        }
+        val uriString = data.toString()
+        pendingDeepLink = uriString
+        methodChannel?.invokeMethod("onDeepLink", uriString)
     }
 
     fun onRequestPermissionsResult(requestCode: Int, grantResults: IntArray): Boolean {
         if (requestCode != REQ_POST_NOTIFICATIONS) {
             return false
         }
-        val granted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+        val granted = (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) &&
+            pushCoordinator.hasNotificationPermission()
         pendingPermissionResult?.success(granted)
         pendingPermissionResult = null
         return true
@@ -68,15 +99,20 @@ class PlatformBridgePlugin(
             )
             "installVerifiedApk" -> {
                 val path = call.argument<String>("apkPath").orEmpty()
-                installerCoordinator.installVerifiedApk(path)
-                    .onSuccess { status -> result.success(status) }
-                    .onFailure { err ->
-                        val msg = err.message ?: "unknown_error:Failed to install APK."
-                        val splitIdx = msg.indexOf(':')
-                        val code = if (splitIdx > 0) msg.substring(0, splitIdx) else "install_failed"
-                        val detail = if (splitIdx > 0) msg.substring(splitIdx + 1) else msg
-                        result.error(code, detail, null)
+                ioExecutor.execute {
+                    val outcome = installerCoordinator.installVerifiedApk(path)
+                    mainHandler.post {
+                        outcome
+                            .onSuccess { status -> result.success(status) }
+                            .onFailure { err ->
+                                val msg = err.message ?: "unknown_error:Failed to install APK."
+                                val splitIdx = msg.indexOf(':')
+                                val code = if (splitIdx > 0) msg.substring(0, splitIdx) else "install_failed"
+                                val detail = if (splitIdx > 0) msg.substring(splitIdx + 1) else msg
+                                result.error(code, detail, null)
+                            }
                     }
+                }
             }
             "configureRuntimePush" -> handleConfigurePush(call, result)
             "getPushStatus" -> result.success(pushCoordinator.statusMap())
@@ -86,10 +122,65 @@ class PlatformBridgePlugin(
                 result.success(null)
             }
             "requestNotificationPermission" -> handleRequestNotificationPermission(result)
+            "openNotificationSettings" -> result.success(pushCoordinator.openNotificationSettings(activity))
             "shareText" -> handleShareText(call, result)
             "scanQrCode" -> handleScanQrCode(call, result)
+            "consumePendingDeepLink" -> {
+                val uri = pendingDeepLink
+                pendingDeepLink = null
+                result.success(uri ?: "")
+            }
+            "setSecureScreen" -> {
+                val enabled = call.argument<Boolean>("enabled") ?: false
+                activity?.runOnUiThread {
+                    if (enabled) {
+                        activity.window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    } else {
+                        activity.window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                    }
+                }
+                result.success(null)
+            }
+            "copySensitiveText" -> {
+                val text = call.argument<String>("text").orEmpty()
+                val clearAfterSeconds = (call.argument<Int>("clearAfterSeconds") ?: 45).coerceIn(5, 300)
+                copySensitiveToClipboard(text, clearAfterSeconds)
+                result.success(true)
+            }
             else -> result.notImplemented()
         }
+    }
+
+    private fun copySensitiveToClipboard(text: String, clearAfterSeconds: Int) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("Deep Sky", text)
+        val extraKey = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ClipDescription.EXTRA_IS_SENSITIVE
+        } else {
+            "android.content.extra.IS_SENSITIVE"
+        }
+        clip.description.extras = PersistableBundle().apply {
+            putBoolean(extraKey, true)
+        }
+        clipboard.setPrimaryClip(clip)
+
+        pendingClipboardClear?.let { mainHandler.removeCallbacks(it) }
+        val clearTask = Runnable {
+            val current = clipboard.primaryClip
+                ?.takeIf { it.itemCount > 0 }
+                ?.getItemAt(0)
+                ?.text
+                ?.toString()
+            if (current == text) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    clipboard.clearPrimaryClip()
+                } else {
+                    clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+                }
+            }
+        }
+        pendingClipboardClear = clearTask
+        mainHandler.postDelayed(clearTask, clearAfterSeconds * 1000L)
     }
 
     private fun handleConfigurePush(call: MethodCall, result: MethodChannel.Result) {
@@ -113,8 +204,16 @@ class PlatformBridgePlugin(
     }
 
     private fun handleRequestNotificationPermission(result: MethodChannel.Result) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || pushCoordinator.hasNotificationPermission()) {
-            result.success(true)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            result.success(pushCoordinator.hasNotificationPermission())
+            return
+        }
+        val runtimeGranted = androidx.core.content.ContextCompat.checkSelfPermission(
+            context,
+            android.Manifest.permission.POST_NOTIFICATIONS,
+        ) == PackageManager.PERMISSION_GRANTED
+        if (runtimeGranted) {
+            result.success(pushCoordinator.hasNotificationPermission())
             return
         }
         val hostActivity = activity

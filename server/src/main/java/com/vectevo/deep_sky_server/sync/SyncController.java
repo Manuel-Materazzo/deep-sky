@@ -5,7 +5,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -52,15 +51,10 @@ public class SyncController {
 	}
 
 	@GetMapping("/envelopes")
-	public List<SyncService.EnvelopeView> listEnvelopes(
+	public SyncService.EnvelopePageView listEnvelopes(
 			@AuthenticationPrincipal DevicePrincipal principal,
-			@RequestParam(defaultValue = "0") long afterSeq) {
-		return syncService.listEnvelopes(principal, afterSeq);
-	}
-
-	@GetMapping("/visibility")
-	public List<SyncService.EnvelopeVisibilityRow> getVisibilityAudit(
-			@AuthenticationPrincipal DevicePrincipal principal) {
-		return syncService.getVisibilityAudit(principal);
+			@RequestParam(defaultValue = "0") long afterSeq,
+			@RequestParam(defaultValue = "100") int limit) {
+		return syncService.listEnvelopes(principal, afterSeq, limit);
 	}
 }

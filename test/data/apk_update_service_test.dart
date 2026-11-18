@@ -83,6 +83,18 @@ void main() {
       ).toString(),
       'https://updates.example.org/releases',
     );
+    expect(
+      () => ApkUpdateService.resolveSourceBaseUri(
+        'http://updates.example.org/releases',
+      ),
+      throwsFormatException,
+    );
+    expect(
+      ApkUpdateService.resolveSourceBaseUri(
+        'http://192.168.1.10:8080/releases/',
+      ).toString(),
+      'http://192.168.1.10:8080/releases',
+    );
   });
 
   test('rejects tampered manifest, lower version, and wrong package', () async {
@@ -361,6 +373,7 @@ void main() {
     );
 
     expect(controller.defaultUpdateSource, 'Manuel-Materazzo/deep-sky');
+    expect(controller.allowCustomUpdateTrustAnchor, isFalse);
     expect(
       ApkUpdateService.parseEd25519PublicKey(
         controller.trustedUpdatePublicKeyB64,
@@ -368,6 +381,21 @@ void main() {
       32,
     );
 
+    // Custom key is ignored unless allowCustomUpdateTrustAnchor is enabled (CA-11)
+    await expectLater(
+      controller.checkForUpdates(
+        source: 'https://custom.example.test/releases',
+        trustedKeyB64: base64Encode(rel.publicKey.bytes),
+      ),
+      completes,
+    );
+    expect(
+      requestedManifestUri.toString(),
+      'https://github.com/Manuel-Materazzo/deep-sky/releases/latest/download/manifest.json',
+    );
+    expect(controller.availableUpdate, isNull);
+
+    controller.setAllowCustomUpdateTrustAnchor(true);
     await controller.checkForUpdates(
       source: controller.defaultUpdateSource,
       trustedKeyB64: base64Encode(rel.publicKey.bytes),
@@ -383,6 +411,85 @@ void main() {
       trustedKeyB64: 'not-valid-base64!',
     );
     expect(controller.updateFeedback, contains('Chiave pubblica Ed25519'));
+  });
+
+  test('oversized .part file is deleted and recovered cleanly, and streaming hash matches in-memory SHA-256 (CA-11)', () async {
+    final rel = await buildSignedRelease(versionCode: 4);
+    final Directory tempDir = Directory.systemTemp.createTempSync(
+      'sp03_oversized_',
+    );
+    addTearDown(() => tempDir.deleteSync(recursive: true));
+
+    final File partFile = File(
+      '${tempDir.path}${Platform.pathSeparator}deep-sky-1.0.4-4.apk.part',
+    );
+    partFile.writeAsBytesSync(List<int>.filled(rel.apkBytes.length + 512, 7));
+    expect(partFile.existsSync(), isTrue);
+
+    int downloadCalls = 0;
+    final MockClient httpClient = MockClient.streaming((
+      http.BaseRequest req,
+      http.ByteStream bodyStream,
+    ) async {
+      if (req.url.path.endsWith('manifest.json')) {
+        return http.StreamedResponse(
+          Stream<List<int>>.value(rel.manifestBytes),
+          200,
+        );
+      }
+      if (req.url.path.endsWith('manifest.json.sig')) {
+        return http.StreamedResponse(
+          Stream<List<int>>.value(rel.sigBytes),
+          200,
+        );
+      }
+      downloadCalls++;
+      expect(req.headers.containsKey('Range'), isFalse);
+      return http.StreamedResponse(
+        Stream<List<int>>.fromIterable(<List<int>>[
+          rel.apkBytes.sublist(0, 1500),
+          rel.apkBytes.sublist(1500),
+        ]),
+        200,
+      );
+    });
+
+    final ApkUpdateService service = ApkUpdateService(
+      httpClient: httpClient,
+      retryDelay: (_) => Duration.zero,
+    );
+    final ApkReleaseManifest manifest = await service.fetchAndVerifyManifest(
+      sourceBaseUri: Uri.parse('https://mirror.example.test/dl'),
+      trustedPublicKey: rel.publicKey,
+      currentApp: installedApp,
+    );
+
+    final File verified = await service.downloadAndVerifyApk(
+      sourceBaseUri: Uri.parse('https://mirror.example.test/dl'),
+      manifest: manifest,
+      stagingDir: tempDir.path,
+      availableBytes: 50 * 1024 * 1024,
+    );
+    expect(downloadCalls, 1);
+    expect(verified.existsSync(), isTrue);
+    expect(verified.lengthSync(), rel.apkBytes.length);
+
+    // Verify streaming hash equivalence directly on a multi-chunk (>128 KiB) file
+    final File multiChunkFile = File(
+      '${tempDir.path}${Platform.pathSeparator}large_sample.bin',
+    );
+    final Uint8List largeBytes = Uint8List.fromList(
+      List<int>.generate(200 * 1024 + 17, (int i) => (i * 13) & 0xff),
+    );
+    multiChunkFile.writeAsBytesSync(largeBytes);
+    final Hash expectedDigest = await Sha256().hash(largeBytes);
+    final String expectedHex = expectedDigest.bytes
+        .map((int b) => b.toRadixString(16).padLeft(2, '0'))
+        .join();
+    expect(
+      await ApkUpdateService.computeFileSha256Hex(multiChunkFile),
+      expectedHex,
+    );
   });
 
   test(
