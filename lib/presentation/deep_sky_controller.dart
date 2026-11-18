@@ -38,7 +38,7 @@ class DeepSkyController extends ChangeNotifier {
     this._sceneStateMapper = const SceneStateMapper(),
     Future<String> Function(String path)? loadAssetString,
     Future<PlatformCapabilities> Function()? loadCapabilities,
-    this.clientVersionCode = 1,
+    int? clientVersionCode,
     this.protocolVersion = 1,
     this.defaultServerUrl = 'https://deepsky.vectevo.com',
     this.defaultUpdateSource = 'Manuel-Materazzo/deep-sky',
@@ -49,7 +49,8 @@ class DeepSkyController extends ChangeNotifier {
        _nativeBridge = nativeBridge ?? const NativeBridge(),
        _httpClient = httpClient ?? http.Client(),
        _loadAssetString = loadAssetString ?? rootBundle.loadString,
-       _loadCapabilitiesOverride = loadCapabilities {
+       _loadCapabilitiesOverride = loadCapabilities,
+       _clientVersionCodeOverride = clientVersionCode {
     final SecureKeyStore resolvedKeyStore = keyStore ?? FlutterSecureKeyStore();
     _keyStore = resolvedKeyStore;
     _crypto = crypto ?? DeepSkyCrypto();
@@ -81,7 +82,15 @@ class DeepSkyController extends ChangeNotifier {
   final SceneStateMapper _sceneStateMapper;
   final Future<String> Function(String path) _loadAssetString;
   final Future<PlatformCapabilities> Function()? _loadCapabilitiesOverride;
-  final int clientVersionCode;
+  final int? _clientVersionCodeOverride;
+
+  /// Effective Android `versionCode` sent in API compatibility headers.
+  ///
+  /// Uses the runtime value loaded from native [PlatformCapabilities] unless
+  /// explicitly overridden (for example in tests).
+  int get clientVersionCode =>
+      _clientVersionCodeOverride ?? capabilities.versionCode;
+
   final int protocolVersion;
   final String defaultServerUrl;
   final String defaultUpdateSource;

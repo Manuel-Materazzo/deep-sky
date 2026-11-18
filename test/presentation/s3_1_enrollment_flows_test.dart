@@ -596,4 +596,55 @@ void main() {
       expect(controller.errorNotice, contains('incompleto'));
     },
   );
+
+  test('DeepSkyController uses native capabilities.versionCode for compatibility check and X-Client-Version-Code header', () async {
+    String? seenClientVersionHeader;
+    final MockClient mockHttp = MockClient((http.Request req) async {
+      seenClientVersionHeader = req.headers['X-Client-Version-Code'];
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'minClientVersionCode': 4,
+          'minProtocolVersion': 1,
+        }),
+        200,
+        headers: const <String, String>{'Content-Type': 'application/json'},
+      );
+    });
+
+    final DeepSkyController compatibleController = DeepSkyController(
+      keyStore: InMemorySecureKeyStore(),
+      httpClient: mockHttp,
+      loadAssetString: (_) async => pilotManifestRaw,
+      loadCapabilities: () async => const PlatformCapabilities(
+        packageName: 'com.vectevo.deep_sky',
+        androidApiLevel: 35,
+        versionName: '0.5',
+        versionCode: 5,
+        supportsRequestInstallPackages: false,
+      ),
+      defaultServerUrl: 'https://couple.example.test',
+    );
+    await compatibleController.initialize();
+    expect(compatibleController.clientVersionCode, 5);
+    expect(seenClientVersionHeader, '5');
+    expect(compatibleController.phase, AppBootPhase.unpaired);
+
+    final DeepSkyController outdatedController = DeepSkyController(
+      keyStore: InMemorySecureKeyStore(),
+      httpClient: mockHttp,
+      loadAssetString: (_) async => pilotManifestRaw,
+      loadCapabilities: () async => const PlatformCapabilities(
+        packageName: 'com.vectevo.deep_sky',
+        androidApiLevel: 35,
+        versionName: '0.3',
+        versionCode: 3,
+        supportsRequestInstallPackages: false,
+      ),
+      defaultServerUrl: 'https://couple.example.test',
+    );
+    await outdatedController.initialize();
+    expect(outdatedController.clientVersionCode, 3);
+    expect(seenClientVersionHeader, '3');
+    expect(outdatedController.phase, AppBootPhase.upgradeRequired);
+  });
 }
