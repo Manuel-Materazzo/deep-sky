@@ -10,6 +10,7 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.vectevo.deep_sky.MainActivity
 import com.vectevo.deep_sky.R
+import com.vectevo.deep_sky.platform.PlatformBridgePlugin
 
 /**
  * Handles background data-only FCM wakeup messages and token rotation (SP-01, S-02).
@@ -38,6 +39,8 @@ class DeepSkyFirebaseMessagingService : FirebaseMessagingService() {
         // Privacy rule S-02: ignore any unexpected display fields and resolve purely from l10nKey.
         val key = message.data["l10nKey"] ?: "wakeup.generic"
         coordinator.recordWakeup(key, System.currentTimeMillis())
+        // AU-18: If the Flutter engine is currently attached, wake Dart to trigger silent sync.
+        PlatformBridgePlugin.dispatchForegroundWakeup(key)
 
         val bodyResId = when (key) {
             "wakeup.thinking_of_you" -> R.string.push_body_thinking_of_you

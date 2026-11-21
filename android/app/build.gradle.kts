@@ -1,8 +1,35 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.isFile) {
+        FileInputStream(keystorePropertiesFile).use { load(it) }
+    }
+}
+
+fun releaseSigningProp(propName: String, envName: String): String? =
+    keystoreProperties.getProperty(propName)?.trim()?.takeIf { it.isNotEmpty() }
+        ?: System.getenv(envName)?.trim()?.takeIf { it.isNotEmpty() }
+
+val releaseStoreFilePath = releaseSigningProp("storeFile", "DEEPSKY_KEYSTORE_PATH")
+val releaseStorePassword = releaseSigningProp("storePassword", "DEEPSKY_KEYSTORE_PASSWORD")
+val releaseKeyAlias = releaseSigningProp("keyAlias", "DEEPSKY_KEY_ALIAS")
+val releaseKeyPassword = releaseSigningProp("keyPassword", "DEEPSKY_KEY_PASSWORD")
+val hasReleaseSigningConfig = listOf(
+    releaseStoreFilePath,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { it != null }
+val isUnsignedReleaseBuild = project.hasProperty("unsigned") &&
+    project.property("unsigned").toString().equals("true", ignoreCase = true)
 
 android {
     namespace = "com.vectevo.deep_sky"
@@ -23,14 +50,40 @@ android {
         versionName = flutter.versionName
     }
 
-    buildTypes {
-        release {
-            // Pass -Punsigned=true in CI release workflows (CI-02, PD-10) to emit an unsigned APK
-            // for offline promoter signing via scripts/sign-release.*.
-            if (!project.hasProperty("unsigned")) {
-                signingConfig = signingConfigs.getByName("debug")
+    signingConfigs {
+        if (hasReleaseSigningConfig) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFilePath!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
             }
         }
+    }
+
+    buildTypes {
+        release {
+            // AU-13: Never silently fall back to the debug signing key for release builds.
+            // Pass -Punsigned=true in CI release workflows (CI-02, PD-10) to emit an unsigned APK
+            // for offline promoter signing via scripts/sign-release.*, or configure release signing
+            // via android/key.properties or DEEPSKY_KEYSTORE_* environment variables.
+            if (!isUnsignedReleaseBuild && hasReleaseSigningConfig) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
+}
+
+gradle.taskGraph.whenReady {
+    val wantsRelease = allTasks.any { task ->
+        val name = task.name.lowercase()
+        (name.contains("release") && (name.contains("assemble") || name.contains("bundle") || name.contains("package")))
+    }
+    if (wantsRelease && !isUnsignedReleaseBuild && !hasReleaseSigningConfig) {
+        throw GradleException(
+            "Release builds require either -Punsigned=true (for offline promoter signing) " +
+                "or a release signing config via android/key.properties / DEEPSKY_KEYSTORE_* env vars (AU-13)."
+        )
     }
 }
 

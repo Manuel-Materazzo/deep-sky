@@ -10,9 +10,11 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.os.Build
 import java.io.File
+import java.lang.ref.WeakReference
 import android.os.Handler
 import android.os.Looper
 import android.os.PersistableBundle
+import android.os.SystemClock
 import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import com.vectevo.deep_sky.platform.installer.ApkInstallerCoordinator
@@ -41,6 +43,16 @@ class PlatformBridgePlugin(
         const val CHANNEL_NAME = "com.vectevo.deep_sky/platform"
         private const val REQ_POST_NOTIFICATIONS = 4102
         private const val REQ_SCAN_QR = 4104
+
+        @Volatile
+        private var activePluginRef: WeakReference<PlatformBridgePlugin>? = null
+
+        /**
+         * Forwards a foreground FCM data-only wakeup to the attached Flutter engine (`AU-18`).
+         */
+        fun dispatchForegroundWakeup(l10nKey: String) {
+            activePluginRef?.get()?.notifyForegroundWakeup(l10nKey)
+        }
     }
 
     private var methodChannel: MethodChannel? = null
@@ -50,10 +62,27 @@ class PlatformBridgePlugin(
     private val mainHandler = Handler(Looper.getMainLooper())
     private val ioExecutor = Executors.newSingleThreadExecutor()
     private var pendingClipboardClear: Runnable? = null
+    private var clipboardClearDeadlineElapsedMs: Long = 0L
+    private var lastSensitiveCopiedText: String? = null
 
     fun register(flutterEngine: FlutterEngine) {
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME).also {
             it.setMethodCallHandler(this)
+        }
+        activePluginRef = WeakReference(this)
+    }
+
+    fun detach() {
+        methodChannel?.setMethodCallHandler(null)
+        methodChannel = null
+        if (activePluginRef?.get() === this) {
+            activePluginRef = null
+        }
+    }
+
+    private fun notifyForegroundWakeup(l10nKey: String) {
+        mainHandler.post {
+            methodChannel?.invokeMethod("onPushWakeup", l10nKey)
         }
     }
 
@@ -161,7 +190,21 @@ class PlatformBridgePlugin(
                 }
                 result.success(dir.absolutePath)
             }
+            "getOfflineCacheRootDir" -> {
+                val dir = File(context.filesDir, "offline_cache")
+                if (!dir.exists()) {
+                    dir.mkdirs()
+                }
+                result.success(dir.absolutePath)
+            }
             else -> result.notImplemented()
+        }
+    }
+
+    fun onResume() {
+        val deadline = clipboardClearDeadlineElapsedMs
+        if (deadline > 0L && SystemClock.elapsedRealtime() >= deadline) {
+            clearSensitiveClipboard(forceClearOnApi28Plus = false)
         }
     }
 
@@ -179,22 +222,42 @@ class PlatformBridgePlugin(
         clipboard.setPrimaryClip(clip)
 
         pendingClipboardClear?.let { mainHandler.removeCallbacks(it) }
+        lastSensitiveCopiedText = text
+        clipboardClearDeadlineElapsedMs = SystemClock.elapsedRealtime() + clearAfterSeconds * 1000L
         val clearTask = Runnable {
-            val current = clipboard.primaryClip
-                ?.takeIf { it.itemCount > 0 }
-                ?.getItemAt(0)
-                ?.text
-                ?.toString()
-            if (current == text) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    clipboard.clearPrimaryClip()
-                } else {
-                    clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
-                }
-            }
+            // AU-08: On Android 10+, background apps cannot read primaryClip (returns null).
+            // Clear unconditionally on API 28+ when the timer fires so Recovery Keys and invite
+            // links do not remain on the clipboard after switching to a messenger.
+            clearSensitiveClipboard(forceClearOnApi28Plus = true)
         }
         pendingClipboardClear = clearTask
         mainHandler.postDelayed(clearTask, clearAfterSeconds * 1000L)
+    }
+
+    private fun clearSensitiveClipboard(forceClearOnApi28Plus: Boolean) {
+        pendingClipboardClear?.let { mainHandler.removeCallbacks(it) }
+        pendingClipboardClear = null
+        val expectedText = lastSensitiveCopiedText
+        clipboardClearDeadlineElapsedMs = 0L
+        lastSensitiveCopiedText = null
+
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && forceClearOnApi28Plus) {
+            clipboard.clearPrimaryClip()
+            return
+        }
+        val current = clipboard.primaryClip
+            ?.takeIf { it.itemCount > 0 }
+            ?.getItemAt(0)
+            ?.text
+            ?.toString()
+        if (current == null || current == expectedText) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                clipboard.clearPrimaryClip()
+            } else {
+                clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+            }
+        }
     }
 
     private fun handleConfigurePush(call: MethodCall, result: MethodChannel.Result) {
