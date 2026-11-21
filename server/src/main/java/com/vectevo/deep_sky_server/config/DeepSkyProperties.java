@@ -59,7 +59,11 @@ public record DeepSkyProperties(
 			if (minPackVersion == null || minPackVersion.isBlank()) {
 				minPackVersion = "1.0.0";
 			}
-			trustedPublicKeys = trustedPublicKeys == null ? Map.of() : Map.copyOf(trustedPublicKeys);
+			trustedPublicKeys = trustedPublicKeys == null
+					? Map.of()
+					: trustedPublicKeys.entrySet().stream()
+							.filter(e -> e.getValue() != null && !e.getValue().isBlank())
+							.collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> e.getValue().trim()));
 		}
 	}
 }

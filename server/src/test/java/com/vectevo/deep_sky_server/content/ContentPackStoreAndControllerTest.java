@@ -36,7 +36,7 @@ class ContentPackStoreAndControllerTest {
 	Path tempDir;
 
 	@Test
-	void servesSignedPackFileByFileWithConditionalEtagAndImmutableHeaders() throws Exception {
+	void servesSignedPackFileByFileWithEtagNoCachePathAndImmutableBlobs() throws Exception {
 		KeyPair kp = generateEd25519();
 		String pubB64 = Base64.getEncoder().encodeToString(kp.getPublic().getEncoded());
 
@@ -75,24 +75,68 @@ class ContentPackStoreAndControllerTest {
 				.andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_PLAIN))
 				.andExpect(content().string(org.hamcrest.Matchers.startsWith("v1:")));
 
-		// 3) Individual PNG asset with immutable Cache-Control, strict Content-Type, and 304
+		// 3) Path-addressed PNG: revalidated on each use (no-cache), strict Content-Type, ETag and 304
 		var floorResult = mvc.perform(get("/api/v1/content/pack/files/assets/floor.png"))
 				.andExpect(status().isOk())
 				.andExpect(content().contentType(MediaType.IMAGE_PNG))
 				.andExpect(header().longValue(HttpHeaders.CONTENT_LENGTH, floorBytes.length))
-				.andExpect(header().string(HttpHeaders.CACHE_CONTROL, "public, max-age=31536000, immutable"))
+				.andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-cache"))
 				.andExpect(content().bytes(floorBytes))
 				.andReturn();
 		String floorEtag = floorResult.getResponse().getHeader(HttpHeaders.ETAG);
+		String floorSha = sha256Hex(floorBytes);
+		assertThat(floorEtag).isEqualTo("\"" + floorSha + "\"");
 
 		mvc.perform(get("/api/v1/content/pack/files/assets/floor.png").header(HttpHeaders.IF_NONE_MATCH, floorEtag))
-				.andExpect(status().isNotModified());
+				.andExpect(status().isNotModified())
+				.andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-cache"));
 
-		// 4) Unindexed or traversal paths are rejected
+		// 4) Content-addressed blob: immutable for one year, strong ETag, 304
+		mvc.perform(get("/api/v1/content/pack/blobs/" + floorSha))
+				.andExpect(status().isOk())
+				.andExpect(content().contentType(MediaType.IMAGE_PNG))
+				.andExpect(header().longValue(HttpHeaders.CONTENT_LENGTH, floorBytes.length))
+				.andExpect(header().string(HttpHeaders.CACHE_CONTROL, "public, max-age=31536000, immutable"))
+				.andExpect(header().string(HttpHeaders.ETAG, floorEtag))
+				.andExpect(content().bytes(floorBytes));
+		mvc.perform(get("/api/v1/content/pack/blobs/" + floorSha).header(HttpHeaders.IF_NONE_MATCH, floorEtag))
+				.andExpect(status().isNotModified())
+				.andExpect(header().string(HttpHeaders.CACHE_CONTROL, "public, max-age=31536000, immutable"));
+
+		// 5) Invalid / unknown hashes
+		mvc.perform(get("/api/v1/content/pack/blobs/not-a-hash")).andExpect(status().isBadRequest());
+		mvc.perform(get("/api/v1/content/pack/blobs/" + floorSha.toUpperCase())).andExpect(status().isBadRequest());
+		mvc.perform(get("/api/v1/content/pack/blobs/" + "0".repeat(64))).andExpect(status().isNotFound());
+
+		// 6) Unindexed or traversal paths are rejected
 		mvc.perform(get("/api/v1/content/pack/files/assets/missing.png"))
 				.andExpect(status().isNotFound());
 		mvc.perform(get("/api/v1/content/pack/files/..%2Fsecret.txt"))
 				.andExpect(status().is4xxClientError());
+	}
+
+	@Test
+	void reloadIfChangedSwapsOnlyWhenChecksumsChange() throws Exception {
+		KeyPair kp = generateEd25519();
+		String pubB64 = Base64.getEncoder().encodeToString(kp.getPublic().getEncoded());
+		Path packDir = tempDir.resolve("live");
+		writeSignedPack(packDir, kp, "v1", "1.0.0", Map.of("manifest.json", "{}".getBytes(StandardCharsets.UTF_8)));
+		ContentPackStore store = new ContentPackStore(
+				new ContentPackConfig(packDir.toString(), "1.0.0", Map.of("v1", pubB64)), objectMapper);
+		assertThat(store.getActivePack().orElseThrow().packVersion()).isEqualTo("1.0.0");
+
+		store.reloadIfChanged();
+		assertThat(store.getActivePack().orElseThrow().packVersion()).isEqualTo("1.0.0");
+
+		writeSignedPack(packDir, kp, "v1", "1.1.0", Map.of("manifest.json", "{\"a\":1}".getBytes(StandardCharsets.UTF_8)));
+		store.reloadIfChanged();
+		assertThat(store.getActivePack().orElseThrow().packVersion()).isEqualTo("1.1.0");
+	}
+
+	@Test
+	void blankTrustedKeyEntriesAreIgnored() {
+		ContentPackConfig cfg = new ContentPackConfig("", "1.0.0", Map.of("v1", "", "v2", "  "));
+		assertThat(cfg.trustedPublicKeys()).isEmpty();
 	}
 
 	@Test
@@ -147,6 +191,10 @@ class ContentPackStoreAndControllerTest {
 				new ContentPackConfig(dir.toString(), "1.0.0", Map.of("v1", pubB64)),
 				objectMapper);
 		assertThat(store.getActivePack()).isEmpty();
+	}
+
+	private static String sha256Hex(byte[] bytes) throws Exception {
+		return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
 	}
 
 	private static KeyPair generateEd25519() throws Exception {

@@ -10,6 +10,7 @@ import java.security.MessageDigest;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -19,6 +20,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -58,6 +60,11 @@ public class ContentPackStore {
 	public ContentPackStore(ContentPackConfig config, ObjectMapper objectMapper) {
 		this.config = config;
 		this.objectMapper = objectMapper;
+		if (!config.packsDir().isBlank() && config.trustedPublicKeys().isEmpty()) {
+			log.warn("Content packs dir is configured ({}) but no trusted public keys are set "
+					+ "(DEEPSKY_CONTENT_TRUSTED_KEY_V1/V2): server-side Ed25519 verification is DISABLED. "
+					+ "Only SHA-256/path checks run; the client remains the trust anchor.", config.packsDir());
+		}
 		reload();
 	}
 
@@ -94,6 +101,38 @@ public class ContentPackStore {
 		} catch (Exception ex) {
 			log.warn("Rejected content pack in {}: {}", packRoot, ex.getMessage());
 			return false;
+		}
+	}
+
+	/**
+	 * Periodic hot reload: re-verifies and swaps the active pack only when the published
+	 * {@code pack-checksums.json} / {@code .sig} bytes differ from the currently served ones.
+	 */
+	@Scheduled(
+			fixedDelayString = "${deepsky.content.reload-interval:PT60S}",
+			initialDelayString = "${deepsky.content.reload-interval:PT60S}")
+	public void reloadIfChanged() {
+		if (config.packsDir().isBlank()) {
+			return;
+		}
+		try {
+			Path configuredRoot = Path.of(config.packsDir()).toAbsolutePath().normalize();
+			if (!Files.isDirectory(configuredRoot)) {
+				return;
+			}
+			Path packRoot = resolveActivePackRoot(configuredRoot);
+			if (packRoot == null) {
+				return;
+			}
+			LoadedPack current = activePack.get();
+			if (current != null
+					&& Arrays.equals(current.checksumsBytes(), Files.readAllBytes(packRoot.resolve("pack-checksums.json")))
+					&& Arrays.equals(current.signatureBytes(), Files.readAllBytes(packRoot.resolve("pack-checksums.json.sig")))) {
+				return;
+			}
+			reload();
+		} catch (Exception ex) {
+			log.warn("Content pack reload check failed: {}", ex.getMessage());
 		}
 	}
 

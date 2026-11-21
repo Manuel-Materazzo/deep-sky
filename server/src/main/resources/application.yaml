@@ -45,3 +45,8 @@ deepsky:
   content:
     packs-dir: ${DEEPSKY_CONTENT_PACKS_DIR:}
     min-pack-version: ${DEEPSKY_MIN_PACK_VERSION:1.0.0}
+    # Chiavi pubbliche Ed25519 (base64, raw 32B o SPKI 44B) per la verifica difensiva dei pack.
+    # Le voci vuote vengono ignorate; se tutte vuote la verifica della firma lato server e' disattivata.
+    trusted-public-keys:
+      v1: ${DEEPSKY_CONTENT_TRUSTED_KEY_V1:}
+      v2: ${DEEPSKY_CONTENT_TRUSTED_KEY_V2:}

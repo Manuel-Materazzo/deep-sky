@@ -5,12 +5,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -23,6 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class ContentPackController {
 
 	private static final String FILES_PREFIX = "/api/v1/content/pack/files/";
+	private static final String IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
+	private static final Pattern SHA256_HEX = Pattern.compile("^[0-9a-f]{64}$");
 
 	private final ContentPackStore store;
 
@@ -100,20 +104,50 @@ public class ContentPackController {
 			return ResponseEntity.notFound().build();
 		}
 
-		String etag = quotedEtag(fileEntry.sha256());
+		// Path-addressed URL: the same path is reused across pack versions, so it must be revalidated (no immutable).
+		return serveEntry(fileEntry, ifNoneMatch, CacheControl.noCache().getHeaderValue());
+	}
+
+	/**
+	 * Content-addressed endpoint: the URL is the SHA-256 of the bytes, so the response is truly immutable.
+	 */
+	@GetMapping("/blobs/{sha256}")
+	public ResponseEntity<byte[]> getPackBlob(
+			@PathVariable("sha256") String sha256,
+			@RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch)
+			throws IOException {
+		if (sha256 == null || !SHA256_HEX.matcher(sha256).matches()) {
+			return ResponseEntity.badRequest().build();
+		}
+		Optional<ContentPackStore.LoadedPack> maybePack = store.getActivePack();
+		if (maybePack.isEmpty()) {
+			return ResponseEntity.notFound().build();
+		}
+		ContentPackStore.PackFileEntry entry = maybePack.get().files().values().stream()
+				.filter(e -> e.sha256().equals(sha256))
+				.findFirst()
+				.orElse(null);
+		if (entry == null) {
+			return ResponseEntity.notFound().build();
+		}
+		return serveEntry(entry, ifNoneMatch, IMMUTABLE_CACHE_CONTROL);
+	}
+
+	private static ResponseEntity<byte[]> serveEntry(
+			ContentPackStore.PackFileEntry entry, String ifNoneMatch, String cacheControl) throws IOException {
+		String etag = quotedEtag(entry.sha256());
 		if (matchesEtag(ifNoneMatch, etag)) {
 			return ResponseEntity.status(HttpStatus.NOT_MODIFIED)
 					.eTag(etag)
-					.header(HttpHeaders.CACHE_CONTROL, "public, max-age=31536000, immutable")
+					.header(HttpHeaders.CACHE_CONTROL, cacheControl)
 					.build();
 		}
-
-		byte[] bytes = Files.readAllBytes(fileEntry.resolvedPath());
+		byte[] bytes = Files.readAllBytes(entry.resolvedPath());
 		return ResponseEntity.ok()
-				.contentType(resolveMediaType(relativePath))
+				.contentType(resolveMediaType(entry.relativePath()))
 				.contentLength(bytes.length)
 				.eTag(etag)
-				.header(HttpHeaders.CACHE_CONTROL, "public, max-age=31536000, immutable")
+				.header(HttpHeaders.CACHE_CONTROL, cacheControl)
 				.body(bytes);
 	}
 
