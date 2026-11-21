@@ -102,10 +102,14 @@ class EncryptedLocalCache {
     int? lastEpoch,
   }) async {
     final List<CachedEventEntry> windowed = _windowEntries(entries);
+    // An explicit cursor is authoritative: it may intentionally sit below the
+    // highest cached seq so quarantined envelopes are refetched (`AU-04`).
     int computedLastSeq = lastSeq ?? 0;
-    for (final CachedEventEntry entry in entries) {
-      if ((entry.seq ?? 0) > computedLastSeq) {
-        computedLastSeq = entry.seq!;
+    if (lastSeq == null) {
+      for (final CachedEventEntry entry in entries) {
+        if ((entry.seq ?? 0) > computedLastSeq) {
+          computedLastSeq = entry.seq!;
+        }
       }
     }
     final SecretKey cacheKey = await _deriveCacheKey(coupleRootKey);
@@ -191,10 +195,15 @@ class EncryptedLocalCache {
         .cast<Map<String, Object?>>()
         .map(CachedEventEntry.fromJson)
         .toList(growable: false);
-    int storedLastSeq = clearObj['lastSeq'] as int? ?? 0;
-    for (final CachedEventEntry entry in events) {
-      if ((entry.seq ?? 0) > storedLastSeq) {
-        storedLastSeq = entry.seq!;
+    // Schema 2+ persists an authoritative cursor (`AU-04`, `AU-05`); only
+    // legacy schema 1 caches derive it from the highest cached seq.
+    final int? persistedLastSeq = clearObj['lastSeq'] as int?;
+    int storedLastSeq = persistedLastSeq ?? 0;
+    if (persistedLastSeq == null) {
+      for (final CachedEventEntry entry in events) {
+        if ((entry.seq ?? 0) > storedLastSeq) {
+          storedLastSeq = entry.seq!;
+        }
       }
     }
     final int storedLastEpoch = clearObj['lastEpoch'] as int? ?? 1;

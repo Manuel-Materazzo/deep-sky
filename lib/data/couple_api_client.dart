@@ -21,7 +21,7 @@ class ApiRequestException implements Exception {
     if (errorCode == 'CLOCK_SKEW') {
       return true;
     }
-    return message.toLowerCase().contains('timestamp');
+    return errorCode == null && message.toLowerCase().contains('timestamp');
   }
 
   bool get isDeviceUnknownOrRevoked {

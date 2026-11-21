@@ -373,6 +373,348 @@ void main() {
     expect(events.first.payload.body['note'], 'Recovered after drop');
   });
 
+  group('AU-02 follow-up: rotation promotion, retry guard and mutex', () {
+    Future<
+      ({
+        _FakeServer server,
+        InMemorySecureKeyStore storeA,
+        PairingAndSyncRepository Function(InMemorySecureKeyStore) makeRepo,
+        PairingAndSyncRepository repoA,
+        PairingAndSyncRepository repoB,
+        LocalDeviceIdentity idA,
+        LocalDeviceIdentity idB,
+        LocalDeviceIdentity idC,
+      })
+    >
+    pairThree(MockClient Function(_FakeServer) mockFor) async {
+      final _FakeServer server = _FakeServer();
+      final MockClient mockHttp = mockFor(server);
+      final DeepSkyCrypto crypto = DeepSkyCrypto();
+      PairingAndSyncRepository makeRepo(InMemorySecureKeyStore store) =>
+          PairingAndSyncRepository(
+            keyStore: store,
+            crypto: crypto,
+            clientFactory: (String url) => CoupleApiClient(
+              baseUrl: url,
+              httpClient: mockHttp,
+              crypto: crypto,
+            ),
+          );
+      final InMemorySecureKeyStore storeA = InMemorySecureKeyStore();
+      final PairingAndSyncRepository repoA = makeRepo(storeA);
+      final PairingAndSyncRepository repoB = makeRepo(InMemorySecureKeyStore());
+      final PairingAndSyncRepository repoC = makeRepo(InMemorySecureKeyStore());
+
+      final init = await repoA.createInitialInvite(
+        serverUrl: 'https://test.local',
+        deviceLabel: 'Phone A',
+      );
+      final PendingJoinSession joinB = await repoB.acceptInvite(
+        serverUrl: 'https://test.local',
+        inviteToken: init.invite.inviteToken,
+        sasSecret: init.invite.sasSecret!,
+        deviceLabel: 'Phone B',
+      );
+      final st = await repoA.checkInviteAndSas(
+        init.invite.inviteToken,
+        sasSecret: init.invite.sasSecret,
+      );
+      await repoA.confirmSasAndDeliverRootKey(
+        targetDeviceId: st.status.acceptedDeviceId!,
+        targetKemPublicKey: st.status.acceptedKemPublicKey!,
+      );
+      final LocalDeviceIdentity idB = await repoB.completeKeyDelivery(
+        session: joinB,
+      );
+
+      final CreateInviteResponse enroll = await repoA.createEnrollmentInvite();
+      final PendingJoinSession joinC = await repoC.acceptInvite(
+        serverUrl: 'https://test.local',
+        inviteToken: enroll.inviteToken,
+        sasSecret: enroll.sasSecret!,
+        deviceLabel: 'Phone C',
+      );
+      final st2 = await repoA.checkInviteAndSas(
+        enroll.inviteToken,
+        sasSecret: enroll.sasSecret,
+      );
+      await repoA.confirmSasAndDeliverRootKey(
+        targetDeviceId: st2.status.acceptedDeviceId!,
+        targetKemPublicKey: st2.status.acceptedKemPublicKey!,
+      );
+      final LocalDeviceIdentity idC = await repoC.completeKeyDelivery(
+        session: joinC,
+      );
+      return (
+        server: server,
+        storeA: storeA,
+        makeRepo: makeRepo,
+        repoA: repoA,
+        repoB: repoB,
+        idA: init.identity,
+        idB: idB,
+        idC: idC,
+      );
+    }
+
+    Future<String> serverRecoveryAuthPub(Uint8List seed) async {
+      final SimpleKeyPair kp = await DeepSkyCrypto().deriveRecoveryAuthKeyPair(
+        seed,
+      );
+      return base64UrlEncode((await kp.extractPublicKey()).bytes);
+    }
+
+    test('promotes committed rotation when an older EPOCH_ROTATION delivery exists for this device', () async {
+      bool dropNextRevokeResponse = false;
+      bool offlineOnReconcile = false;
+      final f = await pairThree(
+        (_FakeServer server) => MockClient((http.Request req) async {
+          final http.Response res = await server.handle(req);
+          if (dropNextRevokeResponse &&
+              req.method == 'POST' &&
+              req.url.path.endsWith('/revoke')) {
+            dropNextRevokeResponse = false;
+            throw const SocketException('reset after commit');
+          }
+          if (offlineOnReconcile &&
+              req.url.path == '/api/v1/pairing/epoch-rotations/me') {
+            throw TimeoutException('offline');
+          }
+          return res;
+        }),
+      );
+
+      // B revokes C first: A receives an EPOCH_ROTATION delivery at epoch 2.
+      await f.repoB.revokeDevice(f.idC.deviceId);
+      await f.repoA.sendEncryptedEvent(
+        eventType: 'thinking_of_you',
+        body: <String, Object?>{'note': 'adopt epoch 2'},
+      );
+      expect((await f.repoA.loadIdentity())!.currentKeyEpoch, 2);
+      expect(f.server.deliveries['epoch:${f.idA.deviceId}'], isNotNull);
+
+      // A now revokes B; server commits epoch 3 but the response is lost.
+      dropNextRevokeResponse = true;
+      offlineOnReconcile = true;
+      await expectLater(
+        f.repoA.revokeDevice(f.idB.deviceId),
+        throwsA(isA<SocketException>()),
+      );
+      expect(await f.storeA.read('deep_sky.pending_rotation.v1'), isNotNull);
+      expect((await f.repoA.loadIdentity())!.currentKeyEpoch, 2);
+
+      offlineOnReconcile = false;
+      final LocalDeviceIdentity? promoted = await f.repoA
+          .reconcilePendingRotation();
+      expect(promoted!.currentKeyEpoch, 3);
+      expect(await f.storeA.read('deep_sky.pending_rotation.v1'), isNull);
+      final String couplePub =
+          f.server.couples.values.single['recoveryAuthPublicKeyB64']! as String;
+      expect(await serverRecoveryAuthPub(promoted.recoverySeed!), couplePub);
+    });
+
+    test('retry after lost response does not generate new keys and keeps committed ones', () async {
+      bool dropNextRevokeResponse = false;
+      bool offline = false;
+      int revokePosts = 0;
+      final f = await pairThree(
+        (_FakeServer server) => MockClient((http.Request req) async {
+          if (offline && req.url.path == '/api/v1/pairing/epoch-rotations/me') {
+            throw TimeoutException('offline');
+          }
+          final http.Response res = await server.handle(req);
+          if (req.method == 'POST' && req.url.path.endsWith('/revoke')) {
+            revokePosts++;
+            if (dropNextRevokeResponse) {
+              dropNextRevokeResponse = false;
+              throw const SocketException('reset after commit');
+            }
+          }
+          return res;
+        }),
+      );
+
+      dropNextRevokeResponse = true;
+      offline = true;
+      await expectLater(
+        f.repoA.revokeDevice(f.idC.deviceId),
+        throwsA(isA<SocketException>()),
+      );
+      final String? pendingRaw = await f.storeA.read(
+        'deep_sky.pending_rotation.v1',
+      );
+      expect(pendingRaw, isNotNull);
+
+      // Retry while the server state is still unknown: calm typed or network
+      // error, no new keys, pending record untouched.
+      await expectLater(
+        f.repoA.revokeDevice(f.idC.deviceId),
+        throwsA(isA<TimeoutException>()),
+      );
+      expect(await f.storeA.read('deep_sky.pending_rotation.v1'), pendingRaw);
+      expect(revokePosts, 1);
+
+      // Network back: retry resolves the committed rotation without a new POST.
+      offline = false;
+      final LocalDeviceIdentity result = await f.repoA.revokeDevice(
+        f.idC.deviceId,
+      );
+      expect(revokePosts, 1);
+      expect(result.currentKeyEpoch, 2);
+      expect(await f.storeA.read('deep_sky.pending_rotation.v1'), isNull);
+      final Map<String, Object?> pending =
+          jsonDecode(pendingRaw!) as Map<String, Object?>;
+      expect(base64UrlEncode(result.recoverySeed!), pending['recoverySeedB64']);
+      final String couplePub =
+          f.server.couples.values.single['recoveryAuthPublicKeyB64']! as String;
+      expect(await serverRecoveryAuthPub(result.recoverySeed!), couplePub);
+
+      // Partner B can adopt epoch 2 and A decrypts what B sends there.
+      await f.repoB.sendEncryptedEvent(
+        eventType: 'thinking_of_you',
+        body: <String, Object?>{'note': 'hello at epoch 2'},
+      );
+      final List<DecryptedEventRecord> events = await f.repoA
+          .fetchAndDecryptEvents();
+      expect(events.map((e) => e.payload.body['note']), <Object?>[
+        'hello at epoch 2',
+      ]);
+      expect(events.single.envelope.keyEpoch, 2);
+    });
+
+    test('reconcile running while revoke is in flight waits and does not delete the pending record', () async {
+      final Completer<void> gate = Completer<void>();
+      bool gateRevoke = false;
+      final List<String> epochRotationGets = <String>[];
+      final f = await pairThree(
+        (_FakeServer server) => MockClient((http.Request req) async {
+          if (req.url.path == '/api/v1/pairing/epoch-rotations/me') {
+            epochRotationGets.add(req.url.path);
+          }
+          if (gateRevoke &&
+              req.method == 'POST' &&
+              req.url.path.endsWith('/revoke')) {
+            await gate.future;
+          }
+          return server.handle(req);
+        }),
+      );
+
+      gateRevoke = true;
+      final Future<LocalDeviceIdentity> revoking = f.repoA.revokeDevice(
+        f.idB.deviceId,
+      );
+      // Let the revoke reach the (blocked) HTTP call.
+      for (int i = 0; i < 20; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(await f.storeA.read('deep_sky.pending_rotation.v1'), isNotNull);
+      epochRotationGets.clear();
+
+      final Future<LocalDeviceIdentity?> reconciling = f.repoA
+          .reconcilePendingRotation();
+      for (int i = 0; i < 20; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      // The concurrent reconcile must not have queried the server nor
+      // dropped the write-ahead record.
+      expect(epochRotationGets, isEmpty);
+      expect(await f.storeA.read('deep_sky.pending_rotation.v1'), isNotNull);
+
+      gate.complete();
+      final LocalDeviceIdentity rotated = await revoking;
+      final LocalDeviceIdentity? after = await reconciling;
+      expect(rotated.currentKeyEpoch, 2);
+      expect(after!.currentKeyEpoch, 2);
+      expect(await f.storeA.read('deep_sky.pending_rotation.v1'), isNull);
+      expect(
+        (await f.repoA.loadIdentity())!.recoverySeed,
+        orderedEquals(rotated.recoverySeed!),
+      );
+    });
+  });
+
+  test('AU-04: quarantined envelope is retried after app restart (cursor not advanced past it)', () async {
+    final _FakeServer fakeServer = _FakeServer();
+    final MockClient mockHttp = MockClient(
+      (http.Request req) => fakeServer.handle(req),
+    );
+    final DeepSkyCrypto crypto = DeepSkyCrypto();
+    final InMemorySecureKeyStore store = InMemorySecureKeyStore();
+    PairingAndSyncRepository makeRepo() => PairingAndSyncRepository(
+      keyStore: store,
+      crypto: crypto,
+      clientFactory: (String url) =>
+          CoupleApiClient(baseUrl: url, httpClient: mockHttp, crypto: crypto),
+    );
+    final PairingAndSyncRepository repo = makeRepo();
+    final init = await repo.createInitialInvite(
+      serverUrl: 'https://test.local',
+      deviceLabel: 'Phone A',
+    );
+    await repo.sendEncryptedEvent(
+      eventType: 'thinking_of_you',
+      body: <String, Object?>{'note': 'valid 1'},
+    );
+    // The corrupted envelope sits in the MIDDLE of the timeline: a later valid
+    // envelope must not drag the persisted cursor past it.
+    final int corruptedSeq = fakeServer._seqCounter++;
+    fakeServer.envelopes.add(<String, Object?>{
+      'envelopeId': 'corrupted-env-2',
+      'coupleId': init.identity.coupleId,
+      'senderDeviceId': init.identity.deviceId,
+      'seq': corruptedSeq,
+      'channel': 'EVENT',
+      'keyEpoch': 1,
+      'nonceB64': base64UrlEncode(List<int>.filled(24, 1)),
+      'ciphertextB64': base64UrlEncode(List<int>.filled(48, 2)),
+      'createdAtServer': DateTime.now().toUtc().toIso8601String(),
+    });
+    await repo.sendEncryptedEvent(
+      eventType: 'thinking_of_you',
+      body: <String, Object?>{'note': 'valid 2'},
+    );
+
+    final SyncEventsSnapshot first = await repo.syncEventsWithOfflineFallback();
+    expect(first.quarantinedEnvelopes, hasLength(1));
+    final CachedEventsSnapshot cached = await repo.loadCachedSnapshot();
+    expect(
+      cached.events.map((e) => e.seq ?? 0).reduce((a, b) => a > b ? a : b),
+      greaterThan(corruptedSeq),
+    );
+    expect(cached.lastSeq, lessThan(corruptedSeq));
+
+    // App restart: in-memory quarantine list is gone, persisted cursor must
+    // still cause the bad envelope to be fetched (and reported) again.
+    final PairingAndSyncRepository restarted = makeRepo();
+    final SyncEventsSnapshot second = await restarted
+        .syncEventsWithOfflineFallback();
+    expect(second.quarantinedEnvelopes.map((q) => q.envelopeId), <String>[
+      'corrupted-env-2',
+    ]);
+    expect(second.events, hasLength(2));
+  });
+
+  test('ApiRequestException.isClockSkew only falls back to message text without an errorCode', () {
+    expect(const ApiRequestException(401, 'Bad timestamp').isClockSkew, isTrue);
+    expect(
+      const ApiRequestException(
+        401,
+        'Malformed X-Device-Id or X-Timestamp',
+        errorCode: 'AUTH_HEADERS_INVALID',
+      ).isClockSkew,
+      isFalse,
+    );
+    expect(
+      const ApiRequestException(
+        401,
+        'skew',
+        errorCode: 'CLOCK_SKEW',
+      ).isClockSkew,
+      isTrue,
+    );
+  });
+
   test('AU-04: single corrupted envelope is quarantined without breaking timeline sync', () async {
     final _FakeServer fakeServer = _FakeServer();
     final MockClient mockHttp = MockClient(
@@ -951,6 +1293,16 @@ class _FakeServer {
         path.startsWith('/api/v1/pairing/devices/') &&
         path.endsWith('/revoke')) {
       final String targetId = path.split('/')[5];
+      if (bodyJson.isNotEmpty) {
+        // Like the real server: a rotation must target exactly current + 1.
+        final int currentEpoch = couples[coupleId]!['currentKeyEpoch']! as int;
+        if (bodyJson['targetEpoch'] != currentEpoch + 1) {
+          return _json(409, <String, Object?>{
+            'code': 'STALE_KEY_EPOCH',
+            'message': 'Epoch rotation target must be current + 1',
+          });
+        }
+      }
       devices[targetId]!['revokedAt'] = DateTime.now()
           .toUtc()
           .toIso8601String();
