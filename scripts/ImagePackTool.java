@@ -25,9 +25,12 @@ import javax.imageio.ImageIO;
  *
  * <p>Uses premultiplied bicubic progressive downscaling to prevent alpha edge halos (A-04).
  * Encodes lossless 32-bit RGBA PNG first (with zeroed RGB on alpha=0 pixels and optimal Paeth
- * filtering at zlib level 9); if the file exceeds {@code --max-bytes}, encodes a crisp
- * 256-color RGBA indexed PNG (PNG8 with full {@code PLTE} + {@code tRNS} alpha table and
- * subtle RGB error diffusion) to stay well within DD-10 mobile budgets.
+ * filtering at zlib level 9, keeping the smaller of a fixed-Paeth and an adaptive per-row
+ * filter encoding). If the file exceeds {@code --max-bytes} the build FAILS by default (the
+ * plan mandates lossless derivatives, DD-10). Only with the explicit {@code --allow-palette}
+ * opt-in does it fall back to a lossy 256-color RGBA indexed PNG (PNG8 with {@code PLTE} +
+ * {@code tRNS} and subtle RGB error diffusion). {@code --max-bytes} is an exact byte count
+ * (callers use KiB = 1024 bytes).
  */
 public final class ImagePackTool {
 
@@ -53,6 +56,7 @@ public final class ImagePackTool {
         int targetW = Integer.parseInt(requireArg(args, "--width"));
         int targetH = Integer.parseInt(requireArg(args, "--height"));
         long maxBytes = parseOptionalLong(args, "--max-bytes", Long.MAX_VALUE);
+        boolean allowPalette = hasFlag(args, "--allow-palette");
 
         BufferedImage src = ImageIO.read(inPath.toFile());
         if (src == null) {
@@ -67,6 +71,13 @@ public final class ImagePackTool {
         byte[] chosen = losslessPng;
         String mode = "RGBA32";
 
+        if (losslessPng.length > maxBytes && !allowPalette) {
+            System.err.printf(
+                    "ERROR: %s lossless RGBA32 output is %d bytes, over the budget of %d bytes (%.1f KiB). "
+                            + "Reduce the artwork complexity or, as an explicit lossy opt-in, rerun with --allow-palette.%n",
+                    outPath.getFileName(), losslessPng.length, maxBytes, maxBytes / 1024.0);
+            System.exit(2);
+        }
         if (losslessPng.length > maxBytes) {
             float[] dithers = {0.55f, 0.25f, 0.0f};
             int[] colorCounts = {256, 192, 160};
@@ -164,47 +175,87 @@ public final class ImagePackTool {
         return dst;
     }
 
-    /** Lossless 32-bit RGBA PNG with transparent-pixel RGB zeroing and Paeth scanline filtering. */
+    /**
+     * Lossless 32-bit RGBA PNG with transparent-pixel RGB zeroing. Encodes twice (fixed Paeth and
+     * adaptive per-row filter by minimum sum of absolute values) and keeps the smaller file.
+     */
     private static byte[] encodeRgba32Png(BufferedImage img) throws IOException {
         int w = img.getWidth();
         int h = img.getHeight();
         int[] argb = img.getRGB(0, 0, w, h, null, 0, w);
         int stride = w * 4;
-        byte[] raw = new byte[h * (1 + stride)];
-        byte[] prevRow = new byte[stride];
-        byte[] curRow = new byte[stride];
-        int outPos = 0;
-
+        byte[][] rows = new byte[h][stride];
         for (int y = 0; y < h; y++) {
             int rowOff = y * w;
+            byte[] curRow = rows[y];
             for (int x = 0; x < w; x++) {
                 int p = argb[rowOff + x];
                 int a = (p >>> 24) & 0xFF;
                 int base = x * 4;
-                if (a == 0) {
-                    curRow[base] = 0;
-                    curRow[base + 1] = 0;
-                    curRow[base + 2] = 0;
-                    curRow[base + 3] = 0;
-                } else {
+                if (a != 0) {
                     curRow[base] = (byte) ((p >>> 16) & 0xFF);
                     curRow[base + 1] = (byte) ((p >>> 8) & 0xFF);
                     curRow[base + 2] = (byte) (p & 0xFF);
                     curRow[base + 3] = (byte) a;
                 }
             }
-            raw[outPos++] = 4; // Paeth
-            for (int i = 0; i < stride; i++) {
-                int a = i >= 4 ? (curRow[i - 4] & 0xFF) : 0;
-                int b = prevRow[i] & 0xFF;
-                int c = i >= 4 ? (prevRow[i - 4] & 0xFF) : 0;
-                raw[outPos++] = (byte) ((curRow[i] & 0xFF) - paeth(a, b, c));
-            }
-            System.arraycopy(curRow, 0, prevRow, 0, stride);
         }
 
         byte[] ihdr = buildIhdr(w, h, 8, 6);
-        return assemblePng(ihdr, null, null, zlibCompress(raw));
+        byte[] best = null;
+        for (boolean adaptive : new boolean[] {false, true}) {
+            byte[] raw = new byte[h * (1 + stride)];
+            byte[] prevRow = new byte[stride];
+            byte[][] candidates = new byte[5][stride];
+            int outPos = 0;
+            for (int y = 0; y < h; y++) {
+                byte[] curRow = rows[y];
+                int chosen = 4;
+                if (adaptive) {
+                    long bestScore = Long.MAX_VALUE;
+                    for (int f = 0; f <= 4; f++) {
+                        long score = filterRow(f, curRow, prevRow, candidates[f]);
+                        if (score < bestScore) {
+                            bestScore = score;
+                            chosen = f;
+                        }
+                    }
+                } else {
+                    filterRow(4, curRow, prevRow, candidates[4]);
+                }
+                raw[outPos++] = (byte) chosen;
+                System.arraycopy(candidates[chosen], 0, raw, outPos, stride);
+                outPos += stride;
+                prevRow = curRow;
+            }
+            byte[] png = assemblePng(ihdr, null, null, zlibCompress(raw));
+            if (best == null || png.length < best.length) {
+                best = png;
+            }
+        }
+        return best;
+    }
+
+    /** Applies PNG filter {@code type} (0-4, bpp=4) and returns the sum of absolute signed residuals. */
+    private static long filterRow(int type, byte[] cur, byte[] prev, byte[] out) {
+        long score = 0;
+        for (int i = 0; i < cur.length; i++) {
+            int x = cur[i] & 0xFF;
+            int a = i >= 4 ? (cur[i - 4] & 0xFF) : 0;
+            int b = prev[i] & 0xFF;
+            int c = i >= 4 ? (prev[i - 4] & 0xFF) : 0;
+            int pred = switch (type) {
+                case 0 -> 0;
+                case 1 -> a;
+                case 2 -> b;
+                case 3 -> (a + b) / 2;
+                default -> paeth(a, b, c);
+            };
+            byte r = (byte) (x - pred);
+            out[i] = r;
+            score += Math.abs((int) r);
+        }
+        return score;
     }
 
     /** 256-color RGBA PNG8 (PLTE + tRNS) via median-cut quantization with configurable RGB error diffusion. */
@@ -541,6 +592,15 @@ public final class ImagePackTool {
         return "";
     }
 
+    private static boolean hasFlag(String[] args, String flag) {
+        for (int i = 1; i < args.length; i++) {
+            if (flag.equals(args[i])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static long parseOptionalLong(String[] args, String flag, long fallback) {
         for (int i = 1; i < args.length - 1; i++) {
             if (flag.equals(args[i])) {
@@ -553,7 +613,7 @@ public final class ImagePackTool {
     private static void printUsageAndExit() {
         System.err.println("""
                 Usage:
-                  java scripts/ImagePackTool.java resize --in <src.png> --out <dst.png> --width <W> --height <H> [--max-bytes <N>]
+                  java scripts/ImagePackTool.java resize --in <src.png> --out <dst.png> --width <W> --height <H> [--max-bytes <N>] [--allow-palette]
                   java scripts/ImagePackTool.java inspect --in <img.png>""");
         System.exit(1);
     }

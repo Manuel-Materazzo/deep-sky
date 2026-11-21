@@ -16,19 +16,23 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Size budgets from m3-operative-plan.md §6.3 ("KB" in the plan is interpreted as KiB = 1024 bytes;
+# scripts/validate_content.py uses the same constants and ImagePackTool receives exact bytes).
+KIB = 1024
+
 # Target derivative dimensions and size budgets (bytes) from m3-operative-plan.md §6.3
 ASSET_SPECS: dict[str, tuple[int, int, int]] = {
-    "floor.png": (1440, 960, 400 * 1024),
-    "window_frame.png": (450, 600, 250 * 1024),
-    "window_sky_day.png": (450, 600, 250 * 1024),
-    "window_sky_twilight.png": (450, 600, 250 * 1024),
-    "window_sky_night.png": (450, 600, 250 * 1024),
-    "rug.png": (900, 360, 250 * 1024),
-    "couch.png": (960, 540, 250 * 1024),
-    "floor_lamp_calm.png": (360, 720, 250 * 1024),
-    "floor_lamp_lit.png": (360, 720, 250 * 1024),
-    "couple_on_couch.png": (640, 480, 250 * 1024),
-    "pet_sleeping.png": (384, 288, 250 * 1024),
+    "floor.png": (1440, 960, 400 * KIB),
+    "window_frame.png": (450, 600, 250 * KIB),
+    "window_sky_day.png": (450, 600, 250 * KIB),
+    "window_sky_twilight.png": (450, 600, 250 * KIB),
+    "window_sky_night.png": (450, 600, 250 * KIB),
+    "rug.png": (900, 360, 250 * KIB),
+    "couch.png": (960, 540, 250 * KIB),
+    "floor_lamp_calm.png": (360, 720, 250 * KIB),
+    "floor_lamp_lit.png": (360, 720, 250 * KIB),
+    "couple_on_couch.png": (640, 480, 250 * KIB),
+    "pet_sleeping.png": (384, 288, 250 * KIB),
 }
 
 
@@ -36,6 +40,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Build optimized Deep Sky content pack derivatives.")
     parser.add_argument("--masters", required=True, help="Directory with high-res master PNGs")
     parser.add_argument("--out-assets", required=True, help="Output assets/ directory inside pack")
+    parser.add_argument(
+        "--allow-palette",
+        action="store_true",
+        help="EXPLICIT lossy opt-in: when the lossless RGBA PNG exceeds the budget, fall back to a "
+        "256-color indexed PNG instead of failing. Off by default (plan section 6.3 mandates lossless).",
+    )
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parent.parent
@@ -59,8 +69,7 @@ def main() -> int:
             continue
         target_w, target_h, max_bytes = spec
         out_path = out_assets / master.name
-        subprocess.run(
-            [
+        cmd = [
                 "java",
                 str(tool_path),
                 "resize",
@@ -74,19 +83,26 @@ def main() -> int:
                 str(target_h),
                 "--max-bytes",
                 str(max_bytes),
-            ],
-            check=True,
-        )
+        ]
+        if args.allow_palette:
+            cmd.append("--allow-palette")
+        result = subprocess.run(cmd)
+        if result.returncode != 0:
+            errors.append(
+                f"{master.name}: lossless output over budget {max_bytes} bytes ({max_bytes // KIB} KiB); "
+                "rerun with --allow-palette only if lossy PNG8 quantization is explicitly accepted"
+            )
+            continue
         if oxipng:
             subprocess.run([oxipng, "-o", "4", "--strip", "safe", str(out_path)], check=True)
         size = out_path.stat().st_size
         total_bytes += size
-        print(f"  Verified {out_path.name}: {size:,} bytes (budget <= {max_bytes:,} bytes)")
+        print(f"  Verified {out_path.name}: {size:,} bytes (budget <= {max_bytes:,} bytes = {max_bytes // KIB} KiB)")
         if size > max_bytes:
             errors.append(f"{out_path.name}: {size} bytes exceeds DD-10 budget {max_bytes} bytes")
 
-    print(f"Total runtime assets size: {total_bytes:,} bytes ({total_bytes / 1024:.1f} KB)")
-    if total_bytes > int(1.8 * 1024 * 1024):
+    print(f"Total runtime assets size: {total_bytes:,} bytes ({total_bytes / KIB:.1f} KiB)")
+    if total_bytes > int(1.8 * 1024 * KIB):
         errors.append(f"Total pack size {total_bytes} exceeds DD-10 budget of 1.8 MB")
 
     if errors:

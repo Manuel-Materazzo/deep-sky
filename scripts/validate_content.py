@@ -22,10 +22,13 @@ ALLOWED_ANIM_TYPES = {"fade", "translateY", "translateX", "scale", "rotate"}
 ALLOWED_CURVES = {"linear", "easeInOut", "easeIn", "easeOut"}
 ALLOWED_REPEATS = {"none", "loop", "reverse"}
 
-# DD-10 runtime budgets (applied to packs shipping real assets/)
-MAX_FLOOR_ASSET_BYTES = 400 * 1024
-MAX_OBJECT_ASSET_BYTES = 250 * 1024
-MAX_PACK_TOTAL_BYTES = int(1.8 * 1024 * 1024)
+# DD-10 runtime budgets (applied to packs shipping real assets/).
+# "KB"/"MB" in m3-operative-plan.md section 6.3 are interpreted as KiB/MiB (1024 bytes), identical
+# to scripts/build_content_pack.py.
+KIB = 1024
+MAX_FLOOR_ASSET_BYTES = 400 * KIB
+MAX_OBJECT_ASSET_BYTES = 250 * KIB
+MAX_PACK_TOTAL_BYTES = int(1.8 * 1024 * KIB)
 
 
 def _is_int(v: object) -> bool:
