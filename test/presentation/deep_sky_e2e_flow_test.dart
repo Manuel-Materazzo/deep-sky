@@ -150,22 +150,26 @@ void main() {
       expect(ctrlB.sceneState.fromPartner, isTrue);
       expect(ctrlB.events.single.payload.body['note'], 'Pensiero della sera');
 
-      // Render Partner B UI and confirm status card copy & lit scene.
+      // Render Partner B UI and confirm dual-state "<Partner> ti ha pensato" card & Ricambia button.
       await tester.pumpWidget(
         DeepSkyApp(controller: ctrlB, autoInitialize: false),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Hai un pensiero in arrivo.'), findsOneWidget);
+      expect(find.textContaining('ti ha pensato'), findsOneWidget);
+      expect(find.textContaining('Pensiero della sera'), findsOneWidget);
+      expect(find.byKey(const Key('reply-thought-button')), findsOneWidget);
 
-      // 5) Simulate offline mode -> calm read-only banner + cached timeline preserved + writes disabled.
+      // 5) Simulate offline mode -> calm read-only banner + cached thought preserved + writes disabled.
       server.simulateOffline = true;
+      await tapVisible(find.text('Noi'));
       await tapVisible(find.byKey(const Key('refresh-sync-button')));
+      await tapVisible(find.text('Casa'));
       expect(find.byKey(const Key('offline-readonly-banner')), findsOneWidget);
       expect(find.textContaining('Pensiero della sera'), findsWidgets);
-      final FilledButton offlineSend = tester.widget<FilledButton>(
-        find.byKey(const Key('send-thought-button')),
+      final FilledButton offlineReply = tester.widget<FilledButton>(
+        find.byKey(const Key('reply-thought-button')),
       );
-      expect(offlineSend.onPressed, isNull);
+      expect(offlineReply.onPressed, isNull);
 
       // 6) Recover onto a third fresh device using the 24 BIP-39 words (F-20).
       server.simulateOffline = false;
@@ -175,6 +179,7 @@ void main() {
         loadAssetString: (_) async => pilotManifestRaw,
         loadCapabilities: () async => testCaps,
         defaultServerUrl: 'https://couple.example.test',
+        enableSkyRefreshTimer: false,
       );
       ctrlC.reduceMotion = true;
       await ctrlC.initialize();
@@ -186,13 +191,13 @@ void main() {
       expect(ctrlC.phase, AppBootPhase.paired);
       expect(ctrlC.events.single.payload.body['note'], 'Pensiero della sera');
 
-      // 7) Cross-device enrollment from Devices tab UI -> Phone D (F-20).
-      // Render Phone A back in HomeShellPage and switch to Dispositivi tab.
+      // 7) Cross-device enrollment from Noi tab UI -> Phone D (F-20).
+      // Render Phone A back in HomeShellPage and switch to Noi tab.
       await tester.pumpWidget(
         DeepSkyApp(controller: ctrlA, autoInitialize: false),
       );
       await tester.pumpAndSettle();
-      await tapVisible(find.text('Dispositivi'));
+      await tapVisible(find.text('Noi'));
       await tapVisible(
         find.byKey(const Key('create-enrollment-invite-button')),
       );
@@ -207,6 +212,7 @@ void main() {
         loadAssetString: (_) async => pilotManifestRaw,
         loadCapabilities: () async => testCaps,
         defaultServerUrl: 'https://couple.example.test',
+        enableSkyRefreshTimer: false,
       );
       ctrlD.reduceMotion = true;
       await tester.pumpWidget(DeepSkyApp(controller: ctrlD));
@@ -228,12 +234,12 @@ void main() {
         findsOneWidget,
       );
 
-      // Phone A (Dispositivi tab) polls, sees the matching SAS, and delivers keys.
+      // Phone A (Noi tab) polls, sees the matching SAS, and delivers keys.
       await tester.pumpWidget(
         DeepSkyApp(controller: ctrlA, autoInitialize: false),
       );
       await tester.pumpAndSettle();
-      await tapVisible(find.text('Dispositivi'));
+      await tapVisible(find.text('Noi'));
       await tapVisible(find.byKey(const Key('enroll-poll-invite-button')));
       expect(find.text('Codice di verifica SAS: $enrollSas'), findsOneWidget);
       await tapVisible(find.byKey(const Key('enroll-confirm-sas-button')));
@@ -257,6 +263,7 @@ void main() {
 
       // 8) Server enforces minimum version (HTTP 426) -> UpgradeRequiredPage (F-19).
       server.minClientVersionCode = 5;
+      await tapVisible(find.text('Noi'));
       await tapVisible(find.byKey(const Key('refresh-sync-button')));
       expect(find.byKey(const Key('upgrade-required-page')), findsOneWidget);
       expect(find.text('Aggiornamento richiesto'), findsOneWidget);
@@ -369,12 +376,12 @@ void main() {
       );
       await ctrlC.skipNameSetup();
 
-      // 1) Phone B unlinks ONLY itself via Dispositivi -> "Scollega questo dispositivo e pulisci spazio locale"
+      // 1) Phone B unlinks ONLY itself via Noi -> "Scollega questo dispositivo e pulisci spazio locale"
       await tester.pumpWidget(
         DeepSkyApp(controller: ctrlB, autoInitialize: false),
       );
       await tester.pumpAndSettle();
-      await tapVisible(find.text('Dispositivi'));
+      await tapVisible(find.text('Noi'));
       await tapVisible(find.byKey(const Key('unlink-device-button')));
       await tapVisible(find.byKey(const Key('confirm-unlink-device-button')));
       await settleController(ctrlB);
@@ -404,10 +411,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('revoked-device-banner')), findsOneWidget);
-      final FilledButton revokedSend = tester.widget<FilledButton>(
-        find.byKey(const Key('send-thought-button')),
+      final FilledButton revokedAction = tester.widget<FilledButton>(
+        find.byKey(const Key('reply-thought-button')),
       );
-      expect(revokedSend.onPressed, isNull);
+      expect(revokedAction.onPressed, isNull);
 
       await tapVisible(find.byKey(const Key('reset-revoked-device-button')));
       await settleController(ctrlC);
@@ -447,7 +454,7 @@ void main() {
       expect(find.byKey(const Key('recovery-key-setup-page')), findsOneWidget);
       await tapVisible(find.byKey(const Key('recovery-saved-checkbox')));
       await tapVisible(find.byKey(const Key('confirm-recovery-button')));
-      await tapVisible(find.text('Dispositivi'));
+      await tapVisible(find.text('Noi'));
       await tapVisible(find.byKey(const Key('unpair-couple-button')));
       await tapVisible(find.byKey(const Key('confirm-unpair-couple-button')));
       await settleController(ctrlA);
@@ -455,14 +462,14 @@ void main() {
       expect(find.byKey(const Key('onboarding-page')), findsOneWidget);
       expect(server.coupleUnpaired, isTrue);
 
-      // Phone D sees the revoked/unpaired banner and can wipe local data via Dispositivi tab too
+      // Phone D sees the revoked/unpaired banner and can wipe local data via Noi tab too
       await ctrlD.refreshSync();
       expect(ctrlD.isDeviceRevoked, isTrue);
       await tester.pumpWidget(
         DeepSkyApp(controller: ctrlD, autoInitialize: false),
       );
       await tester.pumpAndSettle();
-      await tapVisible(find.text('Dispositivi'));
+      await tapVisible(find.text('Noi'));
       await tapVisible(find.byKey(const Key('unlink-device-button')));
       await settleController(ctrlD);
       expect(find.byKey(const Key('onboarding-page')), findsOneWidget);

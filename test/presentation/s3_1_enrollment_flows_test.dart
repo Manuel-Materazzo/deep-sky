@@ -413,8 +413,8 @@ void main() {
       );
       expect(find.byKey(const Key('push-optin-card')), findsNothing);
 
-      // Devices tab asks calmly for confirmation before revoking another device (S1-D11)
-      await tapVisible(tester, find.text('Dispositivi'));
+      // Noi tab asks calmly for confirmation before revoking another device (S1-D11)
+      await tapVisible(tester, find.text('Noi'));
       await tapVisible(tester, find.byKey(const Key('revoke-device-dev-b')));
       expect(find.text('Revocare questo dispositivo?'), findsOneWidget);
       await tapVisible(tester, find.byKey(const Key('confirm-revoke-dev-b')));
@@ -544,12 +544,28 @@ void main() {
       await tester.pumpWidget(DeepSkyApp(controller: controller));
       await tester.pumpAndSettle();
 
-      await tapVisible(tester, find.text('Impostazioni'));
+      await tapVisible(tester, find.byKey(const Key('open-settings-button')));
+      final Finder settingsScroll = find
+          .descendant(
+            of: find.byKey(const Key('settings-page')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('enable-push-button')),
+        200,
+        scrollable: settingsScroll,
+      );
       expect(find.text('Permesso di sistema: consentito'), findsOneWidget);
       await tapVisible(tester, find.byKey(const Key('enable-push-button')));
       expect(find.byKey(const Key('push-feedback-text')), findsOneWidget);
       expect(find.textContaining('Google Play Services'), findsOneWidget);
 
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('open-notification-settings-button')),
+        200,
+        scrollable: settingsScroll,
+      );
       await tapVisible(
         tester,
         find.byKey(const Key('open-notification-settings-button')),
