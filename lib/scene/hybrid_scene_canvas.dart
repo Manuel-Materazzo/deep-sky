@@ -1,27 +1,40 @@
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:deep_sky/presentation/theme/deep_sky_theme.dart';
 import 'package:deep_sky/scene/asset_override_registry.dart';
 import 'package:deep_sky/scene/scene_manifest.dart';
 import 'package:flutter/semantics.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Renders a layered [SceneManifest] room with level-1 declarative animations,
-/// reduce-motion compliance, normalized touch hit-testing, and accessibility semantics (SP-04).
-class HybridSceneCanvas extends StatelessWidget {
+/// reduce-motion compliance, normalized touch hit-testing, accessibility semantics,
+/// bounded image decoding, and explicit sky-variant cache eviction (`SP-04`, `ADR-0007`, `S2-APP-03`).
+///
+/// Supports both APK-bundled assets (`isFileSystem: false`) and verified file-system
+/// content packs (`isFileSystem: true`). When `manifest.background == null`, transparent
+/// PNG slots render directly over the dynamic wall-backdrop of the Home screen without
+/// opaque borders or vignette boxes (`S2-D02`).
+class HybridSceneCanvas extends StatefulWidget {
   const HybridSceneCanvas({
     super.key,
     required this.manifest,
     required this.packAssetRoot,
+    this.isFileSystem = false,
     this.isNight = false,
     this.reduceMotion = false,
     this.slotStates = const <String, String>{},
     this.overrides = const AssetOverrideRegistry(),
     this.languageCode = 'it',
     this.onSlotTapped,
+    this.expandFloorDownward = false,
+    this.extraFloorHeight = 0.0,
+    this.floorBaseColor,
   });
 
   final SceneManifest manifest;
   final String packAssetRoot;
+  final bool isFileSystem;
   final bool isNight;
   final bool reduceMotion;
   final Map<String, String> slotStates;
@@ -29,83 +42,249 @@ class HybridSceneCanvas extends StatelessWidget {
   final String languageCode;
   final void Function(SceneSlot slot)? onSlotTapped;
 
-  String _fullAssetPath(String relativeAsset) {
+  /// When true (`S3-2` Home), extends the `floor` slot seamlessly downward below
+  /// the logical scene bounds so the floor continues to the bottom of the screen.
+  final bool expandFloorDownward;
+  final double extraFloorHeight;
+  final Color? floorBaseColor;
+
+  /// Evicts all assets belonging to [manifest] at [packAssetRoot] from Flutter's
+  /// `imageCache` (used on hot content-pack reload, `S2-APP-02`, `ADR-0007`).
+  static void evictPackImages({
+    required SceneManifest manifest,
+    required String packAssetRoot,
+    required bool isFileSystem,
+  }) {
+    final Set<String> relPaths = <String>{};
+    final SceneBackground? bg = manifest.background;
+    if (bg != null) {
+      relPaths.add(bg.dayAsset);
+      relPaths.add(bg.nightAsset);
+    }
+    for (final SceneSlot slot in manifest.slots) {
+      for (final List<SceneLayer> layers in slot.states.values) {
+        for (final SceneLayer layer in layers) {
+          relPaths.add(layer.asset);
+        }
+      }
+    }
+    for (final String rel in relPaths) {
+      _buildProvider(
+        packAssetRoot: packAssetRoot,
+        relativeAsset: rel,
+        isFileSystem: isFileSystem,
+      ).evict();
+    }
+  }
+
+  static ImageProvider _buildProvider({
+    required String packAssetRoot,
+    required String relativeAsset,
+    required bool isFileSystem,
+  }) {
+    final String cleanRel = relativeAsset.replaceAll(RegExp(r'^/+'), '');
+    if (isFileSystem) {
+      final String fullPath = <String>[
+        packAssetRoot.replaceAll(RegExp(r'[/\\]+$'), ''),
+        ...cleanRel.split('/'),
+      ].join(Platform.pathSeparator);
+      return FileImage(File(fullPath));
+    }
     final String root = packAssetRoot.replaceAll(RegExp(r'/+$'), '');
-    final String rel = relativeAsset.replaceAll(RegExp(r'^/+'), '');
-    return '$root/$rel';
+    return AssetImage('$root/$cleanRel');
+  }
+
+  @override
+  State<HybridSceneCanvas> createState() => _HybridSceneCanvasState();
+}
+
+class _HybridSceneCanvasState extends State<HybridSceneCanvas> {
+  final Map<String, ImageProvider> _activeSkyProviders =
+      <String, ImageProvider>{};
+
+  @override
+  void didUpdateWidget(covariant HybridSceneCanvas oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final String? oldWindowState = oldWidget.slotStates['window'];
+    final String? newWindowState = widget.slotStates['window'];
+    final bool packChanged =
+        oldWidget.packAssetRoot != widget.packAssetRoot ||
+        oldWidget.isFileSystem != widget.isFileSystem ||
+        oldWidget.manifest.packVersion != widget.manifest.packVersion;
+
+    // ADR-0007: evict outgoing window sky variant immediately so only one sky
+    // variant stays decoded in RAM at a time.
+    if (packChanged || oldWindowState != newWindowState) {
+      for (final ImageProvider provider in _activeSkyProviders.values) {
+        provider.evict();
+      }
+      _activeSkyProviders.clear();
+    }
+  }
+
+  ImageProvider _resolveLayerProvider({
+    required SceneSlot slot,
+    required SceneLayer layer,
+    required int? cacheWidth,
+    required int? cacheHeight,
+  }) {
+    final String resolvedAsset = widget.overrides.resolveAsset(slot.id, layer);
+    final ImageProvider base = HybridSceneCanvas._buildProvider(
+      packAssetRoot: widget.packAssetRoot,
+      relativeAsset: resolvedAsset,
+      isFileSystem: widget.isFileSystem,
+    );
+    // Always preserve intrinsic PNG aspect ratio when downscaling to slot bounds
+    // (`policy: ResizeImagePolicy.fit`): default `exact` would squash portrait
+    // assets like the 3:4 window into a square on smaller screens/lower DPRs.
+    final ImageProvider sized = (cacheWidth != null || cacheHeight != null)
+        ? ResizeImage(
+            base,
+            width: cacheWidth,
+            height: cacheHeight,
+            policy: ResizeImagePolicy.fit,
+          )
+        : base;
+    if (slot.id == 'window' && layer.id.startsWith('sky')) {
+      _activeSkyProviders['${slot.id}:${layer.id}'] = sized;
+    }
+    return sized;
+  }
+
+  String _resolveSlotStateKey(SceneSlot slot) {
+    final String? requested = widget.slotStates[slot.id];
+    if (requested != null && slot.states.containsKey(requested)) {
+      return requested;
+    }
+    // Legacy compatibility: if a pilot pack's window only defines calm/lit
+    // and floor_lamp is lit, light the legacy window.
+    if (slot.id == 'window' &&
+        widget.slotStates['floor_lamp'] == 'lit' &&
+        slot.states.containsKey('lit')) {
+      return 'lit';
+    }
+    return slot.defaultState;
   }
 
   @override
   Widget build(BuildContext context) {
     final bool disableAnimations =
-        reduceMotion || MediaQuery.disableAnimationsOf(context);
+        widget.reduceMotion || MediaQuery.disableAnimationsOf(context);
+    final double dpr = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 3.0);
+    final DeepSkyTokens tokens = DeepSkyTheme.tokensOf(context);
 
-    final List<SceneSlot> sortedSlots = List<SceneSlot>.from(manifest.slots)
-      ..sort((SceneSlot a, SceneSlot b) => a.zIndex.compareTo(b.zIndex));
+    final List<SceneSlot> sortedSlots = List<SceneSlot>.from(
+      widget.manifest.slots,
+    )..sort((SceneSlot a, SceneSlot b) => a.zIndex.compareTo(b.zIndex));
 
-    final SceneBackground? bg = manifest.background;
-    final String? bgAsset = bg == null
+    final SceneBackground? bg = widget.manifest.background;
+    final bool hasOpaqueBackground = bg != null;
+    final ImageProvider? bgProvider = bg == null
         ? null
-        : _fullAssetPath(isNight ? bg.nightAsset : bg.dayAsset);
+        : HybridSceneCanvas._buildProvider(
+            packAssetRoot: widget.packAssetRoot,
+            relativeAsset: widget.isNight ? bg.nightAsset : bg.dayAsset,
+            isFileSystem: widget.isFileSystem,
+          );
 
-    return AspectRatio(
-      aspectRatio: manifest.numericAspectRatio,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: LayoutBuilder(
-          builder: (BuildContext context, BoxConstraints constraints) {
-            final double sceneW = constraints.maxWidth;
-            final double sceneH = constraints.maxHeight;
+    final double extraFloor = widget.expandFloorDownward
+        ? math.max(0.0, widget.extraFloorHeight)
+        : 0.0;
 
-            return Stack(
-              fit: StackFit.expand,
-              children: <Widget>[
-                if (bgAsset != null)
-                  Image.asset(
-                    bgAsset,
+    Widget canvas = LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final double sceneW = constraints.maxWidth;
+        final double sceneH = sceneW / widget.manifest.numericAspectRatio;
+        final double totalH = sceneH + extraFloor;
+
+        return SizedBox(
+          width: sceneW,
+          height: totalH,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: <Widget>[
+              if (bgProvider != null)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  width: sceneW,
+                  height: sceneH,
+                  child: Image(
+                    image: ResizeImage.resizeIfNeeded(
+                      (sceneW * dpr).round().clamp(64, 1600),
+                      null,
+                      bgProvider,
+                    ),
                     fit: BoxFit.cover,
                     gaplessPlayback: true,
                     excludeFromSemantics: true,
-                  )
-                else
-                  ColoredBox(
-                    color: isNight
-                        ? const Color(0xFF1A2238)
-                        : const Color(0xFFEFE6D6),
                   ),
+                ),
 
-                // Visual layers ordered by zIndex -> layer zOffset, isolated with RepaintBoundary.
+              // Continuous warm parquet continuation beneath floor.png on tall displays (`S2-D02`)
+              if (widget.expandFloorDownward)
                 for (final SceneSlot slot in sortedSlots)
-                  ..._buildSlotVisualLayers(
-                    slot: slot,
-                    sceneW: sceneW,
-                    sceneH: sceneH,
-                    disableAnimations: disableAnimations,
-                  ),
+                  if (slot.id == 'floor')
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      top: (slot.bounds.y + 0.14) * sceneH,
+                      bottom: 0,
+                      child: ColoredBox(
+                        color: widget.floorBaseColor ?? tokens.floorParquetBase,
+                      ),
+                    ),
 
-                // Interactive normalized touch areas sorted for predictable screen-reader traversal.
-                for (int i = 0; i < sortedSlots.length; i++)
+              // Visual layers ordered by zIndex -> layer zOffset, isolated with RepaintBoundary.
+              for (final SceneSlot slot in sortedSlots)
+                ..._buildSlotVisualLayers(
+                  slot: slot,
+                  sceneW: sceneW,
+                  sceneH: sceneH,
+                  totalH: totalH,
+                  dpr: dpr,
+                  tokens: tokens,
+                  disableAnimations: disableAnimations,
+                ),
+
+              // Interactive normalized touch areas sorted for predictable TalkBack traversal.
+              for (int i = 0; i < sortedSlots.length; i++)
+                if (sortedSlots[i].id != 'floor')
                   _buildSlotTouchTarget(
                     slot: sortedSlots[i],
                     sortIndex: i + 1,
                     sceneW: sceneW,
                     sceneH: sceneH,
                   ),
-              ],
-            );
-          },
-        ),
-      ),
+            ],
+          ),
+        );
+      },
     );
+
+    if (hasOpaqueBackground) {
+      canvas = AspectRatio(
+        aspectRatio: widget.manifest.numericAspectRatio,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: canvas,
+        ),
+      );
+    }
+
+    return canvas;
   }
 
   List<Widget> _buildSlotVisualLayers({
     required SceneSlot slot,
     required double sceneW,
     required double sceneH,
+    required double totalH,
+    required double dpr,
+    required DeepSkyTokens tokens,
     required bool disableAnimations,
   }) {
-    final String stateKey = slotStates[slot.id] ?? slot.defaultState;
+    final String stateKey = _resolveSlotStateKey(slot);
     final List<SceneLayer> rawLayers =
         slot.states[stateKey] ??
         slot.states[slot.defaultState] ??
@@ -113,49 +292,99 @@ class HybridSceneCanvas extends StatelessWidget {
     final List<SceneLayer> layers = List<SceneLayer>.from(rawLayers)
       ..sort((SceneLayer a, SceneLayer b) => a.zOffset.compareTo(b.zOffset));
 
-    final double left = slot.bounds.x * sceneW;
+    final bool isContinuousFloor =
+        slot.id == 'floor' && widget.expandFloorDownward;
+    final double left = isContinuousFloor ? 0 : slot.bounds.x * sceneW;
     final double top = slot.bounds.y * sceneH;
-    final double width = slot.bounds.width * sceneW;
-    final double height = slot.bounds.height * sceneH;
+    final double width = isContinuousFloor
+        ? sceneW
+        : slot.bounds.width * sceneW;
+    final double height = isContinuousFloor
+        ? math.max(slot.bounds.height * sceneH, totalH - top)
+        : slot.bounds.height * sceneH;
 
-    return layers
-        .map((SceneLayer layer) {
-          final String assetPath = _fullAssetPath(
-            overrides.resolveAsset(slot.id, layer),
-          );
-          final List<SceneAnimation> anims = slot.animations
-              .where((SceneAnimation a) => a.layerId == layer.id)
-              .toList(growable: false);
+    final int decodeW = (width * dpr).round().clamp(32, 1600);
+    final int? decodeH = isContinuousFloor
+        ? null
+        : (height * dpr).round().clamp(32, 1600);
 
-          Widget child = Opacity(
-            opacity: layer.opacity.clamp(0.0, 1.0),
-            child: Image.asset(
-              assetPath,
-              fit: BoxFit.contain,
-              gaplessPlayback: true,
-              excludeFromSemantics: true,
-            ),
-          );
+    final List<Widget> widgets = <Widget>[];
 
-          if (anims.isNotEmpty) {
-            child = RepaintBoundary(
-              child: _Level1LayerAnimator(
-                animation: anims.first,
-                disableAnimations: disableAnimations,
-                child: child,
+    // DD-10 §6.3 hybrid lamp lighting: soft ambient radial amber/rose bloom behind
+    // floor_lamp_lit.png directly on the wall-backdrop without extra texture RAM.
+    if (slot.id == 'floor_lamp' && stateKey == 'lit') {
+      final double glowRadius = math.max(width, height) * 0.9;
+      widgets.add(
+        Positioned(
+          left: left + (width - glowRadius) / 2,
+          top: top - glowRadius * 0.12,
+          width: glowRadius,
+          height: glowRadius,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              key: const Key('floor-lamp-ambient-glow'),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: <Color>[
+                    tokens.amberGlow.withValues(alpha: 0.34),
+                    tokens.calmAccent.withValues(alpha: 0.14),
+                    Colors.transparent,
+                  ],
+                  stops: const <double>[0.0, 0.48, 1.0],
+                ),
               ),
-            );
-          }
+            ),
+          ),
+        ),
+      );
+    }
 
-          return Positioned(
-            left: left,
-            top: top,
-            width: width,
-            height: height,
-            child: IgnorePointer(child: child),
-          );
-        })
-        .toList(growable: false);
+    for (final SceneLayer layer in layers) {
+      final ImageProvider provider = _resolveLayerProvider(
+        slot: slot,
+        layer: layer,
+        cacheWidth: decodeW,
+        cacheHeight: decodeH,
+      );
+      final List<SceneAnimation> anims = slot.animations
+          .where((SceneAnimation a) => a.layerId == layer.id)
+          .toList(growable: false);
+
+      Widget child = Opacity(
+        opacity: layer.opacity.clamp(0.0, 1.0),
+        child: Image(
+          image: provider,
+          fit: isContinuousFloor ? BoxFit.cover : BoxFit.contain,
+          alignment: isContinuousFloor ? Alignment.topCenter : Alignment.center,
+          gaplessPlayback: true,
+          excludeFromSemantics: true,
+          filterQuality: FilterQuality.medium,
+        ),
+      );
+
+      if (anims.isNotEmpty) {
+        child = RepaintBoundary(
+          child: _Level1LayerAnimator(
+            animation: anims.first,
+            disableAnimations: disableAnimations,
+            child: child,
+          ),
+        );
+      }
+
+      widgets.add(
+        Positioned(
+          left: left,
+          top: top,
+          width: width,
+          height: height,
+          child: IgnorePointer(child: child),
+        ),
+      );
+    }
+
+    return widgets;
   }
 
   Widget _buildSlotTouchTarget({
@@ -172,12 +401,14 @@ class HybridSceneCanvas extends StatelessWidget {
       height: area.height * sceneH,
       child: Semantics(
         sortKey: OrdinalSortKey(sortIndex.toDouble()),
-        button: onSlotTapped != null,
-        label: slot.accessibilityLabel.resolve(languageCode),
+        button: widget.onSlotTapped != null,
+        label: slot.accessibilityLabel.resolve(widget.languageCode),
         child: GestureDetector(
           key: Key('scene-slot-${slot.id}'),
           behavior: HitTestBehavior.opaque,
-          onTap: onSlotTapped == null ? null : () => onSlotTapped!(slot),
+          onTap: widget.onSlotTapped == null
+              ? null
+              : () => widget.onSlotTapped!(slot),
           child: const SizedBox.expand(),
         ),
       ),

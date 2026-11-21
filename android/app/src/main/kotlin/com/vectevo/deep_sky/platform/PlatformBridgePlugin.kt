@@ -7,7 +7,9 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
 import android.os.Build
+import java.io.File
 import android.os.Handler
 import android.os.Looper
 import android.os.PersistableBundle
@@ -146,6 +148,18 @@ class PlatformBridgePlugin(
                 val clearAfterSeconds = (call.argument<Int>("clearAfterSeconds") ?: 45).coerceIn(5, 300)
                 copySensitiveToClipboard(text, clearAfterSeconds)
                 result.success(true)
+            }
+            "isConnectionUnmetered" -> {
+                val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                val unmetered = cm?.isActiveNetworkMetered == false
+                result.success(unmetered)
+            }
+            "getContentPackRootDir" -> {
+                val dir = File(context.filesDir, "content_packs")
+                if (!dir.exists()) {
+                    dir.mkdirs()
+                }
+                result.success(dir.absolutePath)
             }
             else -> result.notImplemented()
         }

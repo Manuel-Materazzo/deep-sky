@@ -45,15 +45,21 @@ class CompatibilityPolicy {
   const CompatibilityPolicy({
     required this.minClientVersionCode,
     required this.minProtocolVersion,
+    this.minPackVersion = '1.0.0',
   });
 
   final int minClientVersionCode;
   final int minProtocolVersion;
+  final String minPackVersion;
 
   factory CompatibilityPolicy.fromJson(Map<String, Object?> json) {
+    final String? rawPackVer = json['minPackVersion'] as String?;
     return CompatibilityPolicy(
       minClientVersionCode: json['minClientVersionCode'] as int? ?? 1,
       minProtocolVersion: json['minProtocolVersion'] as int? ?? 1,
+      minPackVersion: (rawPackVer != null && rawPackVer.trim().isNotEmpty)
+          ? rawPackVer.trim()
+          : '1.0.0',
     );
   }
 }

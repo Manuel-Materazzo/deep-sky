@@ -261,4 +261,37 @@ class NativeBridge {
     }
     await Clipboard.setData(ClipboardData(text: text));
   }
+
+  /// Returns `true` when the active Android network is unmetered (e.g. Wi-Fi) (`S2-APP-02`).
+  ///
+  /// Defaults to `true` on desktop/headless hosts without Android platform channels.
+  Future<bool> isConnectionUnmetered() async {
+    try {
+      final bool? unmetered = await _channel.invokeMethod<bool>(
+        'isConnectionUnmetered',
+      );
+      return unmetered ?? true;
+    } on MissingPluginException {
+      return true;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Returns the app-private directory used for verified content packs (`S2-APP-02`, `AD-06`).
+  Future<String?> getContentPackRootDir() async {
+    try {
+      final String? path = await _channel.invokeMethod<String>(
+        'getContentPackRootDir',
+      );
+      if (path == null || path.trim().isEmpty) {
+        return null;
+      }
+      return path.trim();
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
 }

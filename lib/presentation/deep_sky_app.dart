@@ -40,6 +40,7 @@ class _DeepSkyAppState extends State<DeepSkyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _controller.refreshPushStatus();
+      _controller.refreshLocalSkyPeriod();
       unawaited(_controller.pollActiveInviteSilently());
     }
   }

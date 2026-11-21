@@ -1,6 +1,7 @@
+import 'package:deep_sky/scene/local_scene_view_state.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// Design System semantic tokens for Deep Sky ("Intimate Sanctuary", `V-06`, `V-08`, `V-09`).
+/// Design System semantic tokens for Deep Sky ("Intimate Sanctuary", `DS-3`, `V-06`, `V-08`, `V-09`).
 @immutable
 class DeepSkyTokens extends ThemeExtension<DeepSkyTokens> {
   const DeepSkyTokens({
@@ -23,6 +24,13 @@ class DeepSkyTokens extends ThemeExtension<DeepSkyTokens> {
     required this.mutedInk,
     required this.offlineBannerSurface,
     required this.offlineBannerInk,
+    required this.wallDayTop,
+    required this.wallDayBottom,
+    required this.wallTwilightTop,
+    required this.wallTwilightBottom,
+    required this.wallNightTop,
+    required this.wallNightBottom,
+    required this.floorParquetBase,
   });
 
   final Color skyBackdrop;
@@ -44,6 +52,35 @@ class DeepSkyTokens extends ThemeExtension<DeepSkyTokens> {
   final Color mutedInk;
   final Color offlineBannerSurface;
   final Color offlineBannerInk;
+  final Color wallDayTop;
+  final Color wallDayBottom;
+  final Color wallTwilightTop;
+  final Color wallTwilightBottom;
+  final Color wallNightTop;
+  final Color wallNightBottom;
+  final Color floorParquetBase;
+
+  /// Returns the dynamic room wall colors for the active local [SkyPeriod] (`S2-D01`, `S2-APP-01`).
+  LinearGradient wallGradientFor(SkyPeriod period) {
+    final (Color top, Color bottom) = switch (period) {
+      SkyPeriod.day => (wallDayTop, wallDayBottom),
+      SkyPeriod.twilight => (wallTwilightTop, wallTwilightBottom),
+      SkyPeriod.night => (wallNightTop, wallNightBottom),
+    };
+    return LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: <Color>[top, bottom],
+    );
+  }
+
+  Color wallHeaderColorFor(SkyPeriod period) {
+    return switch (period) {
+      SkyPeriod.day => wallDayTop,
+      SkyPeriod.twilight => wallTwilightTop,
+      SkyPeriod.night => wallNightTop,
+    };
+  }
 
   static const DeepSkyTokens light = DeepSkyTokens(
     skyBackdrop: Color(0xFFFFF7FA),
@@ -65,6 +102,13 @@ class DeepSkyTokens extends ThemeExtension<DeepSkyTokens> {
     mutedInk: Color(0xFF624758),
     offlineBannerSurface: Color(0xFFF5E5D6),
     offlineBannerInk: Color(0xFF5F4428),
+    wallDayTop: Color(0xFFFAF2EC),
+    wallDayBottom: Color(0xFFF2E2D9),
+    wallTwilightTop: Color(0xFFF3DDE7),
+    wallTwilightBottom: Color(0xFFE7C9D8),
+    wallNightTop: Color(0xFFE5DFEE),
+    wallNightBottom: Color(0xFFD6CEE3),
+    floorParquetBase: Color(0xFFA95E38),
   );
 
   static const DeepSkyTokens dark = DeepSkyTokens(
@@ -87,6 +131,13 @@ class DeepSkyTokens extends ThemeExtension<DeepSkyTokens> {
     mutedInk: Color(0xFFDAC0C9),
     offlineBannerSurface: Color(0xFF2F2242),
     offlineBannerInk: Color(0xFFFEF3C7),
+    wallDayTop: Color(0xFF2D3652),
+    wallDayBottom: Color(0xFF232942),
+    wallTwilightTop: Color(0xFF311F3E),
+    wallTwilightBottom: Color(0xFF231630),
+    wallNightTop: Color(0xFF1C2337),
+    wallNightBottom: Color(0xFF190F24),
+    floorParquetBase: Color(0xFF8C4C2C),
   );
 
   @override
@@ -110,6 +161,13 @@ class DeepSkyTokens extends ThemeExtension<DeepSkyTokens> {
     Color? mutedInk,
     Color? offlineBannerSurface,
     Color? offlineBannerInk,
+    Color? wallDayTop,
+    Color? wallDayBottom,
+    Color? wallTwilightTop,
+    Color? wallTwilightBottom,
+    Color? wallNightTop,
+    Color? wallNightBottom,
+    Color? floorParquetBase,
   }) {
     return DeepSkyTokens(
       skyBackdrop: skyBackdrop ?? this.skyBackdrop,
@@ -131,6 +189,13 @@ class DeepSkyTokens extends ThemeExtension<DeepSkyTokens> {
       mutedInk: mutedInk ?? this.mutedInk,
       offlineBannerSurface: offlineBannerSurface ?? this.offlineBannerSurface,
       offlineBannerInk: offlineBannerInk ?? this.offlineBannerInk,
+      wallDayTop: wallDayTop ?? this.wallDayTop,
+      wallDayBottom: wallDayBottom ?? this.wallDayBottom,
+      wallTwilightTop: wallTwilightTop ?? this.wallTwilightTop,
+      wallTwilightBottom: wallTwilightBottom ?? this.wallTwilightBottom,
+      wallNightTop: wallNightTop ?? this.wallNightTop,
+      wallNightBottom: wallNightBottom ?? this.wallNightBottom,
+      floorParquetBase: floorParquetBase ?? this.floorParquetBase,
     );
   }
 
@@ -167,13 +232,31 @@ class DeepSkyTokens extends ThemeExtension<DeepSkyTokens> {
         other.offlineBannerInk,
         t,
       )!,
+      wallDayTop: Color.lerp(wallDayTop, other.wallDayTop, t)!,
+      wallDayBottom: Color.lerp(wallDayBottom, other.wallDayBottom, t)!,
+      wallTwilightTop: Color.lerp(wallTwilightTop, other.wallTwilightTop, t)!,
+      wallTwilightBottom: Color.lerp(
+        wallTwilightBottom,
+        other.wallTwilightBottom,
+        t,
+      )!,
+      wallNightTop: Color.lerp(wallNightTop, other.wallNightTop, t)!,
+      wallNightBottom: Color.lerp(wallNightBottom, other.wallNightBottom, t)!,
+      floorParquetBase: Color.lerp(
+        floorParquetBase,
+        other.floorParquetBase,
+        t,
+      )!,
     );
   }
 }
 
-/// Intimate Sanctuary theme builder enforcing calm twilight & warm rose palettes (`V-01`..`V-10`).
+/// Intimate Sanctuary theme builder enforcing calm twilight & warm rose palettes (`DS-3`, `V-01`..`V-10`).
 class DeepSkyTheme {
   const DeepSkyTheme._();
+
+  static const String displayFontFamily = 'Plus Jakarta Sans';
+  static const String bodyFontFamily = 'Nunito Sans';
 
   static const double radiusDefault = 8.0;
   static const double radiusMd = 12.0;
@@ -262,6 +345,7 @@ class DeepSkyTheme {
   }) {
     final TextTheme textTheme = TextTheme(
       headlineLarge: TextStyle(
+        fontFamily: displayFontFamily,
         fontSize: 28,
         fontWeight: FontWeight.w700,
         height: 36 / 28,
@@ -269,6 +353,7 @@ class DeepSkyTheme {
         color: scheme.onSurface,
       ),
       headlineMedium: TextStyle(
+        fontFamily: displayFontFamily,
         fontSize: 24,
         fontWeight: FontWeight.w600,
         height: 32 / 24,
@@ -276,18 +361,21 @@ class DeepSkyTheme {
         color: scheme.onSurface,
       ),
       headlineSmall: TextStyle(
+        fontFamily: displayFontFamily,
         fontSize: 20,
         fontWeight: FontWeight.w600,
         height: 28 / 20,
         color: scheme.onSurface,
       ),
       titleMedium: TextStyle(
+        fontFamily: displayFontFamily,
         fontSize: 18,
         fontWeight: FontWeight.w600,
         height: 24 / 18,
         color: scheme.onSurface,
       ),
       titleSmall: TextStyle(
+        fontFamily: displayFontFamily,
         fontSize: 14,
         fontWeight: FontWeight.w600,
         height: 20 / 14,
@@ -295,24 +383,28 @@ class DeepSkyTheme {
         color: scheme.onSurface,
       ),
       bodyLarge: TextStyle(
+        fontFamily: bodyFontFamily,
         fontSize: 17,
         fontWeight: FontWeight.w400,
         height: 26 / 17,
         color: scheme.onSurface,
       ),
       bodyMedium: TextStyle(
+        fontFamily: bodyFontFamily,
         fontSize: 15,
         fontWeight: FontWeight.w400,
         height: 22 / 15,
         color: scheme.onSurface,
       ),
       bodySmall: TextStyle(
+        fontFamily: bodyFontFamily,
         fontSize: 13,
         fontWeight: FontWeight.w400,
         height: 18 / 13,
         color: scheme.onSurfaceVariant,
       ),
       labelLarge: TextStyle(
+        fontFamily: displayFontFamily,
         fontSize: 14,
         fontWeight: FontWeight.w600,
         height: 20 / 14,
@@ -320,6 +412,7 @@ class DeepSkyTheme {
         color: scheme.onSurface,
       ),
       labelMedium: TextStyle(
+        fontFamily: displayFontFamily,
         fontSize: 12,
         fontWeight: FontWeight.w500,
         height: 16 / 12,
@@ -327,6 +420,7 @@ class DeepSkyTheme {
         color: scheme.onSurfaceVariant,
       ),
       labelSmall: TextStyle(
+        fontFamily: displayFontFamily,
         fontSize: 11,
         fontWeight: FontWeight.w500,
         height: 14 / 11,
@@ -337,6 +431,7 @@ class DeepSkyTheme {
 
     return ThemeData(
       useMaterial3: true,
+      fontFamily: bodyFontFamily,
       colorScheme: scheme,
       scaffoldBackgroundColor: tokens.skyBackdrop,
       textTheme: textTheme,
@@ -345,6 +440,7 @@ class DeepSkyTheme {
         foregroundColor: scheme.onSurface,
         elevation: 0,
         scrolledUnderElevation: 0,
+        titleTextStyle: textTheme.titleMedium,
       ),
       cardTheme: CardThemeData(
         color: tokens.cardSurface,
@@ -356,7 +452,7 @@ class DeepSkyTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(44, 46),
+          minimumSize: const Size(48, 48),
           shape: const StadiumBorder(),
           backgroundColor: scheme.primaryContainer,
           foregroundColor: scheme.onPrimary,
@@ -367,7 +463,7 @@ class DeepSkyTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          minimumSize: const Size(44, 46),
+          minimumSize: const Size(48, 48),
           shape: const StadiumBorder(),
           foregroundColor: tokens.accentText,
           side: BorderSide(color: tokens.cardBorder.withValues(alpha: 0.45)),
