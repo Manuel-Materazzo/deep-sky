@@ -289,10 +289,12 @@ void main() {
         if (req.url.path == '/api/v1/content/pack/checksums.sig') {
           return http.Response.bytes(signed.sigBytes, 200);
         }
-        if (req.url.path == '/api/v1/content/pack/files/manifest.json') {
+        if (req.url.path ==
+            '/api/v1/content/pack/blobs/${await sha256Hex(files['manifest.json']!)}') {
           return http.Response.bytes(files['manifest.json']!, 200);
         }
-        if (req.url.path == '/api/v1/content/pack/files/assets/floor.png') {
+        if (req.url.path ==
+            '/api/v1/content/pack/blobs/${await sha256Hex(files['assets/floor.png']!)}') {
           return http.Response.bytes(<int>[
             0x89,
             0x50,
@@ -381,11 +383,15 @@ void main() {
         if (req.url.path == '/api/v1/content/pack/checksums.sig') {
           return http.Response.bytes(servedSigned.sigBytes, 200);
         }
-        const String prefix = '/api/v1/content/pack/files/';
+        const String prefix = '/api/v1/content/pack/blobs/';
         if (req.url.path.startsWith(prefix)) {
-          final String rel = req.url.path.substring(prefix.length);
-          fetchedFilePaths.add(rel);
-          return http.Response.bytes(servedFiles[rel]!, 200);
+          final String hash = req.url.path.substring(prefix.length);
+          for (final MapEntry<String, List<int>> f in servedFiles.entries) {
+            if (await sha256Hex(f.value) == hash) {
+              fetchedFilePaths.add(f.key);
+              return http.Response.bytes(f.value, 200);
+            }
+          }
         }
         return http.Response('not found', 404);
       }),
@@ -400,6 +406,11 @@ void main() {
     );
     expect(meteredRes.status, ContentPackUpdateStatus.skippedMeteredNetwork);
 
+    final Directory blobsDir = Directory('${tempRoot.path}/blobs')
+      ..createSync(recursive: true);
+    final File orphanBlobA = File('${blobsDir.path}/${'a' * 64}')
+      ..writeAsBytesSync(<int>[1, 2, 3]);
+
     // 2) Manual force downloads & activates v1.1.0 immediately even on metered network
     final ContentPackUpdateResult hotRes = await svc.syncFromServer(
       serverBaseUrl: 'https://couple.example.test',
@@ -410,6 +421,13 @@ void main() {
     expect(hotRes.status, ContentPackUpdateStatus.activatedHotReload);
     expect(hotRes.packVersion, '1.1.0');
     expect(hotRes.downloadedFiles, 2);
+    // Blob GC after manual promotion drops unreferenced blobs but keeps the active pack's files.
+    expect(orphanBlobA.existsSync(), isFalse);
+    expect(
+      File('${blobsDir.path}/${await sha256Hex(pack110['assets/floor.png']!)}')
+          .existsSync(),
+      isTrue,
+    );
 
     // 3) Key rotation to v2 + file-by-file reuse: upgrading to v1.2.0 reuses cached floor.png
     fetchedFilePaths.clear();
@@ -459,6 +477,9 @@ void main() {
       ),
     );
 
+    final File orphanBlobB = File('${blobsDir.path}/${'b' * 64}')
+      ..writeAsBytesSync(<int>[4, 5, 6]);
+
     // 5) Startup promotes staged 1.2.0 -> 2 failed boots without markHomeBootSucceeded -> rollback to 1.1.0!
     final ResolvedContentPack boot1 = await svc.resolveStartupPack(
       bundledManifest: bundledManifest(),
@@ -468,6 +489,19 @@ void main() {
       boot1.packVersion,
       '1.2.0',
     ); // attempt 1 (crashes before first frame)
+    // Blob GC after startup promotion: orphan removed, active (1.2.0) + previous (1.1.0) blobs kept.
+    expect(orphanBlobB.existsSync(), isFalse);
+    for (final Map<String, List<int>> pk in <Map<String, List<int>>>[
+      pack110,
+      pack120,
+    ]) {
+      for (final List<int> bytes in pk.values) {
+        expect(
+          File('${blobsDir.path}/${await sha256Hex(bytes)}').existsSync(),
+          isTrue,
+        );
+      }
+    }
 
     final ResolvedContentPack boot2 = await svc.resolveStartupPack(
       bundledManifest: bundledManifest(),

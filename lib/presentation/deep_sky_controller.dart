@@ -20,7 +20,6 @@ import 'package:deep_sky/domain/update/apk_update_models.dart';
 import 'package:deep_sky/platform/native_bridge.dart';
 import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
 import 'package:deep_sky/scene/asset_override_registry.dart';
-import 'package:deep_sky/scene/hybrid_scene_canvas.dart';
 import 'package:deep_sky/scene/local_scene_view_state.dart';
 import 'package:deep_sky/scene/scene_manifest.dart';
 import 'package:deep_sky/scene/scene_state_mapper.dart';
@@ -123,6 +122,9 @@ class DeepSkyController extends ChangeNotifier {
   final Future<PlatformCapabilities> Function()? _loadCapabilitiesOverride;
   final int? _clientVersionCodeOverride;
   final DateTime Function() _clockUtc;
+
+  /// Current UTC instant from the injectable controller clock (deterministic in tests).
+  DateTime get nowUtc => _clockUtc();
   final DateTime Function() _clockLocal;
   final bool enableSkyRefreshTimer;
   final Duration thoughtSentBannerDuration;
@@ -590,7 +592,9 @@ class DeepSkyController extends ChangeNotifier {
     }
   }
 
-  /// Resets `packBootAttempts` after Home renders its first frame (`S2-APP-02`).
+  /// Resets `packBootAttempts` once the first frame that exercises (or deliberately
+  /// bypasses) the scene has rendered: Home, or a paired pre-Home page such as space/recovery
+  /// setup that never draws the pack, so those boots are not counted as failures (`S2-APP-02`).
   Future<void> markHomeBootSucceeded() =>
       _contentPackService.markHomeBootSucceeded();
 
@@ -653,12 +657,11 @@ class DeepSkyController extends ChangeNotifier {
         case ContentPackUpdateStatus.activatedHotReload:
           final ResolvedContentPack? nextPack = res.resolvedPack;
           if (nextPack != null) {
-            HybridSceneCanvas.evictPackImages(
-              manifest: active,
-              packAssetRoot: activePackAssetRoot,
-              isFileSystem: activePackIsFileSystem,
-            );
-            PaintingBinding.instance.imageCache.clear();
+            // Cached providers are wrapped in ResizeImage with size-dependent keys,
+            // so dropping the whole cache (and live images) is the reliable eviction.
+            PaintingBinding.instance.imageCache
+              ..clear()
+              ..clearLiveImages();
             sceneManifest = nextPack.manifest;
             activePackAssetRoot = nextPack.assetRootPath;
             activePackIsFileSystem = nextPack.isFileSystem;

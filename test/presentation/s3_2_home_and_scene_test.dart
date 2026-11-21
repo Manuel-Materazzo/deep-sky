@@ -36,6 +36,7 @@ void main() {
   Future<InMemorySecureKeyStore> buildPairedStore({
     DateTime? previousOpenedAt,
     List<CachedEventEntry> cachedEvents = const <CachedEventEntry>[],
+    bool nameSetupCompleted = true,
   }) async {
     final InMemorySecureKeyStore store = InMemorySecureKeyStore();
     final DeepSkyCrypto crypto = DeepSkyCrypto();
@@ -59,7 +60,7 @@ void main() {
       kemPublicKey: Uint8List.fromList((await kemKp.extractPublicKey()).bytes),
       recoverySeed: seed,
       pairingCompleted: true,
-      nameSetupCompleted: true,
+      nameSetupCompleted: nameSetupCompleted,
       recoverySavedConfirmed: true,
     );
     await store.write('deep_sky.device_identity.v1', jsonEncode(id.toJson()));
@@ -299,6 +300,91 @@ void main() {
       },
     );
   }
+
+  testWidgets(
+    'Paired boot on a non-Home page (space setup) does not leave packBootAttempts pending and never triggers a false rollback',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final Directory tempPackRoot = Directory.systemTemp.createTempSync(
+        'deepsky_bootcounter_',
+      );
+      addTearDown(() {
+        PaintingBinding.instance.imageCache.clear();
+        try {
+          tempPackRoot.deleteSync(recursive: true);
+        } catch (_) {}
+      });
+
+      // Active external pack v1.1.0 (copy of the bundled v1 assets) with one failed boot recorded.
+      final Directory activeDir = Directory(
+        '${tempPackRoot.path}/active/1.1.0/assets',
+      )..createSync(recursive: true);
+      for (final FileSystemEntity f in Directory(
+        'content/packs/v1/assets',
+      ).listSync()) {
+        if (f is File) {
+          f.copySync('${activeDir.path}/${f.uri.pathSegments.last}');
+        }
+      }
+      File('${tempPackRoot.path}/active/1.1.0/manifest.json').writeAsStringSync(
+        v1ManifestRaw.replaceFirst(
+          '"packVersion": "1.0.0"',
+          '"packVersion": "1.1.0"',
+        ),
+      );
+
+      final InMemorySecureKeyStore store = await buildPairedStore(
+        nameSetupCompleted: false,
+      );
+      const String metaKey = 'deepsky.content_pack.meta.v1';
+      await store.write(
+        metaKey,
+        jsonEncode(<String, Object?>{
+          'activeVersion': '1.1.0',
+          'maxSeenVersion': '1.1.0',
+          'packBootAttempts': 1,
+        }),
+      );
+
+      final MockClient httpClient = buildMockServer();
+      final ContentPackService packService = ContentPackService(
+        keyStore: store,
+        trustedPublicKeys: const <String, SimplePublicKey>{},
+        httpClient: httpClient,
+        resolveStorageRootDir: () async => tempPackRoot.path,
+        isConnectionUnmetered: () async => false,
+      );
+      final DeepSkyController controller = DeepSkyController(
+        keyStore: store,
+        httpClient: httpClient,
+        contentPackService: packService,
+        loadAssetString: (_) async => v1ManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+        enableSkyRefreshTimer: false,
+      );
+      controller.reduceMotion = true;
+
+      await tester.pumpWidget(
+        DeepSkyApp(controller: controller, autoInitialize: false),
+      );
+      await tester.runAsync(controller.initialize);
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)),
+      );
+      await tester.pump();
+
+      expect(find.byKey(const Key('space-setup-page')), findsOneWidget);
+      expect(controller.activePackVersion, '1.1.0');
+      final Map<String, Object?> meta =
+          jsonDecode((await store.read(metaKey))!) as Map<String, Object?>;
+      expect(meta['packBootAttempts'], 0);
+    },
+  );
 
   testWidgets(
     'Dual-state "Ti penso" card shows "<Partner> ti ha pensato" + Ricambia for unseen <6h thought and switches to quick-send after reply',
@@ -722,10 +808,18 @@ void main() {
         if (req.url.path == '/api/v1/content/pack/checksums.sig') {
           return http.Response.bytes(sigBytes, 200);
         }
-        const String prefix = '/api/v1/content/pack/files/';
+        const String prefix = '/api/v1/content/pack/blobs/';
         if (req.url.path.startsWith(prefix)) {
-          final String rel = req.url.path.substring(prefix.length);
-          return http.Response.bytes(files[rel]!, 200);
+          final String hash = req.url.path.substring(prefix.length);
+          for (final MapEntry<String, List<int>> f in files.entries) {
+            final Hash h = await Sha256().hash(f.value);
+            final String fileHash = h.bytes
+                .map((int b) => b.toRadixString(16).padLeft(2, '0'))
+                .join();
+            if (fileHash == hash) {
+              return http.Response.bytes(f.value, 200);
+            }
+          }
         }
         return http.Response('not found', 404);
       });

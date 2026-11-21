@@ -523,7 +523,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
       final String? note = rawNote is String && rawNote.trim().isNotEmpty
           ? rawNote.trim()
           : null;
-      final Duration elapsed = DateTime.now().toUtc().difference(
+      final Duration elapsed = widget.controller.nowUtc.difference(
         unseenThought.payload.createdAtClient.toUtc(),
       );
       final Duration safeElapsed = elapsed.isNegative ? Duration.zero : elapsed;

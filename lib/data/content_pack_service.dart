@@ -300,6 +300,7 @@ class ContentPackService {
             packBootAttempts: 0,
           );
           await _saveMeta(meta);
+          await _collectBlobGarbage(rootPath);
         } else {
           meta = meta.copyWith(clearStagedVersion: true);
           await _saveMeta(meta);
@@ -563,20 +564,20 @@ class ContentPackService {
         final File blobFile = File(
           '${blobsDir.path}${Platform.pathSeparator}${entry.sha256}',
         );
-        Uint8List fileBytes;
-        if (blobFile.existsSync() &&
-            blobFile.lengthSync() == entry.sizeBytes &&
-            await _sha256HexBytes(await blobFile.readAsBytes()) ==
-                entry.sha256) {
-          fileBytes = await blobFile.readAsBytes();
-          reused++;
-        } else {
+        Uint8List? fileBytes;
+        if (blobFile.existsSync() && blobFile.lengthSync() == entry.sizeBytes) {
+          final Uint8List cached = await blobFile.readAsBytes();
+          if (await _sha256HexBytes(cached) == entry.sha256) {
+            fileBytes = cached;
+            reused++;
+          }
+        }
+        if (fileBytes == null) {
+          // Content-addressed URL: immutable and safe for intermediate caches (`S2-SRV-01`).
           final http.Response fileResp;
           try {
             fileResp = await _http.get(
-              Uri.parse(
-                '$base/api/v1/content/pack/files/${entry.relativePath}',
-              ),
+              Uri.parse('$base/api/v1/content/pack/blobs/${entry.sha256}'),
               headers: baseHeaders,
             );
           } catch (error) {
@@ -591,21 +592,24 @@ class ContentPackService {
               'HTTP ${fileResp.statusCode} fetching ${entry.relativePath}',
             );
           }
-          fileBytes = Uint8List.fromList(fileResp.bodyBytes);
-          if (fileBytes.length != entry.sizeBytes) {
+          final Uint8List downloadedBytes = Uint8List.fromList(
+            fileResp.bodyBytes,
+          );
+          if (downloadedBytes.length != entry.sizeBytes) {
             throw ContentPackException(
               ContentPackErrorCode.fileHashMismatch,
-              'Size mismatch for ${entry.relativePath}: expected ${entry.sizeBytes}, got ${fileBytes.length}.',
+              'Size mismatch for ${entry.relativePath}: expected ${entry.sizeBytes}, got ${downloadedBytes.length}.',
             );
           }
-          final String actualSha = await _sha256HexBytes(fileBytes);
+          final String actualSha = await _sha256HexBytes(downloadedBytes);
           if (actualSha != entry.sha256) {
             throw ContentPackException(
               ContentPackErrorCode.fileHashMismatch,
               'SHA-256 mismatch for ${entry.relativePath}.',
             );
           }
-          await blobFile.writeAsBytes(fileBytes, flush: true);
+          await blobFile.writeAsBytes(downloadedBytes, flush: true);
+          fileBytes = downloadedBytes;
           downloaded++;
         }
 
@@ -674,6 +678,7 @@ class ContentPackService {
           packBootAttempts: 0,
         ),
       );
+      await _collectBlobGarbage(rootPath);
 
       return ContentPackUpdateResult(
         status: ContentPackUpdateStatus.activatedHotReload,
@@ -694,6 +699,53 @@ class ContentPackService {
       }
       rethrow;
     }
+  }
+
+  /// Deletes `blobs/<sha256>` entries not referenced by any file of the active,
+  /// previous or staged pack directories (best effort, never throws).
+  Future<void> _collectBlobGarbage(String rootPath) async {
+    try {
+      final Directory blobsDir = Directory(
+        '$rootPath${Platform.pathSeparator}blobs',
+      );
+      if (!blobsDir.existsSync()) {
+        return;
+      }
+      final Set<String> referenced = <String>{};
+      for (final String bucket in const <String>[
+        'active',
+        'previous',
+        'staged',
+      ]) {
+        final Directory bucketDir = Directory(
+          '$rootPath${Platform.pathSeparator}$bucket',
+        );
+        if (!bucketDir.existsSync()) {
+          continue;
+        }
+        for (final FileSystemEntity entity in bucketDir.listSync(
+          recursive: true,
+          followLinks: false,
+        )) {
+          if (entity is File) {
+            referenced.add(await _sha256HexBytes(await entity.readAsBytes()));
+          }
+        }
+      }
+      for (final FileSystemEntity blob in blobsDir.listSync(
+        followLinks: false,
+      )) {
+        if (blob is! File) {
+          continue;
+        }
+        final String name = blob.uri.pathSegments.last;
+        if (_sha256Pattern.hasMatch(name) && !referenced.contains(name)) {
+          try {
+            blob.deleteSync();
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
   }
 
   SceneManifest? _loadVerifiedManifestFromDir(Directory packDir) {

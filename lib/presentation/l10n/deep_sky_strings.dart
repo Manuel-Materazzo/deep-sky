@@ -521,7 +521,7 @@ class DeepSkyStrings {
       : 'Lights a gentle glow in your shared home.';
 
   String get welcomeBackTitle => isIt
-      ? 'Bentornato, la casa ti aspettava.'
+      ? 'Che bello rivederti, la casa ti aspettava.'
       : 'Welcome back, home was waiting for you.';
 
   String get welcomeBackSubtitle => isIt

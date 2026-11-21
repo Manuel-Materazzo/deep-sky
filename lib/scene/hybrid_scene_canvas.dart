@@ -48,35 +48,6 @@ class HybridSceneCanvas extends StatefulWidget {
   final double extraFloorHeight;
   final Color? floorBaseColor;
 
-  /// Evicts all assets belonging to [manifest] at [packAssetRoot] from Flutter's
-  /// `imageCache` (used on hot content-pack reload, `S2-APP-02`, `ADR-0007`).
-  static void evictPackImages({
-    required SceneManifest manifest,
-    required String packAssetRoot,
-    required bool isFileSystem,
-  }) {
-    final Set<String> relPaths = <String>{};
-    final SceneBackground? bg = manifest.background;
-    if (bg != null) {
-      relPaths.add(bg.dayAsset);
-      relPaths.add(bg.nightAsset);
-    }
-    for (final SceneSlot slot in manifest.slots) {
-      for (final List<SceneLayer> layers in slot.states.values) {
-        for (final SceneLayer layer in layers) {
-          relPaths.add(layer.asset);
-        }
-      }
-    }
-    for (final String rel in relPaths) {
-      _buildProvider(
-        packAssetRoot: packAssetRoot,
-        relativeAsset: rel,
-        isFileSystem: isFileSystem,
-      ).evict();
-    }
-  }
-
   static ImageProvider _buildProvider({
     required String packAssetRoot,
     required String relativeAsset,
