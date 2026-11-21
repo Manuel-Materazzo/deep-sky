@@ -1,0 +1,222 @@
+<!DOCTYPE html><html class="dark" lang="it"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_tab" name="shell-type"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,opsz,wght@0,6..12,300..800;1,6..12,300..800&amp;family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "primary-fixed-dim": "#ffafd3", "on-primary-fixed": "#3d0026", "night-surface": "#231832", "on-background": "#eedcfa", "inverse-surface": "#eedcfa", "background": "#1c2337", "on-tertiary-fixed": "#261a00", "tertiary": "#f9bd22", "tertiary-container": "#ca9700", "secondary-container": "#891933", "inverse-on-surface": "#372c42", "surface-tint": "#ffafd3", "surface-container-highest": "#3b3047", "on-surface-variant": "#dac0c9", "on-secondary-fixed": "#400010", "blush-petal": "#fda4af", "blush-core": "#f472b6", "lantern-amber-soft": "#fde68a", "surface-variant": "#3b3047", "secondary-fixed-dim": "#ffb2b9", "secondary-fixed": "#ffdadc", "lantern-glow": "#fbbf24", "tertiary-fixed": "#ffdf9f", "on-secondary-container": "#ff97a3", "inverse-primary": "#a43073", "surface-container-high": "#272a44", "on-tertiary-fixed-variant": "#5c4300", "on-error-container": "#ffdad6", "night-elevated": "#2a314b", "blush-soft": "#fbcfe8", "primary": "#ffafd3", "surface": "#1c2337", "on-primary": "#620040", "secondary": "#ffb2b9", "on-surface": "#eedcfa", "night-plum": "#1a1025", "surface-bright": "#3b4363", "rose-vivid": "#fb7185", "primary-container": "#f472b6", "error-container": "#93000a", "on-primary-container": "#6d0047", "tertiary-fixed-dim": "#f9bd22", "on-error": "#690005", "on-tertiary": "#402d00", "blush-mist": "#fff1f2", "night-indigo": "#130d1e", "primary-fixed": "#ffd8e7", "surface-container": "#20273c", "on-primary-fixed-variant": "#85145a", "outline": "#a28a93", "on-tertiary-container": "#473300", "on-secondary-fixed-variant": "#891933", "error": "#ffb4ab", "outline-variant": "#544249", "surface-dim": "#171c2d", "surface-container-lowest": "#131724", "on-secondary": "#67001f", "surface-container-low": "#1d2335" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-xs": "0.25rem", "margin-mobile": "1rem", "space-xl": "2rem", "gutter": "1rem", "space-sm": "0.5rem", "margin": "1.25rem", "space-lg": "1.5rem", "gutter-mobile": "0.75rem", "space-md": "1rem" }, fontFamily: { "headline-xl": ["Plus Jakarta Sans"], "body-sm": ["Nunito Sans"], "label-lg": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"], "body-lg": ["Nunito Sans"], "headline-sm": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "headline-xl-mobile": ["Plus Jakarta Sans"], "body-md": ["Nunito Sans"], "label-md": ["Plus Jakarta Sans"] }, fontSize: { "headline-xl": ["36px", { lineHeight: "44px", letterSpacing: "-0.02em", fontWeight: "700" }], "body-sm": ["13px", { lineHeight: "18px", fontWeight: "400" }], "label-lg": ["14px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "600" }], "headline-md": ["20px", { lineHeight: "28px", fontWeight: "600" }], "body-lg": ["17px", { lineHeight: "26px", fontWeight: "400" }], "headline-sm": ["18px", { lineHeight: "24px", fontWeight: "600" }], "label-sm": ["11px", { lineHeight: "14px", letterSpacing: "0.02em", fontWeight: "500" }], "headline-lg": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }], "headline-xl-mobile": ["28px", { lineHeight: "36px", letterSpacing: "-0.01em", fontWeight: "700" }], "body-md": ["15px", { lineHeight: "22px", fontWeight: "400" }], "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }] } } } };</script><style>@layer base{html,body{width:100%;margin:0;padding:0;min-height:100%;background-color:#1c2337;color:#eedcfa;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}
+@keyframes floatGentle { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-4px); } }
+@keyframes pulseSubtle { 0%, 100% { opacity: 0.85; transform: scale(1); } 50% { opacity: 1; transform: scale(1.05); } }
+@keyframes twinkle { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.15); } }
+.anim-float { animation: floatGentle 4s ease-in-out infinite; }
+.anim-twinkle { animation: twinkle 2.5s ease-in-out infinite; }
+.anim-twinkle-delay { animation: twinkle 3.2s ease-in-out infinite 1.2s; }
+.vignette-overlay {
+  background: radial-gradient(ellipse at center, rgba(28,35,55,0) 45%, rgba(28,35,55,0.7) 80%, rgba(28,35,55,1) 100%),
+              linear-gradient(to bottom, rgba(28,35,55,0.95) 0%, rgba(28,35,55,0) 12%, rgba(28,35,55,0) 80%, rgba(28,35,55,1) 100%);
+}
+</style></head><body class="bg-[#1c2337] font-body-md text-on-surface antialiased selection:bg-primary-container selection:text-on-primary-container"><header class="fixed top-0 w-full z-50 pt-safe bg-[#1c2337]/80 backdrop-blur-xl shadow-[0_1px_16px_rgba(15,19,30,0.5)] border-b border-primary/10"><div class="h-16 px-space-md flex items-center justify-between"><div class="flex items-center gap-space-sm"><div class="relative flex items-center justify-center w-8 h-8 rounded-full bg-primary/15 border border-primary/30 shadow-[0_0_14px_rgba(244,114,182,0.4)]"><span class="material-symbols-outlined text-[19px] text-blush-petal" style="font-variation-settings: &quot;FILL&quot; 1;">home</span><span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-lantern-glow animate-ping opacity-85"></span><span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-lantern-glow"></span></div><div class="flex flex-col"><div class="flex items-center gap-1.5"><h1 class="font-headline-sm text-headline-sm font-semibold tracking-tight text-on-surface">Casa</h1></div></div></div><div class="flex items-center gap-2.5"><button aria-label="Lume notturno" class="w-9 h-9 flex items-center justify-center rounded-full bg-night-elevated/70 border border-white/5 text-lantern-amber-soft hover:text-lantern-glow active:scale-95 transition-all shadow-[0_0_12px_rgba(251,191,36,0.2)]"><span class="material-symbols-outlined text-[19px]">flare</span></button><a class="relative w-9 h-9 rounded-full bg-gradient-to-tr from-primary/30 to-blush-soft/20 flex items-center justify-center ring-1 ring-blush-core/40 hover:ring-blush-core transition-all active:scale-95" data-path="noi" href="#"><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-inner"><span class="material-symbols-outlined text-on-primary text-[18px]">favorite</span></div><span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#1c2337]"></span></a></div></div></header><main class="flex flex-col relative w-full min-h-screen pt-16 pb-24 bg-[#1c2337] px-0"><div class="flex flex-col w-full">
+<!-- 1. BANNER SUPERIORE ESSENZIALE E MORBIDO -->
+<section class="flex flex-col gap-2 w-full px-space-md pt-3 z-20">
+<!-- Card Ti Penso -->
+<div class="w-full bg-surface-container/90 backdrop-blur-xl rounded-2xl p-3 flex items-center justify-between border border-primary/20 shadow-[0_8px_24px_-4px_rgba(10,13,24,0.6)]">
+<div class="flex items-center gap-2.5 min-w-0">
+<div class="relative flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-br from-primary-container/30 to-rose-vivid/20 text-blush-soft border border-primary/30 shrink-0 shadow-[0_0_18px_rgba(244,114,182,0.35)]">
+<span class="material-symbols-outlined text-[20px] text-blush-petal" style="font-variation-settings: &quot;FILL&quot; 1;">volunteer_activism</span>
+</div>
+<div class="flex flex-col min-w-0">
+<p class="font-headline-sm text-[15px] font-semibold text-blush-mist truncate flex items-center gap-1.5">Anna ti ha pensato</p>
+<p class="font-label-sm text-[12px] text-on-surface-variant/90 flex items-center gap-1.5">
+<span class="w-1.5 h-1.5 rounded-full bg-blush-core animate-pulse"></span>
+1h fa • Vibrazione sul cuore
+</p>
+</div>
+</div>
+<!-- Tasto ricambia -->
+<button class="flex items-center gap-1 px-3 py-1.5 rounded-full bg-gradient-to-r from-primary-container to-rose-vivid text-on-primary-container font-label-md text-label-md active:scale-95 transition-all shadow-[0_0_16px_rgba(244,114,182,0.45)] shrink-0 font-semibold" id="replyThoughtBtn">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: &quot;FILL&quot; 1;">favorite</span>
+<span>Ricambia</span>
+</button>
+</div>
+<!-- Umore di Marta -->
+<button id="moodBarBtn" type="button" class="w-full flex items-center justify-between px-3.5 py-2 rounded-xl bg-night-elevated/80 border border-primary/20 text-on-surface-variant backdrop-blur-md shadow-sm hover:border-primary/40 active:scale-[0.99] transition-all text-left cursor-pointer group"><div class="flex items-center gap-2 min-w-0"><span class="flex items-center justify-center w-5 h-5 rounded-full bg-blush-core/20 text-blush-petal text-[12px] shrink-0 font-semibold">A</span><span class="font-body-sm text-[13px] text-on-surface truncate" id="partnerMoodDisplay">Anna: <strong class="font-semibold text-blush-petal">Serena 🌸</strong></span><span class="text-outline-variant text-[11px] select-none">•</span><span class="font-label-sm text-[12px] text-blush-soft/80 group-hover:text-blush-soft flex items-center gap-1 shrink-0"><span class="material-symbols-outlined text-[14px] text-lantern-glow">edit_note</span><span id="myMoodStatus">Tocca per il tuo</span></span></div><span class="material-symbols-outlined text-[16px] text-blush-petal/70 group-hover:text-blush-petal shrink-0 ml-1 transition-transform group-hover:translate-x-0.5">expand_more</span></button>
+</section>
+<!-- 2. IL SALOTTO ILLUSTRATO - COMPLETAMENTE INTEGRATO E IMMERSIVO -->
+<section class="relative w-full overflow-hidden -mt-1 select-none">
+<!-- Contenitore immagine con dissolvenze organiche (niente card, niente bordo) -->
+<div class="relative w-full aspect-square max-w-[460px] mx-auto">
+<!-- L'immagine del salotto -->
+<img alt="Il nostro salotto intimo di sera" class="w-full h-full object-cover select-none pointer-events-none" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD61satDh2Go_0IzIIC1R6ZyoALTb5k8BpbSjNz5ZOUTPQD-nd6hTepA80op-vDHvCqCubRJ6aguIlRqn4qi9A-wWhBora4Mpj_SLuiPaz2arPGjOMwjFgX7zwYfBQh49CP9OKRgz7dMKkaa7_Q1dpkaNTTUSkX3CtRmQXTdG_E6c1a9ouNQhyiTxRh81v6K2qqJy6-W5-dnxYAiWYN3swx9I3XLOPGT10Ms-xiOy1NhlY7ACdzaUQl">
+<!-- Dissolvenza a gradient mask continua sui 4 lati per fondersi con lo sfondo #1c2337 -->
+<div class="absolute inset-0 vignette-overlay pointer-events-none" style="background: linear-gradient(rgba(28, 35, 55, 0.95) 0%, rgba(28, 35, 55, 0) 15%, rgba(28, 35, 55, 0) 88%, rgba(28, 35, 55, 0.85) 100%);"></div>
+<!-- GLOW DIFFUSO LAMPADA DA TERRA (a destra) -->
+<div class="absolute top-[56%] right-[8%] w-24 h-24 rounded-full bg-gradient-to-tr from-lantern-glow/35 to-rose-vivid/20 blur-xl pointer-events-none anim-twinkle"></div>
+<!-- OVERLAY 1: FINESTRA ASTRONOMICA (in alto a sinistra, sovrapposta all'arco della finestra) -->
+<div class="absolute top-[5%] left-[7%] w-[34%] h-[43%] cursor-pointer group rounded-t-full focus:outline-none" id="windowZone" role="button" tabindex="0">
+<!-- Stelle pulsanti vive -->
+<div class="absolute top-[22%] left-[38%] text-lantern-amber-soft text-[10px] anim-twinkle">✦</div>
+<div class="absolute top-[34%] right-[28%] text-blush-soft text-[8px] anim-twinkle-delay">✧</div>
+<div class="absolute bottom-[44%] left-[24%] text-lantern-glow text-[11px] anim-twinkle">★</div>
+<div class="absolute top-[48%] right-[42%] text-white text-[7px] anim-twinkle-delay">✦</div>
+<!-- Linee costellazione eterea interattiva -->
+<svg class="absolute inset-0 w-full h-full opacity-40 group-hover:opacity-85 transition-opacity duration-300 pointer-events-none" viewBox="0 0 100 130">
+<circle cx="38" cy="30" fill="#fde68a" r="1.5"></circle>
+<circle cx="68" cy="22" fill="#fde68a" r="1.5"></circle>
+<circle cx="80" cy="40" fill="#fde68a" r="1.5"></circle>
+<line stroke="rgba(253,230,138,0.4)" stroke-dasharray="2,2" stroke-width="0.75" x1="38" x2="68" y1="30" y2="22"></line>
+<line stroke="rgba(253,230,138,0.4)" stroke-dasharray="2,2" stroke-width="0.75" x1="68" x2="80" y1="22" y2="40"></line>
+</svg>
+<!-- Pillola discreta info meteo/cielo naturale -->
+<div class="absolute bottom-[8%] left-[10%] right-[10%] py-1 px-2 rounded-full bg-[#1c2337]/75 backdrop-blur-md border border-white/10 flex items-center justify-center gap-1 shadow-sm group-hover:border-lantern-glow/40 transition-all group-active:scale-95">
+<span class="material-symbols-outlined text-[12px] text-lantern-amber-soft" style="font-variation-settings: &quot;FILL&quot; 1;">bedtime</span>
+<span class="font-label-sm text-[10px] text-blush-mist tracking-tight">Cielo sereno • 14°C</span>
+</div>
+</div>
+<!-- OVERLAY 2: BACHECA DEI RICORDI IN SUGHERO (in alto a destra, fisicamente sulla bacheca) -->
+<div class="absolute top-[4%] right-[7%] w-[38%] h-[34%] cursor-pointer group focus:outline-none" id="corkboardZone" role="button" tabindex="0">
+<div class="relative w-full h-full p-2">
+<!-- Miniatura Polaroid viva inclinata con cuoricino -->
+<div class="absolute top-[18%] right-[14%] w-10 h-12 bg-white/95 rounded-sm p-1 shadow-md rotate-6 group-hover:rotate-2 group-hover:scale-110 transition-transform duration-200">
+<div class="w-full h-7 bg-gradient-to-tr from-pink-300 to-rose-400 rounded-[2px] flex items-center justify-center">
+<span class="material-symbols-outlined text-[13px] text-white" style="font-variation-settings: &quot;FILL&quot; 1;">favorite</span>
+</div>
+<div class="w-full h-1.5 mt-1 flex items-center justify-center">
+<div class="w-5 h-0.5 bg-neutral-300 rounded-full"></div>
+</div>
+<!-- Spilla rossa vera -->
+<div class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-rose-600 shadow-[0_1px_3px_rgba(0,0,0,0.5)] ring-1 ring-white/50"></div>
+</div>
+<!-- Mini Post-it Rosa piegato -->
+<div class="absolute bottom-[16%] left-[16%] w-14 h-9 bg-rose-200/95 text-neutral-800 rounded-xs p-1 shadow-sm -rotate-3 group-hover:rotate-0 group-hover:scale-105 transition-transform duration-200 border-t border-rose-300/40">
+<div class="space-y-1">
+<div class="w-9 h-0.5 bg-rose-400/70 rounded"></div>
+<div class="w-11 h-0.5 bg-rose-400/50 rounded"></div>
+</div>
+<span class="absolute bottom-0.5 right-1 text-[8px] text-rose-500 font-bold">♥</span>
+<!-- Spilla ambra -->
+<div class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-amber-500 shadow-sm ring-1 ring-white/40"></div>
+</div>
+<!-- Mini Post-it Giallino -->
+<div class="absolute top-[14%] left-[10%] w-11 h-10 bg-amber-100/90 text-neutral-800 rounded-xs p-1 shadow-sm rotate-2 group-hover:scale-105 transition-transform duration-200">
+<div class="space-y-1 mt-1">
+<div class="w-7 h-0.5 bg-amber-400/60 rounded"></div>
+<div class="w-5 h-0.5 bg-amber-400/40 rounded"></div>
+</div>
+<!-- Spilla corallo -->
+<div class="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-rose-500 shadow-sm ring-1 ring-white/40"></div>
+</div>
+<!-- Suggerimento sottile al passaggio/tap -->
+<div class="absolute -bottom-2 right-2 px-1.5 py-0.5 rounded-full bg-[#1c2337]/90 backdrop-blur-md border border-blush-petal/30 flex items-center gap-1 shadow-md opacity-85 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-[10px] text-blush-petal">push_pin</span>
+<span class="font-label-sm text-[9px] text-blush-soft">Bacheca ricordi</span>
+</div>
+</div>
+</div>
+<!-- OVERLAY 3: SULLA MENSOLA DI LEGNO (Lettera con ceralacca & Diario delle domande a due) -->
+<div class="absolute top-[46.5%] right-[9%] w-[42%] h-[8%] flex items-end justify-center gap-3 px-1 cursor-pointer group focus:outline-none" id="shelfZone" role="button" tabindex="0">
+<!-- Busta chiusa con ceralacca rosa/oro (Capsula del tempo) -->
+<div class="relative flex items-center justify-center group-hover:scale-110 active:scale-95 transition-transform duration-200">
+<div class="w-11 h-7 bg-gradient-to-br from-amber-50 via-rose-100 to-amber-100 rounded-[3px] border border-amber-300/40 shadow-[0_4px_8px_rgba(0,0,0,0.4)] flex items-center justify-center relative overflow-hidden">
+<!-- Taglio della busta -->
+<div class="absolute top-0 inset-x-0 h-3 border-b border-amber-300/40 bg-white/20 transform skew-y-3"></div>
+<!-- Sigillo di ceralacca rosa e oro -->
+<div class="relative z-10 w-3.5 h-3.5 rounded-full bg-gradient-to-tr from-rose-700 via-blush-core to-amber-400 shadow-[0_1px_4px_rgba(100,0,30,0.6)] flex items-center justify-center ring-1 ring-amber-300/50">
+<span class="material-symbols-outlined text-[9px] text-white" style="font-variation-settings: &quot;FILL&quot; 1;">lock</span>
+</div>
+</div>
+<!-- Ombra proiettata sulla mensola -->
+<div class="absolute -bottom-1 inset-x-1 h-1 bg-black/50 blur-[2px] rounded-full pointer-events-none"></div>
+</div>
+<!-- Piccolo diario/libro delle domande a due appoggiato sulla mensola -->
+<div class="relative flex items-center justify-center group-hover:scale-110 active:scale-95 transition-transform duration-200">
+<div class="w-8 h-8 rounded-sm bg-gradient-to-tr from-rose-900 to-blush-core border border-rose-300/40 shadow-[0_4px_8px_rgba(0,0,0,0.4)] flex flex-col justify-between p-1">
+<div class="flex justify-between items-center">
+<span class="text-[7px] text-amber-200 font-bold">NOI</span>
+<span class="material-symbols-outlined text-[9px] text-rose-200">auto_stories</span>
+</div>
+<div class="w-4 h-0.5 bg-rose-200/50 rounded"></div>
+</div>
+<!-- Ombra proiettata -->
+<div class="absolute -bottom-1 inset-x-0.5 h-1 bg-black/50 blur-[2px] rounded-full pointer-events-none"></div>
+</div>
+<!-- Micro etichetta mensola -->
+<div class="absolute -bottom-4 right-1 px-1.5 py-0.2 rounded-full bg-[#1c2337]/90 border border-primary/20 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+<span class="text-[9px] text-blush-petal font-medium">Capsula &amp; Diario</span>
+</div>
+</div>
+<!-- OVERLAY 4: COPPIA E PET "NUBE" SUL DIVANO (In basso al centro) -->
+<div class="absolute bottom-[8%] left-[22%] right-[22%] h-[38%] cursor-pointer group focus:outline-none" id="couchZone" role="button" tabindex="0">
+<!-- Cuoricini animati fluttuanti attorno alla coppia -->
+<div class="absolute top-[8%] left-[45%] text-rose-vivid text-[14px] anim-float opacity-80" style="font-variation-settings: &quot;FILL&quot; 1;">♥</div>
+<div class="absolute top-[22%] left-[28%] text-blush-petal text-[10px] anim-twinkle opacity-70">♥</div>
+<div class="absolute top-[18%] right-[30%] text-blush-soft text-[11px] anim-float opacity-75">♥</div>
+<!-- Spot interattivo sul cagnolino "Nube" che dorme sereno -->
+
+</div>
+<!-- Feedback Toast integrato e non invasivo -->
+<div class="absolute bottom-2 inset-x-6 py-2 px-3 rounded-2xl bg-[#171c2d]/95 border border-primary/30 backdrop-blur-2xl flex items-center justify-between shadow-[0_12px_28px_rgba(0,0,0,0.6)] transform transition-all duration-300 pointer-events-none z-30 translate-y-12 opacity-0" id="roomFeedback">
+<div class="flex items-center gap-2 min-w-0">
+<div class="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-blush-petal shrink-0">
+<span class="material-symbols-outlined text-[15px]" id="feedbackIcon" style="font-variation-settings: &quot;FILL&quot; 1;">auto_awesome</span>
+</div>
+<p class="font-body-sm text-[12px] text-blush-mist truncate" id="feedbackText">Pensiero inviato: Marta sentirà una vibrazione leggera</p>
+</div>
+<span class="text-[11px] text-blush-petal font-medium shrink-0 ml-2">Sentito ♥</span>
+</div>
+</div>
+</section>
+<!-- 3. COUNTDOWN & AZIONE PRIMARIA (TONI ROSA E BLU NOTTE) -->
+<section class="flex flex-col gap-3 w-full px-space-md pb-4 z-20 pt-3">
+<!-- Card del Countdown Essenziale -->
+<div class="relative w-full overflow-hidden rounded-3xl border border-primary/20 bg-surface-container/90 shadow-[0_12px_32px_rgba(10,13,24,0.55)]"><div class="relative w-full h-44"><img alt="Prossimo riabbraccio alla stazione" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB947UktFmVeN7bT79CRfZQNqgpoHqkHWSdN-uykHv3MmAmXMr37mCY7OQZR4z0qOsMq4RG665Y8j2oRcysicv0AJK3M8hG6dTQVnozIg0pwn9SHmklpxD7DQzlsUF-Zmd2KF5DY9YahMSGdKaeJdAzvd7i4ou0O-jmQM0qoJ11EyakXP0pB_Adfh1QIGpBIl7IKQTJfDXG64NoFWuz29Mr7rNh4KWBHipLTEayQjM"><div class="absolute inset-0 bg-gradient-to-t from-[#1c2337] via-transparent to-black/50 pointer-events-none"></div><div class="absolute top-3 left-3 flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1c2337]/80 backdrop-blur-md border border-primary/30 shadow-md"><span class="material-symbols-outlined text-[15px] text-blush-petal" style="font-variation-settings: &quot;FILL&quot; 1;">favorite</span><span class="font-label-sm text-[11px] text-blush-mist font-semibold">Prossimo riabbraccio</span></div><div class="absolute bottom-2.5 inset-x-3 flex items-center justify-between px-3 py-2 rounded-2xl bg-[#1c2337]/90 backdrop-blur-xl border border-white/10"><div class="flex items-center gap-2 min-w-0"><span class="text-[17px] flex items-center justify-center select-none">🚆</span><div class="flex flex-col min-w-0"><p class="font-label-sm text-[12px] font-semibold text-blush-mist truncate">Natale Insieme</p><p class="font-body-sm text-[11px] text-on-surface-variant truncate">Giovinazzo</p></div></div><div class="flex items-center gap-1 shrink-0 bg-primary/15 border border-primary/30 px-2.5 py-1 rounded-xl shadow-inner"><span class="material-symbols-outlined text-[13px] text-lantern-amber-soft" style="font-variation-settings: &quot;FILL&quot; 1;">schedule</span><div class="flex items-center gap-1 text-[11px] font-semibold font-label-sm"><span class="text-blush-mist">3<span class="text-blush-petal text-[9px] font-medium ml-0.5">g</span></span><span class="text-outline-variant text-[10px]">•</span><span class="text-blush-mist">14<span class="text-blush-petal text-[9px] font-medium ml-0.5">h</span></span><span class="text-outline-variant text-[10px]">•</span><span class="text-blush-mist">25<span class="text-blush-petal text-[9px] font-medium ml-0.5">m</span></span></div></div></div></div></div>
+<!-- Bottone d'azione Primario Caldo a Portata di Pollice -->
+
+</section>
+</div>
+<script>
+  (function() {
+    const feedbackBox = document.getElementById('roomFeedback');
+    const feedbackText = document.getElementById('feedbackText');
+    const feedbackIcon = document.getElementById('feedbackIcon');
+    let timer = null;
+
+    function showFeedback(text, iconName) {
+      if (!feedbackBox) return;
+      feedbackText.textContent = text;
+      feedbackIcon.textContent = iconName || 'favorite';
+      feedbackBox.classList.remove('translate-y-12', 'opacity-0');
+      feedbackBox.classList.add('translate-y-0', 'opacity-100');
+
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        feedbackBox.classList.remove('translate-y-0', 'opacity-100');
+        feedbackBox.classList.add('translate-y-12', 'opacity-0');
+      }, 2800);
+    }
+
+    document.getElementById('windowZone')?.addEventListener('click', () => {
+      showFeedback('Sotto lo stesso cielo: 14°C e stelle visibili a Milano', 'nightlight_round');
+    });
+
+    document.getElementById('corkboardZone')?.addEventListener('click', () => {
+      showFeedback('Bacheca: 4 biglietti d\'amore e la foto al lago', 'push_pin');
+    });
+
+    document.getElementById('shelfZone')?.addEventListener('click', () => {
+      showFeedback('Capsula del tempo: sigillata con ceralacca fino a Natale', 'mail');
+    });
+
+    document.getElementById('couchZone')?.addEventListener('click', () => {
+      showFeedback('Hai inviato una carezza a Marta e Biscuit 🐾', 'favorite');
+    });
+
+    document.getElementById('replyThoughtBtn')?.addEventListener('click', function() {
+      this.classList.add('opacity-90');
+      this.innerHTML = '<span class="material-symbols-outlined text-[16px]">done</span><span>Ricambiato!</span>';
+      showFeedback('Pensiero ricambiato con amore', 'favorite');
+    });
+
+    document.getElementById('sendThoughtMainBtn')?.addEventListener('click', () => {
+      showFeedback('Pensiero inviato: Marta sentirà una vibrazione leggera', 'auto_awesome');
+    });
+  })();
+</script><div id="moodBottomSheet" class="fixed inset-0 z-50 flex flex-col justify-end pointer-events-none transition-all duration-300 opacity-0"><div id="moodBackdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 opacity-0"></div><div id="moodDrawer" class="relative w-full max-w-[460px] mx-auto bg-[#190f24] border-t border-blush-petal/25 rounded-t-3xl p-5 pb-8 shadow-[0_-8px_32px_rgba(10,13,24,0.85)] z-10 transform translate-y-full transition-transform duration-300 flex flex-col gap-4"><div class="w-10 h-1 bg-surface-variant rounded-full mx-auto -mt-1 mb-1 opacity-70"></div><div class="flex items-start justify-between"><div class="flex flex-col"><div class="flex items-center gap-1.5"><span class="text-lantern-glow text-[14px]">✨</span><h3 class="font-headline-sm text-headline-sm font-semibold text-blush-mist">Come ti senti oggi, amore?</h3></div><p class="font-body-sm text-[13px] text-on-surface-variant mt-0.5">Condividi un soffio del tuo mondo, solo se ne hai voglia.</p></div><button id="closeMoodSheet" type="button" aria-label="Chiudi" class="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:text-blush-soft transition-colors shrink-0"><span class="material-symbols-outlined text-[18px]">close</span></button></div><div class="flex flex-col gap-2"><label class="font-label-sm text-[11px] text-blush-petal/80 font-medium tracking-wide uppercase">Il tuo stato d'animo</label><div class="flex flex-wrap gap-2" id="moodOptions"><button type="button" class="mood-pill px-3 py-1.5 rounded-full border border-primary/20 bg-surface-container-high/60 text-blush-mist text-[12px] font-label-md flex items-center gap-1.5 hover:border-blush-core/60 transition-all" data-mood="Sereno 🌸"><span>Sereno</span><span>🌸</span></button><button type="button" class="mood-pill px-3 py-1.5 rounded-full border border-primary/20 bg-surface-container-high/60 text-blush-mist text-[12px] font-label-md flex items-center gap-1.5 hover:border-blush-core/60 transition-all" data-mood="Bisogno di coccole 🧸"><span>Coccole</span><span>🧸</span></button><button type="button" class="mood-pill px-3 py-1.5 rounded-full border border-primary/20 bg-surface-container-high/60 text-blush-mist text-[12px] font-label-md flex items-center gap-1.5 hover:border-blush-core/60 transition-all" data-mood="Un po' stanco 🌙"><span>Un po' stanco</span><span>🌙</span></button><button type="button" class="mood-pill px-3 py-1.5 rounded-full border border-primary/20 bg-surface-container-high/60 text-blush-mist text-[12px] font-label-md flex items-center gap-1.5 hover:border-blush-core/60 transition-all" data-mood="Felice e grintoso ✨"><span>Grintoso</span><span>✨</span></button><button type="button" class="mood-pill px-3 py-1.5 rounded-full border border-primary/20 bg-surface-container-high/60 text-blush-mist text-[12px] font-label-md flex items-center gap-1.5 hover:border-blush-core/60 transition-all" data-mood="Pensieroso 💭"><span>Pensieroso</span><span>💭</span></button></div></div><div class="flex flex-col gap-1.5"><label for="moodNoteInput" class="font-label-sm text-[11px] text-blush-petal/80 font-medium tracking-wide uppercase">Un piccolo pensiero (facoltativo)</label><div class="relative"><input id="moodNoteInput" type="text" maxlength="60" placeholder="Es. Avrei voglia di stringerti stasera..." class="w-full px-3.5 py-2.5 rounded-xl bg-surface-container border border-primary/20 text-on-surface placeholder:text-on-surface-variant/50 text-[13px] font-body-sm focus:outline-none focus:border-blush-core/60 transition-all"></div></div><div class="flex items-center gap-2 pt-1"><button id="saveMoodBtn" type="button" class="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-gradient-to-r from-primary-container to-rose-vivid text-on-primary-container font-label-md text-label-md font-semibold active:scale-[0.98] transition-all shadow-[0_0_16px_rgba(244,114,182,0.35)]"><span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">favorite</span><span>Condividi nella nostra Casa</span></button></div><p class="text-center text-[11px] text-on-surface-variant/70 -mt-1">Senza obblighi né fretta: Anna lo vedrà quando entrerà a Casa.</p></div></div><script>(function(){const sheet=document.getElementById('moodBottomSheet');const drawer=document.getElementById('moodDrawer');const backdrop=document.getElementById('moodBackdrop');const openBtn=document.getElementById('moodBarBtn');const closeBtn=document.getElementById('closeMoodSheet');const saveBtn=document.getElementById('saveMoodBtn');const pills=document.querySelectorAll('.mood-pill');const myMoodStatus=document.getElementById('myMoodStatus');let selectedMood='';function openSheet(){sheet.classList.remove('pointer-events-none','opacity-0');backdrop.classList.remove('opacity-0');drawer.classList.remove('translate-y-full');}function closeSheet(){backdrop.classList.add('opacity-0');drawer.classList.add('translate-y-full');setTimeout(()=>{sheet.classList.add('pointer-events-none','opacity-0');},300);}openBtn?.addEventListener('click',openSheet);closeBtn?.addEventListener('click',closeSheet);backdrop?.addEventListener('click',closeSheet);pills.forEach(pill=>{pill.addEventListener('click',()=>{pills.forEach(p=>{p.classList.remove('bg-blush-core/25','border-blush-core','text-blush-mist','font-semibold');p.classList.add('bg-surface-container-high/60','border-primary/20');});pill.classList.remove('bg-surface-container-high/60','border-primary/20');pill.classList.add('bg-blush-core/25','border-blush-core','text-blush-mist','font-semibold');selectedMood=pill.getAttribute('data-mood')||'';});});saveBtn?.addEventListener('click',()=>{const customNote=document.getElementById('moodNoteInput')?.value?.trim();const finalMood=selectedMood||customNote||'Coccolato 🌸';if(myMoodStatus){myMoodStatus.innerHTML='<span class="text-blush-petal font-medium truncate">Tu: '+finalMood+'</span>';}closeSheet();const fbBox=document.getElementById('roomFeedback');const fbText=document.getElementById('feedbackText');const fbIcon=document.getElementById('feedbackIcon');if(fbBox&&fbText&&fbIcon){fbText.textContent='Il tuo umore è ora custodito a Casa con Anna';fbIcon.textContent='favorite';fbBox.classList.remove('translate-y-12','opacity-0');fbBox.classList.add('translate-y-0','opacity-100');setTimeout(()=>{fbBox.classList.remove('translate-y-0','opacity-100');fbBox.classList.add('translate-y-12','opacity-0');},3000);}});})();</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-[#151a2a]/90 backdrop-blur-2xl border-t border-primary/15 shadow-[0_-4px_24px_rgba(10,13,24,0.7)]" data-active-classes="text-blush-core font-semibold scale-105"><div class="flex justify-around items-center h-16 px-space-sm"><a aria-current="page" class="flex flex-col items-center justify-center gap-1 min-w-[56px] h-12 transition-all duration-200 text-blush-core font-semibold scale-105" data-path="casa" href="#"><span class="material-symbols-outlined text-[24px]" style="font-variation-settings: &quot;FILL&quot; 1;">cottage</span><span class="font-label-sm text-label-sm">Casa</span></a><a class="flex flex-col items-center justify-center gap-1 min-w-[56px] h-12 text-on-surface-variant hover:text-blush-soft transition-all duration-200" data-path="gesti" href="#"><span class="material-symbols-outlined text-[24px]">favorite</span><span class="font-label-sm text-label-sm">Gesti</span></a><a class="flex flex-col items-center justify-center gap-1 min-w-[56px] h-12 text-on-surface-variant hover:text-blush-soft transition-all duration-200" data-path="ricordi" href="#"><span class="material-symbols-outlined text-[24px]">photo_album</span><span class="font-label-sm text-label-sm">Ricordi</span></a><a class="flex flex-col items-center justify-center gap-1 min-w-[56px] h-12 text-on-surface-variant hover:text-blush-soft transition-all duration-200" data-path="noi" href="#"><span class="material-symbols-outlined text-[24px]">family_restroom</span><span class="font-label-sm text-label-sm">Noi</span></a></div></nav>
+
+
+
+</body></html>
