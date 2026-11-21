@@ -61,11 +61,16 @@ assets/*.png
 Procedura di pubblicazione di una nuova versione (es. `v1.1.0`):
 
 1. Genera e firma il pacchetto in locale (`scripts/build_content_pack.py`, `scripts/sign_content.py`, `scripts/validate_content.py`); la chiave privata di firma non lascia mai la macchina del promotore.
-2. Pubblica i file in una nuova directory versionata e aggiorna il symlink `current` **atomicamente** (non modificare mai i file sul posto per evitare disallineamenti con `ETag`/`Cache-Control: immutable`, `AU-15`):
+2. Pubblica i file in una nuova directory versionata e aggiorna il symlink `current` (non modificare mai i file sul posto per evitare disallineamenti con `ETag`/`Cache-Control: immutable`, `AU-15`). Il container `api` gira come utente non-root `deepsky` (immagine Alpine/BusyBox), mentre `docker compose cp` scrive come root: l'`exec` va quindi eseguito con `-u root` e la nuova directory va assegnata a `deepsky`. Il server risolve la radice con `toRealPath()`, quindi cambiare la destinazione del symlink è sicuro. `mv -T` potrebbe non essere disponibile in BusyBox: il comando ricade su `ln -sfn` (quasi atomico; se il ricaricamento cade nella finestra di pochi microsecondi, il server mantiene l'ultimo pacchetto valido e riprova al ciclo successivo).
    ```bash
    docker compose cp ./pack-v1.1.0 api:/var/lib/deepsky/packs/v1.1.0
-   docker compose exec api sh -c 'ln -sfn /var/lib/deepsky/packs/v1.1.0 /var/lib/deepsky/packs/current.next && mv -Tf /var/lib/deepsky/packs/current.next /var/lib/deepsky/packs/current'
+   docker compose exec -u root api sh -c 'cd /var/lib/deepsky/packs && chown -R deepsky:deepsky v1.1.0 && ln -sfn v1.1.0 current.next && { mv -fT current.next current || ln -sfn v1.1.0 current; }'
    ```
+   **Migrazione una tantum:** se `current` è ancora una vera directory (non un symlink), `mv -T` non può sostituirla. Prima della prima pubblicazione con symlink, sposta la directory esistente in una directory versionata e crea il symlink (es. se il pacchetto attuale è `v1.0.0`):
+   ```bash
+   docker compose exec -u root api sh -c 'cd /var/lib/deepsky/packs && if [ -d current ] && [ ! -L current ]; then mv current v1.0.0 && ln -sfn v1.0.0 current; fi'
+   ```
+   Se `current` non esiste (i file del pacchetto sono direttamente nella radice), crea prima `v1.0.0/` e sposta lì i file del pacchetto, poi crea il symlink come sopra. Dopo questa migrazione si può usare il comando di pubblicazione standard.
 3. Entro 60 secondi il server ricarica il pacchetto (`@Scheduled`, intervallo configurabile con `deepsky.content.reload-interval`, formato `PT60S`), lo verifica (firma se sono configurate le chiavi, SHA-256, dimensioni, path) e inizia a servirlo. Se la verifica fallisce resta servito l'ultimo pacchetto valido e il motivo compare nel log (`Rejected content pack ...`). Non è necessario riavviare il container; in caso di dubbio `docker compose restart api` forza un ricaricamento.
 4. Controlla: `curl -s https://<dominio>/api/v1/content/pack/checksums` e, per un file, `curl -I https://<dominio>/api/v1/content/pack/blobs/<sha256>`.
 
