@@ -1,273 +1,273 @@
 # Project Brief: Deep Sky
 
-**Versione:** 0.2 (bozza per revisione) · **Data:** 12 novembre 2026 (D-08 aggiornata il 16 novembre 2026) · **Stato:** in attesa di approvazione del promotore
+**Version:** 0.2 (draft for review) · **Date:** November 12, 2026 (D-08 updated November 16, 2026) · **Status:** awaiting sponsor approval
 
-**Destinatari:** promotore del progetto e team di agenti AI incaricati di produrre i documenti successivi (design system, documento architetturale, piano di sviluppo, specifiche, test plan).
+**Audience:** project sponsor and team of AI agents tasked with producing the subsequent documents (design system, architecture document, development plan, specifications, test plan).
 
-**Novità della v0.2 (12 novembre 2026):** Android come prima piattaforma (N-02); cifratura end-to-end confermata dalla v1 con recupero tramite scambio di chiavi tra telefoni e chiave di recupero (S-01, S-06); app offline in sola lettura (N-03); aggiornamenti integrati dalla v1 (N-10, F-19); recupero e nuovo dispositivo (F-20); stack deciso (D-06). Le decisioni tecniche di dettaglio sono nel documento Considerazioni tecniche.
+**What's new in v0.2 (November 12, 2026):** Android as the first platform (N-02); end-to-end encryption confirmed from v1 with recovery via key exchange between phones and recovery key (S-01, S-06); read-only offline app (N-03); built-in updates from v1 (N-10, F-19); recovery and new device (F-20); tech stack decided (D-06). Detailed technical decisions are in the Technical Considerations document.
 
-**Come leggere lo stato delle affermazioni.** Ogni decisione è marcata così:
+**How to read statement statuses.** Every decision is marked as follows:
 
-- **\[Deciso\]**: confermato dal promotore.
-- **\[Ipotesi\]**: proposta ragionevole emersa dalla fase di discovery, non ancora confermata. Gli agenti la trattano come default di lavoro e segnalano se la ritengono problematica.
-- **\[Aperto\]**: questione irrisolta, elencata nel capitolo 14. Gli agenti non la risolvono da soli: la sollevano.
+- **\[Decided\]**: confirmed by the project sponsor.
+- **\[Assumption\]**: reasonable proposal emerged from the discovery phase, not yet confirmed. Agents treat it as a working default and flag if they consider it problematic.
+- **\[Open\]**: unresolved issue, listed in Chapter 14. Agents do not resolve it on their own: they raise it.
 
-Questo documento è autosufficiente: chi lo legge non ha bisogno di altro contesto.
+This document is self-contained: anyone reading it needs no other context.
 
 ---
 
-## 1. Visione in sintesi
+## 1. Vision at a Glance
 
-Costruiamo **una casa digitale privata per due persone**: un’app mobile in cui una coppia, anche a distanza, lascia piccoli segni della propria presenza nella giornata dell’altra. Non è un gestionale di coppia e non è una chat. Disegni, umori, countdown, ricordi e un piccolo pet condiviso non sono funzioni separate: lasciano tracce visibili nello stesso spazio, la “nostra casa”, che cresce con la relazione.
+We are building **a private digital home for two people**: a mobile app where a couple, even long-distance, leaves small signs of their presence in each other's day. It is not a couple's task manager and it is not a chat app. Drawings, moods, countdowns, memories, and a small shared pet are not separate features: they leave visible traces in the same space, "our home," which grows with the relationship.
 
-> Una casa privata e affettuosa per due persone: mobile-first, senza pubblicità, senza streak, senza monete, con un pet che ricorda la vostra storia.
+> A private, affectionate home for two people: mobile-first, no ads, no streaks, no coins, with a pet that remembers your story.
 
-**\[Deciso\]** Il prodotto nasce innanzitutto come app che il promotore userà con la propria partner. L’apertura del codice (open source) è una scelta di valori e di sostenibilità, ma non è l’argomento principale del progetto: il valore primario è l’esperienza.
+**\[Decided\]** The product is born first and foremost as an app that the sponsor will use with his partner. Opening the source code (open source) is a choice of values and sustainability, but it is not the main pitch of the project: the primary value is the experience.
 
-## 2. Obiettivi e non-obiettivi
+## 2. Goals and Non-Goals
 
-### Obiettivi
+### Goals
 
-1. Offrire un’esperienza di vicinanza quotidiana, ricca e piacevole, che due persone vogliano usare spontaneamente.
-2. Garantire che l’intera esperienza sia gratuita da self-hostare, senza pubblicità, tracciamento pubblicitario o funzioni affettive a pagamento.
-3. Rendere l’app godibile per entrambi i partner, anche quando solo uno dei due è tecnico.
-4. Trattare privacy e sicurezza come requisiti verificabili, non come tono rassicurante.
-5. Seguire un processo di sviluppo software completo (brief, design, architettura, piano, implementazione, test, rilascio).
+1. Offer a rich, pleasant experience of everyday closeness that two people want to use spontaneously.
+2. Ensure that the entire experience is free to self-host, with no ads, ad tracking, or paid affection features.
+3. Make the app enjoyable for both partners, even when only one of them is technical.
+4. Treat privacy and security as verifiable requirements, not reassuring marketing copy.
+5. Follow a complete software development process (brief, design, architecture, plan, implementation, testing, release).
 
-### Non-obiettivi (per ora)
+### Non-Goals (for now)
 
-- Chat libera, chiamate audio o video come funzioni centrali.
-- Gestione spese, calendari condivisi complessi, sincronizzazione con calendari esterni.
-- Dating, matching tra sconosciuti, funzioni social tra più coppie.
-- Gamification, valute virtuali, livelli, missioni, classifiche.
-- Hosting gratuito illimitato offerto dal progetto.
+- Free-form chat, audio or video calls as core features.
+- Expense management, complex shared calendars, synchronization with external calendars.
+- Dating, matching between strangers, social features across multiple couples.
+- Gamification, virtual currencies, levels, quests, leaderboards.
+- Unlimited free hosting provided by the project.
 
-## 3. Contesto e problema
+## 3. Context and Problem
 
-Le app per coppie esistenti seguono quasi tutte uno di questi schemi: pubblicità invasive, funzioni affettive dietro abbonamento, meccaniche di engagement (streak, monete, ricompense) che trasformano l’affetto in un dovere misurabile. Esistono alternative open source, ma nessuna soddisfa insieme le esigenze del promotore.
+Existing couple apps almost all follow one of these patterns: intrusive ads, affection features behind a subscription, engagement mechanics (streaks, coins, rewards) that turn affection into a measurable chore. Open source alternatives exist, but none satisfy all of the sponsor's needs together.
 
-La discovery ha esaminato tre progetti rilevanti. Sono riferimenti, non obiettivi da replicare:
+Discovery examined three relevant projects. They are references, not targets to replicate:
 
-| Progetto | Cosa fa bene | Perché non basta |
+| Project | What it does well | Why it falls short |
 | :-- | :-- | :-- |
-| **Kehai** (MIT) | Concetto più vicino: pet condiviso che non muore, corkboard, doodle, umore, countdown, domande | Grafica non apprezzata; impostazione desktop-first; si dichiara progetto personale, senza roadmap né supporto |
-| **Togetherly** (GPL-3.0) | Ampia base funzionale: time capsule, mood, widget, disegno condiviso, mascotte | Coin, ricompense, streak e pubblicità: esattamente l’engagement loop da evitare |
-| **OnePair** (licenza non verificata) | Esperienza senza account, drawing, lettere, capsule | Focus su chat, chiamate e sincronizzazione peer-to-peer; consegna asincrona limitata; poche feature di interesse |
+| **Kehai** (MIT) | Closest concept: shared pet that doesn't die, corkboard, doodle, mood, countdown, questions | Visuals not liked; desktop-first approach; declared a personal project, with no roadmap or support |
+| **Togetherly** (GPL-3.0) | Broad feature base: time capsule, mood, widget, shared drawing, mascot | Coins, rewards, streaks, and ads: the exact engagement loop to avoid |
+| **OnePair** (license unverified) | Accountless experience, drawing, letters, capsules | Focus on chat, calls, and peer-to-peer sync; limited asynchronous delivery; few features of interest |
 
-**Conclusione.** Il gap non sono le feature, già esistenti, ma la **qualità dell’esperienza**: una casa mobile-first, calda e curata, aperta e senza economia dell’attenzione, che funzioni su Android e iPhone e sia semplice per il partner non tecnico.
+**Conclusion.** The gap is not the features, which already exist, but the **quality of the experience**: a mobile-first, warm, and well-crafted home, open and free from the attention economy, that works on Android and iPhone and is simple for the non-technical partner.
 
-## 4. Utenti
+## 4. Users
 
-**Utenti primari:** coppie (anche a distanza) composte da due persone. L’app è sempre usata da esattamente due persone abbinate.
+**Primary users:** couples (including long-distance) composed of two people. The app is always used by exactly two paired people.
 
-**Persona A, “il configuratore”.** Ha competenze tecniche, è disposto a installare e mantenere un server o a scegliere un hosting. Decide dove vivono i dati.
+**Persona A, "the configurator."** Has technical skills, is willing to install and maintain a server or choose a hosting provider. Decides where the data lives.
 
-**Persona B, “il partner”.** Non vuole sapere cosa sia un server. Installa l’app, accetta un invito e deve trovarla bella, semplice e affidabile fin dal primo minuto.
+**Persona B, "the partner."** Does not want to know what a server is. Installs the app, accepts an invite, and must find it beautiful, simple, and reliable from the very first minute.
 
-**Vincolo di design:** la riuscita del prodotto si misura sulla Persona B. Se solo il configuratore è felice, il prodotto ha fallito.
+**Design constraint:** the success of the product is measured on Persona B. If only the configurator is happy, the product has failed.
 
-**\[Ipotesi\]** Utenti secondari futuri: coppie non tecniche che pagano per un hosting gestito; persone che desiderano contribuire al codice.
+**\[Assumption\]** Future secondary users: non-technical couples paying for managed hosting; people wishing to contribute to the code.
 
-## 5. Principi di prodotto
+## 5. Product Principles
 
-Sono i criteri con cui accettare o rifiutare ogni funzione e ogni scelta di design. Gli agenti li citano per ID.
+These are the criteria by which every feature and design choice is accepted or rejected. Agents cite them by ID.
 
-- **P-01. Piccoli gesti, non grandi impegni.** Ogni interazione chiave deve potersi completare in pochi secondi.
-- **P-02. Affetto senza obbligo.** Nessuna funzione trasforma l’affetto in qualcosa di misurabile o dovuto. Vietati: streak, punteggi di compatibilità, conteggi su chi invia di più, solleciti automatici (“il tuo partner aspetta da due giorni”), richieste insistenti di spiegare un umore. Non aprire l’app per giorni deve essere normale.
-- **P-03. Engagement volontario e non punitivo.** Le notifiche esistono per un gesto reale dell’altra persona, mai per riportare l’utente nell’app. Il pet non muore e non si degrada. Gli oggetti della casa si sbloccano come conseguenza naturale delle attività, non come valuta.
-- **P-04. Casa-first, non feature-first.** Le funzioni non sono sezioni di un menu: ogni attività lascia un artefatto visibile nella casa.
-- **P-05. Mobile-first.** L’esperienza primaria è sullo smartphone. Android e iOS sono entrambi cittadini di prima classe.
-- **P-06. Sicurezza come promessa precisa.** “Open source”, “self-hosted” e “privato” non sono sinonimi: sono tre impegni distinti (codice ispezionabile, scelta di chi ospita i dati, protezione del contenuto) e vanno descritti e verificati separatamente.
-- **P-07. Nessun controllo implicito.** Presenza online, conferme di lettura e posizione non sono presenti o, se introdotti in futuro, sono facoltativi e disattivati di default.
-- **P-08. Asincrono per natura.** Un gesto deve arrivare anche se l’altra persona è offline.
-- **P-09. Semplicità per chi non è tecnico.** Il self-hosting è una scelta di chi configura, non una complicazione quotidiana per chi usa.
-- **P-10. Tutto è gratuito se lo ospiti tu.** Nessuna funzione affettiva è bloccata a pagamento.
+- **P-01. Small gestures, not big commitments.** Every key interaction must be completable in a few seconds.
+- **P-02. Affection without obligation.** No feature turns affection into something measurable or owed. Forbidden: streaks, compatibility scores, counts of who sends more, automatic nudges ("your partner has been waiting for two days"), insistent prompts to explain a mood. Not opening the app for days must feel normal.
+- **P-03. Voluntary, non-punitive engagement.** Notifications exist for a real gesture from the other person, never to pull the user back into the app. The pet does not die and does not degrade. House items unlock as a natural consequence of activities, never as currency.
+- **P-04. Home-first, not feature-first.** Features are not menu sections: every activity leaves a visible artifact in the home.
+- **P-05. Mobile-first.** The primary experience is on the smartphone. Android and iOS are both first-class citizens.
+- **P-06. Security as a precise promise.** "Open source," "self-hosted," and "private" are not synonyms: they are three distinct commitments (inspectable code, choice of who hosts the data, content protection) and must be described and verified separately.
+- **P-07. No implicit surveillance.** Online presence, read receipts, and location are not present or, if introduced in the future, are optional and disabled by default.
+- **P-08. Asynchronous by nature.** A gesture must arrive even if the other person is offline.
+- **P-09. Simplicity for non-technical users.** Self-hosting is a choice for the configurator, not a daily complication for the user.
+- **P-10. Everything is free if you host it yourself.** No affection feature is paywalled.
 
-## 6. Concetto di prodotto: la casa
+## 6. Product Concept: The Home
 
-La metafora centrale è **“la nostra casa”**: una piccola stanza condivisa che cresce con la relazione. Gli artefatti prodotti dalle attività vi compaiono:
+The central metaphor is **"our home"**: a small shared room that grows with the relationship. Artifacts produced by activities appear in it:
 
-- un disegno finito diventa un quadro sulla corkboard;
-- una foto del giorno entra nell’album o nella timeline;
-- una lettera sigillata diventa un oggetto nella casa fino alla data di apertura;
-- una risposta a una domanda può diventare una pagina di diario o un ricordo;
-- un countdown può diventare un calendario sulla parete;
-- il pet reagisce a ciò che avete fatto (un cuscino nuovo dopo una time capsule aperta, una foto appesa dopo una foto del giorno, un disegno sul muro dopo un disegno condiviso).
+- a finished drawing becomes a framed picture on the corkboard;
+- a photo of the day enters the album or timeline;
+- a sealed letter becomes an object in the home until its opening date;
+- an answer to a question can become a journal page or a memory;
+- a countdown can become a calendar on the wall;
+- the pet reacts to what you have done (a new cushion after an opened time capsule, a hung photo after a photo of the day, a drawing on the wall after a shared drawing).
 
-La casa non è una valuta, non è un dovere e non misura l’amore.
+The home is not a currency, it is not a chore, and it does not measure love.
 
-**Schermata principale (esempio di intento).** La home deve raccontare in un colpo d’occhio, ad esempio: “Ci vediamo tra 12 giorni. Oggi mi sento un po’ scarico, ma ho voglia di sentirti. Ti ho lasciato un disegno.”
+**Main screen (example of intent).** The home screen should convey at a glance, for example: "We see each other in 12 days. Today I'm feeling a bit drained, but I'd love to hear from you. I left you a drawing."
 
-## 7. Funzionalità
+## 7. Features
 
-### 7.1 Livelli
+### 7.1 Tiers
 
-| Livello | Funzioni | Ruolo |
+| Tier | Features | Role |
 | :-- | :-- | :-- |
-| **Cuore quotidiano** | Thinking of you, mood, disegno a turni, countdown, foto del giorno, domande | Piccoli momenti ricorrenti |
-| **Memoria della coppia** | Timeline, time capsule, corkboard, giorni insieme, widget | Archivio affettivo |
-| **Mondo condiviso** | Pet, casa virtuale, decorazioni, oggetti sbloccati | Continuità e motivo per tornare |
+| **Daily core** | Thinking of you, mood, turn-based drawing, countdown, photo of the day, questions | Small recurring moments |
+| **Couple's memory** | Timeline, time capsule, corkboard, days together, widget | Affectionate archive |
+| **Shared world** | Pet, virtual home, decorations, unlocked items | Continuity and reason to return |
 
-### 7.2 Catalogo delle funzioni
+### 7.2 Feature Catalog
 
-Gli ID sono stabili e vanno usati nei documenti successivi.
+IDs are stable and must be used in subsequent documents.
 
-| ID | Funzione | Descrizione |
+| ID | Feature | Description |
 | :-- | :-- | :-- |
-| **F-01** | Abbinamento | Invito tramite link o QR, senza account pubblici. Procedura comprensibile per entrambi. Possibilità per ciascuno di interrompere l’abbinamento unilateralmente. |
-| **F-02** | Home della casa | Vista d’insieme: countdown attivo, umore recente, ultimo disegno, prossima apertura di time capsule. |
-| **F-03** | Thinking of you | Un tocco, con breve frase facoltativa e notifica discreta. |
-| **F-04** | Mood del giorno | Emoji o piccolo stato, nota facoltativa (anche “oggi avrei bisogno di…”), storico condiviso. Sempre facoltativo. |
-| **F-05** | Disegno a turni | Uno disegna e invia; l’altro può disegnarci sopra; entrambi possono aggiungere messaggi. Asincrono, nessun canvas in tempo reale. Pensato anche per chi non sa disegnare. |
-| **F-06** | Countdown | Data, titolo, descrizione, todo list, immagini e commenti. Prossimo incontro, anniversario o evento a scelta. |
-| **F-07** | Time capsule | Foto o lettera sigillata fino a una data scelta, che si apre il giorno stabilito. |
-| **F-08** | Corkboard | Bacheca libera dove appendere immagini e disegni. |
-| **F-09** | Pet e stanza | Pet condiviso che reagisce alle attività recenti, non muore, conserva una piccola storia di ciò che avete fatto. La casa raccoglie gli artefatti. |
-| **F-10** | Foto del giorno | Una foto quotidiana facoltativa che entra nell’album o nella timeline. |
-| **F-11** | Timeline / memories | Cronologia di ciò che è successo, con immagini. |
-| **F-12** | Giorni insieme | Contatore dei giorni passati insieme. Mai usato come misura di impegno. |
-| **F-13** | Widget | Widget home screen per Android e iOS (es. foto condivisa, giorni insieme, countdown, mood). |
-| **F-14** | Gioco del giorno | Unico modulo che raccoglie domanda del giorno, this or that, would you rather, truth or dare e tic tac toe, per evitare un “pacco di mini-giochi”. |
-| **F-15** | Messaggi brevi contestuali | Frasi, reazioni e note facoltative allegate a disegni, foto, countdown, domande. Nessuna chat libera. |
-| **F-16** | Notifiche | Discrete, con contenuto generico di default sulla schermata bloccata. Solo per gesti reali dell’altra persona. |
-| **F-17** | Esportazione, cancellazione e riattivazione | Esportazione completa dei dati; regole esplicite per cancellazione definitiva e destino dei contenuti condivisi; `[Ipotesi]` eventuale **riattivazione consensuale della coppia** dopo interruzione unilaterale (S-03), solo con conferma esplicita di entrambi i partner prima della cancellazione definitiva (S-04). |
-| F-18 | Personalizzazione degli asset | La coppia sostituisce gli asset della casa (pet, personaggi dei partner, oggetti) con immagini proprie: l’app esporta l’asset attuale con scheda tecnica e prompt suggeriti, l’utente li porta al proprio assistente AI e ricarica il risultato. L’app non offre né integra alcun servizio AI. Ripristino sempre possibile. |
-| F-19 | Aggiornamenti dell’app | Controllo e installazione degli aggiornamenti dell’APK dalle release GitHub e download di pacchetti di contenuti dal server, sempre con conferma dell’utente. Il server può imporre una versione minima del client. |
-| F-20 | Recupero e nuovo dispositivo | Chiave di recupero generata all’abbinamento, con conferma di avvenuto salvataggio; reinstallazione su un nuovo telefono tramite re-invio delle chiavi dall’altro dispositivo o tramite la chiave di recupero (S-06). |
+| **F-01** | Pairing | Invite via link or QR, without public accounts. Procedure understandable by both. Ability for either person to break the pairing unilaterally. |
+| **F-02** | Home screen | Overview: active countdown, recent mood, latest drawing, next time capsule opening. |
+| **F-03** | Thinking of you | One tap, with optional short phrase and discreet notification. |
+| **F-04** | Mood of the day | Emoji or small status, optional note (including "today I could use..."), shared history. Always optional. |
+| **F-05** | Turn-based drawing | One draws and sends; the other can draw on top of it; both can add messages. Asynchronous, no real-time canvas. Designed also for people who can't draw. |
+| **F-06** | Countdown | Date, title, description, todo list, images, and comments. Next meetup, anniversary, or custom event. |
+| **F-07** | Time capsule | Photo or letter sealed until a chosen date, which opens on the set day. |
+| **F-08** | Corkboard | Free-form board to pin images and drawings. |
+| **F-09** | Pet and room | Shared pet that reacts to recent activities, doesn't die, keeps a small history of what you've done. The home collects the artifacts. |
+| **F-10** | Photo of the day | An optional daily photo that enters the album or timeline. |
+| **F-11** | Timeline / memories | Chronology of what happened, with images. |
+| **F-12** | Days together | Counter of days spent together. Never used as a measure of commitment. |
+| **F-13** | Widget | Home screen widget for Android and iOS (e.g., shared photo, days together, countdown, mood). |
+| **F-14** | Game of the day | Single module bringing together question of the day, this or that, would you rather, truth or dare, and tic-tac-toe, to avoid a "bundle of mini-games." |
+| **F-15** | Contextual short messages | Phrases, reactions, and optional notes attached to drawings, photos, countdowns, questions. No free-form chat. |
+| **F-16** | Notifications | Discreet, with generic content by default on the lock screen. Only for real gestures from the other person. |
+| **F-17** | Export, deletion, and reactivation | Full data export; explicit rules for permanent deletion and fate of shared content; `[Assumption]` optional **consensual couple reactivation** after unilateral breakup (S-03), only with explicit confirmation from both partners before permanent deletion (S-04). |
+| F-18 | Asset customization | The couple replaces home assets (pet, partner characters, items) with their own images: the app exports the current asset with a spec sheet and suggested prompts, the user takes them to their own AI assistant and re-uploads the result. The app neither offers nor integrates any AI service. Restoration always possible. |
+| F-19 | App updates | Check and install APK updates from GitHub releases and download content packs from the server, always with user confirmation. The server can enforce a minimum client version. |
+| F-20 | Recovery and new device | Recovery key generated at pairing, with confirmation that it was saved; reinstallation on a new phone via key re-sending from the other device or via the recovery key (S-06). |
 
-### 7.3 Escluso o rimandato
+### 7.3 Excluded or Deferred
 
-- **Escluse:** chat libera come funzione centrale, chiamate audio/video, streak, coin, livelli, missioni, ricompense, pubblicità, punteggi di compatibilità.
-- **Rimandate a valutazione futura:** gestione spese, calendari condivisi, presenza online, posizione, musica in ascolto, dati da wearable, fusi orari. Se introdotte, devono rispettare P-02 e P-07.
+- **Excluded:** free-form chat as a core feature, audio/video calls, streaks, coins, levels, quests, rewards, ads, compatibility scores.
+- **Deferred for future evaluation:** expense management, shared calendars, online presence, location, music listening, wearable data, time zones. If introduced, they must comply with P-02 and P-07.
 
-## 8. Fasi e perimetro del rilascio
+## 8. Release Phases and Scope
 
-**\[Ipotesi\]** Sequenza proposta, da confermare (vedi D-03 nel capitolo 14):
+**\[Assumption\]** Proposed sequence, to be confirmed (see D-03 in Chapter 14):
 
-| Fase | Contenuto | Scopo |
+| Phase | Content | Purpose |
 | :-- | :-- | :-- |
-| **0. Discovery e design** | Moodboard, struttura della casa, prototipi cliccabili di home, disegno a turni, mood, countdown, time capsule | Definire sensazione e identità visiva prima del codice |
-| **1. Nucleo (dogfooding)** | F-01, F-02, F-03, F-04, F-05, F-06, F-07, F-16, F-19, F-20 | Uso reale in due per 2-3 settimane, senza pet né corkboard |
-| **2. Memoria** | F-08, F-10, F-11, F-12, F-13, F-15, F-17 | Aggiungere ciò che entrambi sentono mancare |
-| **3. Mondo** | F-09, F-18 e decorazioni | Dare continuità e identità alla casa |
-| **4. Gioco del giorno** | F-14 | Contenuti ricorrenti in un unico modulo |
-| **5. Apertura** | Decisione su licenza, pubblicazione del codice, modello di hosting | Rilascio pubblico |
+| **0. Discovery and design** | Moodboard, home structure, clickable prototypes of home, turn-based drawing, mood, countdown, time capsule | Define feel and visual identity before code |
+| **1. Core (dogfooding)** | F-01, F-02, F-03, F-04, F-05, F-06, F-07, F-16, F-19, F-20 | Real-world use by two people for 2–3 weeks, without pet or corkboard |
+| **2. Memory** | F-08, F-10, F-11, F-12, F-13, F-15, F-17 | Add what both feel is missing |
+| **3. World** | F-09, F-18, and decorations | Give continuity and identity to the home |
+| **4. Game of the day** | F-14 | Recurring content in a single module |
+| **5. Opening** | License decision, code publication, hosting model | Public release |
 
-Le funzioni vengono aggiunte solo se entrambi i partner ne sentono la mancanza durante l’uso reale.
+Features are added only if both partners feel they are missing during real-world use.
 
-## 9. Sicurezza e privacy
+## 9. Security and Privacy
 
-Requisiti espressi come impegni verificabili. Il documento architetturale deve dire come ciascuno sarà soddisfatto e verificato.
+Requirements expressed as verifiable commitments. The architecture document must state how each will be satisfied and verified.
 
-- **S-01 \[Deciso\]** Il gestore del server non può leggere i contenuti intimi: cifratura end-to-end dalla prima versione. Lo stato derivato (ad esempio le reazioni del pet) è calcolato da un dispositivo, cifrato e caricato sul server per la sincronizzazione. Se per qualche contenuto fosse impossibile, va dichiarato esplicitamente.
-- **S-02 \[Ipotesi\]** Le notifiche mostrano contenuto generico di default, senza esporre umori o messaggi sulla schermata bloccata.
-- **S-03 \[Ipotesi\]** Ogni persona può interrompere l’abbinamento senza il consenso dell’altra; l’interruzione blocca immediatamente tutti i dispositivi e impedisce a un solo partner di riaprire la coppia unilateralmente (anche usando la chiave di recupero condivisa S-06).
-- **S-04 \[Ipotesi\]** Esportazione, cancellazione definitiva, destino dei contenuti condivisi e eventuale finestra di conservazione cifrata per la **riattivazione consensuale della coppia** hanno regole esplicite e documentate; l’eventuale riattivazione di una coppia interrotta richiede il consenso esplicito e verificato di entrambi i partner (mai unilaterale) prima della cancellazione definitiva (F-17, D-15).
-- **S-05 \[Ipotesi\]** Nessuna presenza online, conferma di lettura o posizione attive di default (P-07).
-- **S-06 \[Deciso\]** I dati devono essere sempre recuperabili in caso di perdita di un telefono: l’altro telefono può re-inviare le chiavi al nuovo dispositivo e, in più, all’abbinamento viene generata una **chiave di recupero** che l’utente deve confermare di aver salvato. Il recupero è garantito finché esiste l’altro telefono o la chiave salvata, e l’utente lo deve sapere in modo chiaro.
-- **S-07 \[Deciso\]** Nessuna telemetria pubblicitaria e nessun tracciamento a fini di advertising.
+- **S-01 \[Decided\]** The server operator cannot read intimate content: end-to-end encryption from the first version. Derived state (for example, pet reactions) is computed by one device, encrypted, and uploaded to the server for synchronization. If this were impossible for any content, it must be declared explicitly.
+- **S-02 \[Assumption\]** Notifications show generic content by default, without exposing moods or messages on the lock screen.
+- **S-03 \[Assumption\]** Either person can break the pairing without the other's consent; breaking the pairing immediately locks all devices and prevents a single partner from unilaterally reopening the couple (even using the shared recovery key S-06).
+- **S-04 \[Assumption\]** Export, permanent deletion, fate of shared content, and any encrypted retention window for **consensual couple reactivation** have explicit, documented rules; any reactivation of a broken couple requires explicit, verified consent from both partners (never unilateral) before permanent deletion (F-17, D-15).
+- **S-05 \[Assumption\]** No online presence, read receipts, or location enabled by default (P-07).
+- **S-06 \[Decided\]** Data must always be recoverable if a phone is lost: the other phone can re-send keys to the new device and, in addition, at pairing a **recovery key** is generated which the user must confirm having saved. Recovery is guaranteed as long as the other phone or the saved key exists, and the user must know this clearly.
+- **S-07 \[Decided\]** No advertising telemetry and no tracking for advertising purposes.
 
-## 10. Requisiti non funzionali (direzioni)
+## 10. Non-Functional Requirements (Directions)
 
-Sono direzioni da trasformare in requisiti misurabili nel documento architetturale.
+These are directions to be turned into measurable requirements in the architecture document.
 
-- **N-01 Consegna asincrona affidabile:** un gesto inviato arriva anche con il destinatario offline, nel rispetto di S-01.
-- **N-02 Compatibilità:** Android per primo **\[Deciso\]**; iOS in una fase successiva, con le implicazioni su account sviluppatore a pagamento e relay per il push da riaffrontare allora. Su Android l’app è distribuita come APK (N-10).
-- **N-03 Tolleranza alla rete:** uso accettabile con connessione intermittente e reti diverse. Senza connessione l’app è in **sola lettura** **\[Deciso\]**: scena e ricordi consultabili, azioni di scrittura disattivate con un messaggio gentile (P-02), nessuna coda di sincronizzazione.
-- **N-04 Self-hosting semplice:** installazione e aggiornamento del server documentati e riproducibili, con manutenzione minima.
-- **N-05 Portabilità dei dati:** formati esportati aperti e documentati, nessuna dipendenza obbligatoria da un servizio del progetto.
-- **N-06 Indipendenza da terze parti:** nessuna API esterna obbligatoria; eventuali servizi opzionali (es. notifiche push) sono sostituibili e documentati.
-- **N-07 Accessibilità e localizzazione:** italiano e inglese come lingue iniziali **\[Ipotesi\]**; accessibilità di base (contrasto, dimensioni testo, screen reader) nel design system.
-- **N-08 Prestazioni percepite:** apertura dell’app e invio di un gesto devono sembrare immediati.
-- **N-09 Asset visivi generati con l’AI e sostituibili:** gli asset sono immagini PNG/JPG prodotte con strumenti AI; la coppia può sostituirli con immagini proprie tramite un flusso di esportazione e ricaricamento, senza che l’app integri alcun servizio AI (N-06). Il sistema deve validare formato, dimensioni e trasparenza delle immagini caricate.
-- **N-10 Aggiornamenti integrati dalla prima versione** **\[Deciso\]**: l’app include due meccanismi. (1) Pacchetti di contenuti (asset, manifest della scena, testi) scaricati dal server e verificati, senza installazione. (2) Aggiornamento dell’APK scaricato dalle release GitHub del progetto, con sorgente configurabile, e installato tramite il permesso “Installa app sconosciute” con la conferma di sistema. Il server può imporre una versione minima del client e del protocollo.
+- **N-01 Reliable asynchronous delivery:** a sent gesture arrives even when the recipient is offline, in compliance with S-01.
+- **N-02 Compatibility:** Android first **\[Decided\]**; iOS in a later phase, with the implications regarding paid developer accounts and push relays to be revisited then. On Android the app is distributed as an APK (N-10).
+- **N-03 Network tolerance:** acceptable use with intermittent connectivity and varying networks. When offline, the app is **read-only** **\[Decided\]**: scene and memories viewable, write actions disabled with a gentle message (P-02), no sync queue.
+- **N-04 Simple self-hosting:** server installation and updates documented and reproducible, with minimal maintenance.
+- **N-05 Data portability:** open, documented export formats, no mandatory dependency on a project-run service.
+- **N-06 Third-party independence:** no mandatory external APIs; any optional services (e.g., push notifications) are replaceable and documented.
+- **N-07 Accessibility and localization:** Italian and English as initial languages **\[Assumption\]**; baseline accessibility (contrast, text sizing, screen reader) in the design system.
+- **N-08 Perceived performance:** opening the app and sending a gesture must feel immediate.
+- **N-09 AI-generated and replaceable visual assets:** assets are PNG/JPG images produced with AI tools; the couple can replace them with their own images through an export and re-upload flow, without the app integrating any AI service (N-06). The system must validate format, dimensions, and transparency of uploaded images.
+- **N-10 Built-in updates from the first version** **\[Decided\]**: the app includes two mechanisms. (1) Content packs (assets, scene manifest, texts) downloaded from the server and verified, without installation. (2) APK update downloaded from the project's GitHub releases, with a configurable source, and installed via the "Install unknown apps" permission with system confirmation. The server can enforce a minimum client and protocol version.
 
-## 11. Direzione di esperienza e visiva
+## 11. Experience and Visual Direction
 
-- **\[Deciso\]** Mobile-first, calda, non infantile. La grafica è un elemento centrale del prodotto, non una rifinitura.
-- Punto di partenza negativo, per contrasto: la grafica di Kehai è stata giudicata poco attraente, e la meccanica a ricompense di Togetherly è stressante.
-- Il pet e la casa devono comunicare tenerezza senza risultare infantili né da gioco a punti.
-- Il tono dei testi è affettuoso e mai pressante: “puoi lasciare qualcosa”, mai “devi dimostrare qualcosa”.
-- Il design system dovrà derivare da un moodboard approvato dal promotore (D-04).
+- **\[Decided\]** Mobile-first, warm, not childish. Graphics are a core element of the product, not a finishing touch.
+- Negative starting point, by contrast: Kehai's visuals were judged unappealing, and Togetherly's reward mechanics are stressful.
+- The pet and the home must convey tenderness without looking childish or like a points-based game.
+- Copy tone is affectionate and never pressuring: "you can leave something," never "you must prove something."
+- The design system must derive from a moodboard approved by the sponsor (D-04).
 
-## 12. Modello open source e sostenibilità
+## 12. Open Source Model and Sustainability
 
-**\[Ipotesi\]** Si separa il software dal servizio:
+**\[Assumption\]** Software is separated from service:
 
-| Componente | Proposta |
+| Component | Proposal |
 | :-- | :-- |
-| Applicazione e backend | Open source, senza blocchi funzionali |
-| Self-hosting | Stesse funzioni del servizio gestito |
-| Hosting gestito | Eventuale servizio a pagamento per chi non vuole amministrare nulla |
-| Supporto e manutenzione | Possibili servizi aggiuntivi |
-| Finanziamento comunitario | Donazioni e sponsorizzazioni, senza influenza sui dati |
+| Application and backend | Open source, with no feature locks |
+| Self-hosting | Same features as the managed service |
+| Managed hosting | Optional paid service for those who don't want to administer anything |
+| Support and maintenance | Possible additional services |
+| Community funding | Donations and sponsorships, with no influence on data |
 
-Si paga, eventualmente, per la comodità dell’infrastruttura, mai per poter inviare un gesto d’affetto. Non si promette hosting gratuito illimitato prima di aver stimato costi e modalità d’uso. **\[Deciso\]** La decisione se e quando aprire il codice, e con quale licenza, viene presa dopo il dogfooding (D-05).
+People pay, if at all, for infrastructure convenience, never to send a gesture of affection. Unlimited free hosting is not promised before estimating costs and usage patterns. **\[Decided\]** The decision on whether and when to open the source code, and under what license, is made after dogfooding (D-05).
 
-## 13. Validazione e metriche di successo
+## 13. Validation and Success Metrics
 
-**Domanda guida (metrica nord):** *“Quando avete pensato l’uno all’altra, avete aperto questa app invece di non fare nulla?”*
+**Guiding question (North Star metric):** *"When you thought of each other, did you open this app instead of doing nothing?"*
 
-Il successo non si misura in download. Segnali da osservare durante il dogfooding, raccolti con il consenso dei due partner e nel rispetto di P-02:
+Success is not measured in downloads. Signals to observe during dogfooding, collected with both partners' consent and in compliance with P-02:
 
-- entrambi i partner aprono l’app spontaneamente, non solo il configuratore;
-- l’app viene scelta per un gesto reale (un “ti penso”, un disegno) invece di un messaggio altrove;
-- i partner segnalano spontaneamente cosa manca;
-- nessun partner prova senso di dovere o di colpa per non aver usato l’app.
+- both partners open the app spontaneously, not just the configurator;
+- the app is chosen for a real gesture (a "thinking of you," a drawing) instead of a message elsewhere;
+- partners spontaneously report what is missing;
+- neither partner feels a sense of duty or guilt for not having used the app.
 
-Le metriche non devono mai diventare funzioni visibili agli utenti (nessun contatore di attenzioni).
+Metrics must never become user-facing features (no attention counters).
 
-## 14. Decisioni aperte
+## 14. Open Decisions
 
-Gli agenti non le risolvono: le segnalano e propongono alternative con pro e contro.
+Agents do not resolve them: they flag them and propose alternatives with pros and cons.
 
-| ID | Questione | Note |
+| ID | Issue | Notes |
 | :-- | :-- | :-- |
-| **D-01** | Nome definitivo del prodotto | **\[Deciso\]** **Deep Sky**. |
-| **D-02** | Cifratura end-to-end: ambito e compromessi | Deciso: E2EE dalla v1 (S-01), stato calcolato da un dispositivo, recupero con scambio di chiavi tra telefoni e chiave di recupero (S-06). Dettagli nelle Considerazioni tecniche. |
-| **D-03** | Perimetro dell’MVP | La discovery ha prodotto sia un MVP di nove elementi (inclusi pet e corkboard) sia una sequenza che li rimanda dopo il dogfooding. Va scelto il confine. |
-| **D-04** | Direzione visiva | Serve un moodboard approvato (stile, palette, stile del pet). |
-| **D-05** | Licenza e momento di apertura del codice | Decisione dopo il dogfooding. |
-| **D-06** | Stack tecnologico e architettura | Deciso: Flutter per l’app; Java con Spring Boot e PostgreSQL per il backend; tutto in Docker Compose, con immagini per ARM e AMD. Il documento architetturale ne dettaglia l’uso. |
-| **D-07** | Piattaforme al lancio | Deciso: Android per primo, distribuito come APK dalle release GitHub, senza Play Store né App Store per ora. iOS rimandato. |
-| **D-08** | Notifiche push | **[Deciso]** FCM con credenziali Firebase fornite a runtime dal server del self-hoster, senza relay e senza `google-services.json` nell'APK. Validato con il prototipo SP-01 su hardware reale (app aperta, in background, chiusa dal task switcher, dopo riavvio, in Doze; ADR-0006). Il Force Stop da Impostazioni sospende la consegna fino alla riapertura dell'app. UnifiedPush resta opzione futura (Piano B, non attivato). |
-| **D-09** | Verifica indipendente delle alternative | Una prova pratica di Kehai e OnePair con due dispositivi reali non è stata ancora svolta. Il promotore ha già valutato i progetti; decidere se serve altro. |
-| **D-10** | Modello di hosting gestito | Se e quando offrirlo, a quale costo e con quali garanzie. |
-| D-11 | Strumento di generazione e licenza degli asset AI | I termini d’uso dello strumento devono consentire la redistribuzione degli asset in un progetto open source. La licenza degli asset può differire da quella del codice. |
-| D-12 | Granularità e visibilità della personalizzazione (F-18) | Sostituire interi set di pose o aggiungere accessori sovrapposti? Le personalizzazioni sono visibili a entrambi i partner o solo a chi le crea? Come trattarle rispetto a S-01 (contenuti privati). |
-| D-13 | Esposizione di rete del server | HTTPS pubblico dietro reverse proxy oppure rete privata (es. Tailscale). Impatta la semplicità per il partner non tecnico (P-09) e la sicurezza. |
-| D-14 | Verifica sviluppatore Android per l’APK ufficiale | L’account a distribuzione limitata copre fino a 20 dispositivi. Un APK ufficiale pubblico richiederà la verifica completa quando il requisito si estenderà all’Italia (previsto dal 2027). Nome del pacchetto e chiave di firma devono restare stabili. |
-| **D-15** | Scioglimento coppia, finestra di grazia e riattivazione consensuale (`F-17`, `S-03`, `S-04`, `S-06`) | **\[Aperto\]** Dopo l’interruzione unilaterale (`S-03`), oggi il server esegue una chiusura logica (`unpaired_at`) bloccando auth, inviti e recovery unilaterale (`S-06`). Per `M5 Memoria` va deciso: (a) se prevedere una finestra di conservazione temporanea dei dati cifrati (es. grace period) prima della cancellazione definitiva o se la cancellazione definitiva debba essere immediata/su richiesta esplicita; (b) quale meccanismo crittografico e UX garantisca la **riattivazione consensuale bilaterale** (es. challenge approvata da entrambi i partner, impedendo a chi possiede da solo la Recovery Key condivisa di riaprire la coppia); (c) cosa accade se un solo partner chiede l’esportazione o l’eliminazione definitiva durante la chiusura. |
+| **D-01** | Final product name | **\[Decided\]** **Deep Sky**. |
+| **D-02** | End-to-end encryption: scope and trade-offs | Decided: E2EE from v1 (S-01), state computed by a device, recovery with key exchange between phones and recovery key (S-06). Details in Technical Considerations. |
+| **D-03** | MVP scope | Discovery produced both a nine-element MVP (including pet and corkboard) and a sequence that defers them until after dogfooding. The boundary must be chosen. |
+| **D-04** | Visual direction | Needs an approved moodboard (style, palette, pet style). |
+| **D-05** | License and timing of opening the code | Decision after dogfooding. |
+| **D-06** | Tech stack and architecture | Decided: Flutter for the app; Java with Spring Boot and PostgreSQL for the backend; all in Docker Compose, with ARM and AMD images. The architecture document details its use. |
+| **D-07** | Launch platforms | Decided: Android first, distributed as APK from GitHub releases, without Play Store or App Store for now. iOS deferred. |
+| **D-08** | Push notifications | **[Decided]** FCM with Firebase credentials provided at runtime by the self-hoster's server, without relay and without `google-services.json` in the APK. Validated with prototype SP-01 on real hardware (app open, in background, swiped away from task switcher, after reboot, in Doze; ADR-0006). Force Stop from Settings suspends delivery until the app is reopened. UnifiedPush remains a future option (Plan B, not activated). |
+| **D-09** | Independent verification of alternatives | A hands-on test of Kehai and OnePair with two real devices has not yet been carried out. The sponsor has already evaluated the projects; decide whether more is needed. |
+| **D-10** | Managed hosting model | Whether and when to offer it, at what cost, and with what guarantees. |
+| D-11 | AI asset generation tool and license | The tool's terms of use must allow redistribution of assets in an open source project. The asset license may differ from the code license. |
+| D-12 | Granularity and visibility of customization (F-18) | Replace entire pose sets or add overlaid accessories? Are customizations visible to both partners or only to the creator? How to treat them with respect to S-01 (private content). |
+| D-13 | Server network exposure | Public HTTPS behind a reverse proxy or private network (e.g., Tailscale). Impacts simplicity for the non-technical partner (P-09) and security. |
+| D-14 | Android developer verification for official APK | The limited-distribution account covers up to 20 devices. An official public APK will require full verification when the requirement extends to Italy (expected from 2027). Package name and signing key must remain stable. |
+| **D-15** | Couple dissolution, grace period, and consensual reactivation (`F-17`, `S-03`, `S-04`, `S-06`) | **\[Open\]** After unilateral breakup (`S-03`), today the server performs a soft close (`unpaired_at`) blocking auth, invites, and unilateral recovery (`S-06`). For `M5 Memoria` it must be decided: (a) whether to provide a temporary retention window for encrypted data (e.g., grace period) before permanent deletion or if permanent deletion should be immediate/on explicit request; (b) which cryptographic and UX mechanism guarantees **bilateral consensual reactivation** (e.g., challenge approved by both partners, preventing someone who alone holds the shared Recovery Key from reopening the couple); (c) what happens if only one partner requests export or permanent deletion during closure. |
 
-## 15. Rischi principali
+## 15. Key Risks
 
-| Rischio | Impatto | Mitigazione |
+| Risk | Impact | Mitigation |
 | :-- | :-- | :-- |
-| Scope troppo ampio (casa, pet, giochi, memoria) | Prodotto mai rifinito | Fasi, dogfooding, rifiuto di feature che non servono un bisogno del cuore quotidiano |
-| E2EE complessa con consegna asincrona e recupero chiavi | Ritardi o promesse non mantenibili | Decisione precoce (D-02), prototipo tecnico, dichiarazioni oneste |
-| Qualità grafica insufficiente | Il prodotto non conquista il partner non tecnico | Moodboard e prototipi prima del codice, test con la Persona B |
-| Deriva verso l’engagement farming | Tradimento dei principi | P-02 e P-03 come criteri di accettazione di ogni funzione |
-| Distribuzione su iOS e aggiornamenti | Esperienza diseguale tra Android e iPhone | Decisione esplicita (D-07) |
-| Progetto portato avanti da una persona sola | Abbandono o rallentamento | Piano di sviluppo realistico, documentazione, apertura del codice dopo il dogfooding |
+| Scope too broad (home, pet, games, memory) | Product never polished | Phases, dogfooding, rejecting features that don't serve a daily core need |
+| Complex E2EE with asynchronous delivery and key recovery | Delays or unmaintainable promises | Early decision (D-02), technical prototype, honest disclosures |
+| Insufficient visual quality | Product fails to win over the non-technical partner | Moodboard and prototypes before code, testing with Persona B |
+| Drift toward engagement farming | Betrayal of principles | P-02 and P-03 as acceptance criteria for every feature |
+| iOS distribution and updates | Unequal experience between Android and iPhone | Explicit decision (D-07) |
+| Project carried forward by a single person | Abandonment or slowdown | Realistic development plan, documentation, opening code after dogfooding |
 
-## 16. Glossario
+## 16. Glossary
 
-- **Casa:** spazio condiviso che raccoglie gli artefatti creati dalla coppia.
-- **Artefatto:** traccia visibile lasciata da un’attività (quadro, foto, lettera, oggetto).
-- **Gesto:** interazione breve che comunica presenza (es. “ti penso”).
-- **Dogfooding:** uso reale del prodotto da parte dei due promotori prima di aprirlo ad altri.
-- **Configuratore / Partner:** le due personas descritte al capitolo 4.
-- **E2EE:** cifratura end-to-end, per cui solo i due partner possono leggere i contenuti.
+- **Home:** shared space that collects the artifacts created by the couple.
+- **Artifact:** visible trace left by an activity (framed picture, photo, letter, object).
+- **Gesture:** brief interaction communicating presence (e.g., "thinking of you").
+- **Dogfooding:** real-world use of the product by the two sponsors before opening it to others.
+- **Configurator / Partner:** the two personas described in Chapter 4.
+- **E2EE:** end-to-end encryption, whereby only the two partners can read the content.
 
-## 17. Documenti successivi
+## 17. Subsequent Documents
 
-| Documento | Dipende da questo brief per | Produce |
+| Document | Depends on this brief for | Produces |
 | :-- | :-- | :-- |
-| **Design system** | Capitolo 5 (principi), 6, 11 | Moodboard, tipografia, colori, componenti, tono dei testi |
-| **Documento architetturale** | Capitoli 9 e 10, D-02, D-06, D-07, D-08 | Stack, modello dei dati, modello di sicurezza, deployment |
-| **Specifiche funzionali** | Capitolo 7 (ID F-xx) | Flussi, casi limite, criteri di accettazione per funzione |
-| **Piano di sviluppo** | Capitoli 8 e 15 | Milestone, ordine di lavoro, dipendenze |
-| **Test plan** | Capitoli 9, 10 e 13 | Strategia di test, sicurezza, usabilità con la Persona B |
-| **Piano di apertura e sostenibilità** | Capitolo 12, D-05, D-10 | Licenza, governance, hosting gestito |
+| **Design system** | Chapters 5 (principles), 6, 11 | Moodboard, typography, colors, components, copy tone |
+| **Architecture document** | Chapters 9 and 10, D-02, D-06, D-07, D-08 | Stack, data model, security model, deployment |
+| **Functional specifications** | Chapter 7 (F-xx IDs) | Flows, edge cases, acceptance criteria per feature |
+| **Development plan** | Chapters 8 and 15 | Milestones, work order, dependencies |
+| **Test plan** | Chapters 9, 10, and 13 | Testing strategy, security, usability with Persona B |
+| **Openness and sustainability plan** | Chapter 12, D-05, D-10 | License, governance, managed hosting |
 
-**Regola per gli agenti.** Ogni funzione, requisito o decisione nei documenti successivi deve citare l’ID di questo brief (P-xx, F-xx, S-xx, N-xx, D-xx) da cui discende. Se un documento entra in conflitto con un principio P-xx, vince il principio e il conflitto va segnalato al promotore.
+**Rule for agents.** Every feature, requirement, or decision in subsequent documents must cite the ID from this brief (P-xx, F-xx, S-xx, N-xx, D-xx) from which it derives. If a document conflicts with a P-xx principle, the principle wins and the conflict must be flagged to the sponsor.

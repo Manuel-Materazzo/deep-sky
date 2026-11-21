@@ -1,348 +1,348 @@
-# Piano operativo M0 e M1: Deep Sky
+# M0 and M1 Operative Plan: Deep Sky
 
-**Versione:** 0.1 (bozza per revisione) · **Data:** 14 novembre 2026 · **Dipende da:** Piano di sviluppo v0.1 (milestone M0 e M1), Documento architetturale v0.1, Considerazioni tecniche v0.1
+**Version:** 0.1 (draft for review) · **Date:** November 14, 2026 · **Depends on:** Development Plan v0.1 (milestones M0 and M1), Architectural Document v0.1, Technical Considerations v0.1
 
-**Destinatari:** promotore (che supervisiona tutto, PD-11) e agenti esecutori.
+**Audience:** sponsor (who oversees everything, PD-11) and executing agents.
 
 ---
 
-## 1. Come leggere questo documento
+## 1. How to read this document
 
-**Un solo piano, task etichettati per pista.** Il piano backend e quello dell’app non sono separati in due documenti: le funzioni sono fette verticali che attraversano server, app e contenuti, e i **contratti** (API, formato degli eventi, manifest) sono condivisi. Due piani separati rischiano di divergere proprio sui contratti, e tu dovresti riconciliarli. Ogni task ha invece una **pista** nell’ID: **REP** (repository e processi), **SEC** (segreti e chiavi), **INF** (infrastruttura), **SRV** (server), **APP** (app), **CNT** (contenuti), **CI** (pipeline), **NAME** (nome). Filtrando per prefisso si ottiene la vista per pista. Dalla M2 ogni fetta avrà una scheda unica: prima un task di contratto, poi i sottocompiti server e app in parallelo.
+**A single plan, tasks tagged by track.** The backend plan and the app plan are not separated into two documents: features are vertical slices cutting across server, app, and content, and **contracts** (APIs, event formats, manifests) are shared. Two separate plans risk diverging precisely on contracts, and you would have to reconcile them. Instead, each task has a **track** in its ID: **REP** (repository and processes), **SEC** (secrets and keys), **INF** (infrastructure), **SRV** (server), **APP** (app), **CNT** (content), **CI** (pipeline), **NAME** (name). Filtering by prefix gives the per-track view. Starting from M2, each slice will have a single card: first a contract task, then server and app subtasks in parallel.
 
-**Formato di ogni task:** ruolo, riferimenti agli ID dei documenti, dipendenze e una **checklist di verifica**. Un task è chiuso solo quando:
+**Format of each task:** role, references to document IDs, dependencies, and a **verification checklist**. A task is closed only when:
 
-- tutte le caselle della checklist sono spuntate, **con evidenza** nella pull request (log, schermata, comando eseguito);
-- la pull request è approvata dal promotore, che fa il merge (PD-11);
-- documentazione e ADR eventualmente toccati sono aggiornati.
+- all checklist boxes are checked, **with evidence** in the pull request (logs, screenshots, executed commands);
+- the pull request is approved by the sponsor, who merges it (PD-11);
+- any affected documentation and ADRs are updated.
 
-**Ordine suggerito per M0**
+**Suggested order for M0**
 
-| Ondata | Task |
+| Wave | Tasks |
 | :-- | :-- |
 | **A** | REP-01, REP-02, REP-03, REP-04, SEC-01, SEC-02, NAME-01, CNT-02 |
 | **B** | INF-01, INF-02, INF-03, SEC-03, SEC-04, SRV-01, APP-01 |
 | **C** | INF-04, INF-05, INF-06, SRV-02, SRV-03, APP-02, APP-03, CNT-01, CI-01, CI-02 |
 
-Le licenze: il codice è **MIT** (PD-13, confermata).
+Licensing: the code is **MIT** (PD-13, confirmed).
 
-## 2. Milestone M0, Fondamenta
+## 2. Milestone M0, Foundations
 
-### 2.1 Repository e processi (REP)
+### 2.1 Repository and processes (REP)
 
-**REP-01 · Monorepo pubblico** — Ruolo: release e infrastruttura · Rif.: PD-09, PD-13
+**REP-01 · Public monorepo** — Role: release and infrastructure · Ref.: PD-09, PD-13
 
-- [x] Repository **pubblico**
-- [x] `LICENSE` MIT con anno e titolare corretti
-- [x] README: cos’è Deep Sky, stato del progetto, come contribuire, link ai documenti
-- [x] `CONTRIBUTING.md` (flusso di lavoro, regole delle pull request) e `SECURITY.md` (come segnalare vulnerabilità)
-- [x] Nota sull’uso del **nome e del logo** (la licenza MIT non li concede)
-- [x] `.gitignore` per Flutter, Java, Docker, IDE; nessun file generato o segreto
-- [x] Verificato che la cronologia contenga solo file voluti
+- [x] **Public** repository
+- [x] MIT `LICENSE` with correct year and holder
+- [x] README: what Deep Sky is, project status, how to contribute, links to documents
+- [x] `CONTRIBUTING.md` (workflow, pull request rules) and `SECURITY.md` (how to report vulnerabilities)
+- [x] Note on the use of **name and logo** (the MIT license does not grant them)
+- [x] `.gitignore` for Flutter, Java, Docker, IDEs; no generated files or secrets
+- [x] Verified that history contains only intended files
 
-**REP-02 · Protezione del ramo principale** — Ruolo: release e infrastruttura · Rif.: PD-11 · Dipende da: REP-01
+**REP-02 · Main branch protection** — Role: release and infrastructure · Ref.: PD-11 · Depends on: REP-01
 
-- [x] Merge solo tramite pull request, con CI verde e approvazione del promotore *(da configurare su GitHub)*
-- [x] Nessun *force push*, cronologia lineare *(da configurare su GitHub)*
-- [x] Prova con una pull request di test che viene **rifiutata** se la CI è rossa
+- [x] Merge only via pull request, with green CI and sponsor approval *(to be configured on GitHub)*
+- [x] No *force push*, linear history *(to be configured on GitHub)*
+- [x] Tested with a test pull request that is **rejected** if CI is red
 
-**REP-03 · Modelli e convenzioni** — Ruolo: redattore · Rif.: 2.2, 2.4 del Piano · Dipende da: REP-01
+**REP-03 · Templates and conventions** — Role: technical writer · Ref.: 2.2, 2.4 of the Plan · Depends on: REP-01
 
-- [x] Modello di pull request: ID di riferimento, riepilogo, **evidenza dei test**, punti da guardare con più attenzione, impatti su contratti o sicurezza
-- [x] Modelli di issue: task, difetto, decisione
-- [x] Modello di ADR in `docs/adr/` e primo ADR “usiamo gli ADR”
-- [x] Convenzione dei messaggi di commit e dei nomi dei rami descritta in `CONTRIBUTING.md`
+- [x] Pull request template: reference IDs, summary, **test evidence**, points to look at more closely, impacts on contracts or security
+- [x] Issue templates: task, defect, decision
+- [x] ADR template in `docs/adr/` and first ADR "we use ADRs"
+- [x] Commit message and branch naming convention described in `CONTRIBUTING.md`
 
-**REP-04 · Board di lavoro** — Ruolo: redattore · Dipende da: REP-01
-non necessario
+**REP-04 · Work board** — Role: technical writer · Depends on: REP-01
+not needed
 
-**REP-05 · Documenti nel repository** — Ruolo: redattore · Dipende da: REP-01
+**REP-05 · Documents in the repository** — Role: technical writer · Depends on: REP-01
 
-- [x] Project Brief, Design Brief, Considerazioni tecniche, Documento architetturale, Piano di sviluppo e questo documento esportati in `docs/` come Markdown *(manca ancora `Documento architetturale` in `docs/`)*
-- [x] Indice in `docs/README.md`; gli ID dei documenti sono invariati
-- [x] Aggiornato il nome (“Deep Sky”) dove compare ancora “Casa”
+- [x] Project Brief, Design Brief, Technical Considerations, Architectural Document, Development Plan, and this document exported to `docs/` as Markdown *(Architectural Document is still missing in `docs/`)*
+- [x] Index in `docs/README.md`; document IDs are unchanged
+- [x] Updated the name ("Deep Sky") where "Casa" still appears
 
-### 2.2 Segreti e chiavi (SEC)
+### 2.2 Secrets and keys (SEC)
 
-**SEC-01 · Scansione dei segreti** — Ruolo: release e infrastruttura · Rif.: 3.1 del Piano · Dipende da: REP-01
+**SEC-01 · Secret scanning** — Role: release and infrastructure · Ref.: 3.1 of the Plan · Depends on: REP-01
 
-- [x] Controllo prima di ogni commit e in CI
-- [x] Un commit di prova con un segreto **finto** viene bloccato
-- [x] Scansione dell’intera cronologia: nessun segreto
-- [x] Elenco di ciò che **non** deve mai entrare nel repository (chiavi di firma, chiave di servizio Firebase, segreto di amministrazione, file `.env`)
+- [x] Check before every commit and in CI
+- [x] A test commit with a **fake** secret is blocked
+- [x] Full history scan: no secrets
+- [x] List of what must **never** enter the repository (signing keys, Firebase service key, admin secret, `.env` files)
 
-**SEC-02 · Dipendenze e licenze** — Ruolo: release e infrastruttura · Dipende da: REP-01
+**SEC-02 · Dependencies and licenses** — Role: release and infrastructure · Depends on: REP-01
 
-- [x] Aggiornamenti automatici delle dipendenze configurati
-- [x] Controllo delle licenze in CI: fallisce se compare una licenza copyleft incompatibile con MIT
-- [x] Elenco delle licenze delle dipendenze attuali archiviato *(in `docs/dependencies-licenses.md`)*
+- [x] Automated dependency updates configured
+- [x] License check in CI: fails if a copyleft license incompatible with MIT appears
+- [x] List of current dependency licenses archived *(in `docs/dependencies-licenses.md`)*
 
-**SEC-03 · Chiavi di firma** — Ruolo: promotore con supporto del release · Rif.: PD-10, AD-08
+**SEC-03 · Signing keys** — Role: sponsor with release support · Ref.: PD-10, AD-08
 
-- [x] Generate **offline** la chiave dell’APK e la chiave Ed25519 per manifest e pacchetti
-- [x] **Backup cifrato in due luoghi distinti**
-- [x] **Prova di ripristino** da backup su una macchina pulita
-- [x] Impronta pubblica (SHA-256 del certificato, chiave pubblica) registrata in `docs/` *(tabella pronta in `docs/key-custody.md`)*
-- [x] Le chiavi non sono mai passate per il repository, la CI o una chat
-- [x] Procedura di custodia scritta, senza i segreti *(in `docs/key-custody.md`)*
+- [x] APK key and Ed25519 key for manifests and packs generated **offline**
+- [x] **Encrypted backup in two distinct locations**
+- [x] **Restore test** from backup on a clean machine
+- [x] Public fingerprint (certificate SHA-256, public key) recorded in `docs/` *(table ready in `docs/key-custody.md`)*
+- [x] Keys have never passed through the repository, CI, or a chat
+- [x] Custody procedure written, without secrets *(in `docs/key-custody.md`)*
 
-**SEC-04 · Script di firma locale** — Ruolo: sviluppatore Android nativo · Rif.: PD-10, 10.3 dell’Architettura · Dipende da: SEC-03
+**SEC-04 · Local signing script** — Role: native Android developer · Ref.: PD-10, 10.3 of the Architecture · Depends on: SEC-03
 
-- [x] `scripts/` contiene uno script che prende l’APK non firmato e il manifest e produce APK e manifest firmati
-- [x] L’APK firmato viene verificato con gli strumenti di Android
-- [x] Rifiuta se la versione non è superiore a quella precedente
-- [x] Provato con una chiave **di prova**, mai con quella vera nei test automatici *(verificato con `scripts/test-sign-release.ps1`)*
+- [x] `scripts/` contains a script that takes the unsigned APK and manifest and produces signed APK and manifest
+- [x] Signed APK is verified with Android tools
+- [x] Rejects if the version is not higher than the previous one
+- [x] Tested with a **test** key, never with the real one in automated tests *(verified with `scripts/test-sign-release.ps1`)*
 
-### 2.3 Infrastruttura (INF)
+### 2.3 Infrastructure (INF)
 
-**INF-01 · DNS** — Ruolo: promotore · Rif.: PD-08
+**INF-01 · DNS** — Role: sponsor · Ref.: PD-08
 
-- [x] Il record di `deepsky.vectevo.com` punta all’indirizzo pubblico della VM OCI
-- [x] La risoluzione è verificata da una rete esterna
+- [x] The record for `deepsky.vectevo.com` points to the public address of the OCI VM
+- [x] Resolution is verified from an external network
 
-**INF-02 · Rete e firewall** — Ruolo: release e infrastruttura · Rif.: AR-11 · Dipende da: INF-01
+**INF-02 · Network and firewall** — Role: release and infrastructure · Ref.: AR-11 · Depends on: INF-01
 
-- [x] Porte 80 e 443 aperte nelle regole di rete di OCI **e** nel firewall della VM (le immagini predefinite ne hanno di restrittive)
-- [x] SSH ristretto (solo chiavi, sorgenti limitate se possibile)
-- [x] Una scansione esterna mostra solo le porte attese
-- [x] La porta di gestione del server **non** è raggiungibile dall’esterno
+- [x] Ports 80 and 443 open in OCI network rules **and** in the VM firewall (default images have restrictive ones)
+- [x] SSH restricted (keys only, limited sources if possible)
+- [x] An external scan shows only the expected ports
+- [x] The server management port is **not** reachable from the outside
 
-**INF-03 · Host** — Ruolo: release e infrastruttura · Dipende da: INF-02
+**INF-03 · Host** — Role: release and infrastructure · Depends on: INF-02
 
-- [x] Docker e Docker Compose installati sulla VM ARM
-- [x] Utente non privilegiato per i servizi
-- [x] Aggiornamenti di sicurezza del sistema operativo attivi
-- [x] Spazio su disco e memoria registrati come riferimento
+- [x] Docker and Docker Compose installed on the ARM VM
+- [x] Unprivileged user for services
+- [x] OS security updates active
+- [x] Disk space and memory recorded as baseline
 
-**INF-04 · Compose di sviluppo e produzione** — Ruolo: release e infrastruttura · Rif.: 12.1 dell’Architettura · Dipende da: INF-03, SRV-02
+**INF-04 · Development and production Compose** — Role: release and infrastructure · Ref.: 12.1 of the Architecture · Depends on: INF-03, SRV-02
 
-- [x] il progetto backend contiene un compose con **proxy** (Caddy), **api** e **db** (PostgreSQL con versione fissata), rete interna e volumi *(in `deploy/docker-compose.yml` e `server/docker-compose.yaml`)*
-- [x] Segreti letti da file o Docker secrets, mai scritti nel compose
-- [x] `docker compose up` da un clone pulito avvia tutto *(verificato localmente con `api` + `db`; prova completa con `proxy` su VM/clone pulito da fare)*
-- [x] `https://deepsky.vectevo.com/` risponde con **certificato valido** e un controllo di salute
-- [x] Il database **non** è raggiungibile dall’esterno
-- [x] Un riavvio della VM riporta i servizi su e i dati restano
+- [x] the backend project contains a compose with **proxy** (Caddy), **api**, and **db** (PostgreSQL with pinned version), internal network, and volumes *(in `deploy/docker-compose.yml` and `server/docker-compose.yaml`)*
+- [x] Secrets read from files or Docker secrets, never written in compose
+- [x] `docker compose up` from a clean clone starts everything *(verified locally with `api` + `db`; full test with `proxy` on VM/clean clone to be done)*
+- [x] `https://deepsky.vectevo.com/` responds with a **valid certificate** and a health check
+- [x] The database is **not** reachable from the outside
+- [x] A VM reboot brings services back up and data persists
 
-**INF-05 · Backup** — Ruolo: release e infrastruttura · Rif.: TC-11, 12.5 dell’Architettura · Dipende da: INF-04
+**INF-05 · Backup** — Role: release and infrastructure · Ref.: TC-11, 12.5 of the Architecture · Depends on: INF-04
 
-- [x] Gli script esistenti coprono dump del database, volume dei blob e volume dei pacchetti nella stessa finestra *(bozza e checklist in `docs/backup-restore.md`)*
-- [x] I backup sono cifrati e hanno una retention definita
-- [x] **Ripristino provato** su una macchina di prova e procedura documentata
+- [x] Existing scripts cover database dump, blob volume, and pack volume in the same window *(draft and checklist in `docs/backup-restore.md`)*
+- [x] Backups are encrypted and have a defined retention
+- [x] **Restore tested** on a test machine and procedure documented
 
-**INF-06 · Log** — Ruolo: release e infrastruttura · Rif.: S-07, 15 dell’Architettura · Dipende da: INF-04
+**INF-06 · Logs** — Role: release and infrastructure · Ref.: S-07, 15 of the Architecture · Depends on: INF-04
 
-- [x] Rotazione dei log configurata
-- [x] Nessun contenuto dei messaggi nei log; indirizzi IP del proxy conservati per poco tempo *(header rimossi e IP mascherati in `deploy/Caddyfile`)*
+- [x] Log rotation configured
+- [x] No message content in logs; proxy IP addresses retained for a short time *(headers stripped and IPs masked in `deploy/Caddyfile`)*
 
 ### 2.4 Server (SRV)
 
-**SRV-01 · Scheletro Spring Boot** — Ruolo: sviluppatore backend · Rif.: AR-01, TC-02
+**SRV-01 · Spring Boot skeleton** — Role: backend developer · Ref.: AR-01, TC-02
 
-- [x] Progetto con i moduli dell’Architettura 5.1 (anche vuoti) *(`config`, `shared`, `pairing`, `sync`, `blob`, `push`, `content` — ADR-0004)*
-- [x] Salute e metriche tramite Actuator, profili sviluppo e produzione
-- [x] Migrazione iniziale del database con Flyway
-- [x] **Test di architettura** che verificano i confini tra moduli
-- [x] **Test di integrazione con PostgreSQL reale** (Testcontainers) verde
-- [x] Versioni di Java e Spring Boot registrate in un ADR *(ADR-0002)*
+- [x] Project with the modules from Architecture 5.1 (even empty) *(`config`, `shared`, `pairing`, `sync`, `blob`, `push`, `content` — ADR-0004)*
+- [x] Health and metrics via Actuator, development and production profiles
+- [x] Initial database migration with Flyway
+- [x] **Architecture tests** verifying boundaries between modules
+- [x] **Integration test with real PostgreSQL** (Testcontainers) green
+- [x] Java and Spring Boot versions recorded in an ADR *(ADR-0002)*
 
-**SRV-02 · Immagine multi-architettura** — Ruolo: sviluppatore backend · Rif.: TC-03 · Dipende da: SRV-01
+**SRV-02 · Multi-architecture image** — Role: backend developer · Ref.: TC-03 · Depends on: SRV-01
 
-- [x] Dockerfile con utente non privilegiato e limiti di memoria della JVM parametrici
-- [x] Immagine per **ARM64 e AMD64** costruita in CI *(workflow configurato in `.github/workflows/ci.yml`, in attesa esecuzione CI)*
-- [x] Provata sulla VM ARM e su una macchina AMD *(provata su AMD64; verifica ARM64 su VM OCI da fare)*
-- [x] Dimensione dell’immagine, tempo di avvio e memoria a riposo registrati (base per SP-05) *(baseline AMD64 in ADR-0002)*
+- [x] Dockerfile with unprivileged user and parameterized JVM memory limits
+- [x] Image for **ARM64 and AMD64** built in CI *(workflow configured in `.github/workflows/ci.yml`, awaiting CI execution)*
+- [x] Tested on the ARM VM and on an AMD machine *(tested on AMD64; ARM64 verification on OCI VM to be done)*
+- [x] Image size, startup time, and idle memory recorded (baseline for SP-05) *(AMD64 baseline in ADR-0002)*
 
-**SRV-03 · Configurazione** — Ruolo: sviluppatore backend · Dipende da: SRV-01
+**SRV-03 · Configuration** — Role: backend developer · Depends on: SRV-01
 
-- [x] Parametri via variabili d’ambiente o segreti (dominio, database, segreto di amministrazione, parametri Firebase, quote)
-- [x] Validazione all’avvio con messaggi chiari sugli errori di configurazione
-- [x] Documento con l’elenco dei parametri e dei valori predefiniti *(in `docs/server-configuration.md`)*
+- [x] Parameters via environment variables or secrets (domain, database, admin secret, Firebase parameters, quotas)
+- [x] Startup validation with clear messages on configuration errors
+- [x] Document listing parameters and default values *(in `docs/server-configuration.md`)*
 
 ### 2.5 App (APP)
 
-**APP-01 · Progetto Flutter** — Ruolo: sviluppatore client · Rif.: TC-01, AR-06, PD-07
+**APP-01 · Flutter project** — Role: client developer · Ref.: TC-01, AR-06, PD-07
 
-- [x] Identificativo dell’app `com.vectevo.deep_sky`; nome visibile “Deep Sky”
-- [x] Struttura a livelli (presentation, scene, domain, data, platform)
-- [x] Regole di analisi statica e formattazione attive
-- [x] APK di debug costruito e installato su un telefono reale *(APK di debug costruito; installazione su telefono fisico da eseguire)*
-- [x] Versione minima di Android supportata e livello di API di destinazione decisi e annotati in un ADR *(minSdk 26, targetSdk 36 — ADR-0003)*
+- [x] App identifier `com.vectevo.deep_sky`; visible name "Deep Sky"
+- [x] Layered structure (presentation, scene, domain, data, platform)
+- [x] Static analysis and formatting rules active
+- [x] Debug APK built and installed on a real phone *(debug APK built; installation on physical phone to be executed)*
+- [x] Minimum supported Android version and target API level decided and noted in an ADR *(minSdk 26, targetSdk 36 — ADR-0003)*
 
-**APP-02 · Canale nativo Android** — Ruolo: sviluppatore Android nativo · Rif.: 8.4 dell’Architettura · Dipende da: APP-01
+**APP-02 · Android native channel** — Role: native Android developer · Ref.: 8.4 of the Architecture · Depends on: APP-01
 
-- [x] Canale tra Flutter e Kotlin con un metodo di prova
-- [x] Test del canale
-- [x] Struttura pronta per installatore, widget e Firebase
+- [x] Channel between Flutter and Kotlin with a test method
+- [x] Channel test
+- [x] Structure ready for installer, widget, and Firebase
 
-**APP-03 · Test dell’app** — Ruolo: QA · Rif.: 14 dell’Architettura · Dipende da: APP-01
+**APP-03 · App tests** — Role: QA · Ref.: 14 of the Architecture · Depends on: APP-01
 
-- [x] Un test unitario, uno di widget e un test *golden* di esempio in CI
-- [x] Procedura per i test su dispositivo reale documentata *(in `docs/device-testing.md`)*
+- [x] One sample unit test, one widget test, and one *golden* test in CI
+- [x] Procedure for real-device testing documented *(in `docs/device-testing.md`)*
 
-### 2.6 Contenuti (CNT)
+### 2.6 Content (CNT)
 
-**CNT-01 · Struttura dei contenuti** — Ruolo: designer con architetto · Rif.: AR-09, 9.7 dell’Architettura · Dipende da: REP-01
+**CNT-01 · Content structure** — Role: designer with architect · Ref.: AR-09, 9.7 of the Architecture · Depends on: REP-01
 
-- [x] `content/` con pacchetto base vuoto, manifest di esempio e **schema** del manifest
-- [x] Un validatore controlla il manifest di esempio
-- [x] Script che calcola hash e firma (con chiave di prova)
-- [x] Schema approvato dal designer: copre slot, aree di tocco, stati, animazioni livello 1 *(in attesa approvazione del designer)*
+- [x] `content/` with empty base pack, sample manifest, and manifest **schema**
+- [x] A validator checks the sample manifest
+- [x] Script that computes hash and signature (with test key)
+- [x] Schema approved by the designer: covers slots, touch areas, states, level 1 animations *(awaiting designer approval)*
 
-**CNT-02 · Termini degli strumenti di generazione** — Ruolo: redattore, con decisione del promotore · Rif.: D-11, A-08
+**CNT-02 · Generation tool terms** — Role: technical writer, with sponsor decision · Ref.: D-11, A-08
 
-- [x] Elenco degli strumenti candidati e **termini d’uso** rilevanti (uso commerciale, redistribuzione, progetti open source) *(in `docs/ai-asset-tools-terms.md`)*
-- [x] Data di verifica e fonte per ogni strumento
-- [x] Raccomandazione sulla licenza degli asset, da decidere dal promotore
-- [x] Nessun asset inserito nel repository prima di questa decisione
+- [x] List of candidate tools and relevant **terms of use** (commercial use, redistribution, open source projects) *(in `docs/ai-asset-tools-terms.md`)*
+- [x] Verification date and source for each tool
+- [x] Recommendation on asset licensing, to be decided by the sponsor
+- [x] No assets placed in the repository before this decision
 
 ### 2.7 Pipeline (CI)
 
-**CI-01 · Workflow** — Ruolo: release e infrastruttura · Dipende da: REP-01, SRV-01, APP-01
+**CI-01 · Workflow** — Role: release and infrastructure · Depends on: REP-01, SRV-01, APP-01
 
-- [x] Job server: build e test, con PostgreSQL reale
-- [x] Job app: analisi, test, APK di debug
-- [x] Job deploy: validazione dei file compose
-- [x] Job sicurezza: segreti e licenze (SEC-01, SEC-02)
-- [x] Job immagine: build multi-architettura
-- [x] Tutti verdi su una pull request di prova; tempi registrati; cache attive *(in attesa esecuzione su GitHub Actions)*
+- [x] Server job: build and test, with real PostgreSQL
+- [x] App job: analysis, test, debug APK
+- [x] Deploy job: compose file validation
+- [x] Security job: secrets and licenses (SEC-01, SEC-02)
+- [x] Image job: multi-architecture build
+- [x] All green on a test pull request; timings recorded; caches active *(awaiting execution on GitHub Actions)*
 
-**CI-02 · Artefatti di release** — Ruolo: release e infrastruttura · Rif.: 10.3, 12.3 dell’Architettura · Dipende da: CI-01, SEC-04
+**CI-02 · Release artifacts** — Role: release and infrastructure · Ref.: 10.3, 12.3 of the Architecture · Depends on: CI-01, SEC-04
 
-- [x] La CI produce APK e manifest **non firmati** *(`.github/workflows/release.yml`, build `-Punsigned=true` verificata)*
-- [x] Il flusso “scarico, firma in locale, carico sulla release” è descritto e provato una volta *(descritto in `docs/release-signing-workflow.md`; firma locale provata, ciclo completo con release GitHub da provare)*
+- [x] CI produces **unsigned** APK and manifest *(`.github/workflows/release.yml`, `-Punsigned=true` build verified)*
+- [x] The "download, sign locally, upload to release" flow is described and tested once *(described in `docs/release-signing-workflow.md`; local signing tested, full cycle with GitHub release to be tested)*
 
-### 2.8 Nome (NAME)
+### 2.8 Name (NAME)
 
-**NAME-01 · Disponibilità di Deep Sky** — Ruolo: redattore, con decisione del promotore
+**NAME-01 · Availability of Deep Sky** — Role: technical writer, with sponsor decision
 
-- [x] Controllo di GitHub, domini, social, app esistenti per coppie
-- [x] Ricerca preliminare nelle banche dati dei marchi
+- [x] Check of GitHub, domains, social media, existing apps for couples
+- [x] Preliminary search in trademark databases
 
-### 2.9 Uscita da M0
+### 2.9 M0 Exit
 
-- [x] Da un clone pulito server e database si avviano in locale e la CI è verde
-- [x] `https://deepsky.vectevo.com` risponde con certificato valido
-- [x] La CI produce un APK di prova non firmato, firmato in locale con lo script
-- [x] Chiavi di firma custodite e ripristino provato
-- [x] Repository protetto, modelli e board attivi
-- [x] Backup e ripristino provati sulla VM
+- [x] From a clean clone, server and database start locally and CI is green
+- [x] `https://deepsky.vectevo.com` responds with a valid certificate
+- [x] CI produces an unsigned test APK, signed locally with the script
+- [x] Signing keys stored securely and restore tested
+- [x] Repository protected, templates and board active
+- [x] Backup and restore tested on the VM
 
-## 3. Milestone M1, Prototipi di verifica
+## 3. Milestone M1, Verification prototypes
 
-Ogni prototipo vive su un ramo `proto/sp-xx` e serve a **rispondere a una domanda**, non a produrre codice di produzione: il ramo non entra nel principale così com’è. Il risultato è un **ADR** in `docs/adr/` che conferma o corregge l’architettura, con i dati misurati. Il codice che merita di restare viene **promosso**: dopo l’ADR si estrae in pull request normali, con struttura finale, test e Definition of Done, e il promotore le rivede come tutto il resto. Per ridurre il lavoro di promozione i prototipi si scrivono già nella struttura definitiva del progetto (cartelle e livelli), **senza scorciatoie su cifratura e sicurezza**. Si possono eseguire in parallelo; SP-02 e SP-01 sono i più rischiosi e partono per primi.
+Each prototype lives on a `proto/sp-xx` branch and serves to **answer a question**, not to produce production code: the branch does not enter main as-is. The output is an **ADR** in `docs/adr/` that confirms or corrects the architecture, with measured data. Code worth keeping is **promoted**: after the ADR, it is extracted into normal pull requests, with final structure, tests, and Definition of Done, and the sponsor reviews them like everything else. To reduce promotion work, prototypes are already written in the final project structure (folders and layers), **with no shortcuts on encryption and security**. They can run in parallel; SP-02 and SP-01 are the riskiest and start first.
 
-### 3.1 SP-02 · Abbinamento, recupero, nuovo dispositivo
+### 3.1 SP-02 · Pairing, recovery, new device
 
-Ruolo: architetto, sviluppatore client e backend, **revisore di sicurezza** · Rif.: AR-05, cap. 7, S-01, S-06 · Ramo: `proto/sp-02` · Bozza ADR: [ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md)
+Role: architect, client and backend developer, **security reviewer** · Ref.: AR-05, ch. 7, S-01, S-06 · Branch: `proto/sp-02` · Draft ADR: [ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md)
 
-- **SP02-01** Documento breve con formato di busta, eventi, chiavi derivate e flussi di arruolamento e recupero (`docs/sp-02-e2ee-protocol.md` su `proto/sp-02`)
-- **SP02-02** Modulo di cifratura nell’app con una libreria matura e vettori di prova (`lib/domain/crypto/`, 7 test unitari)
-- **SP02-03** Server minimo: inviti, creazione coppia, arruolamento, conservazione di buste (`server/` + Testcontainers PostgreSQL 17)
-- **SP02-04** Flusso di abbinamento con codice di verifica e consegna della chiave radice
-- **SP02-05** Chiave di recupero (parole e QR) e recupero su un nuovo dispositivo senza alcun altro telefono
-- **SP02-06** Revoca di un dispositivo
-- **SP02-07** Estrazione di tutto ciò che il server vede e conserva
+- **SP02-01** Short document with envelope format, events, derived keys, and enrollment and recovery flows (`docs/sp-02-e2ee-protocol.md` on `proto/sp-02`)
+- **SP02-02** Encryption module in the app with a mature library and test vectors (`lib/domain/crypto/`, 7 unit tests)
+- **SP02-03** Minimal server: invites, couple creation, enrollment, envelope storage (`server/` + Testcontainers PostgreSQL 17)
+- **SP02-04** Pairing flow with verification code and root key delivery
+- **SP02-05** Recovery key (words and QR) and recovery on a new device without any other phone
+- **SP02-06** Device revocation
+- **SP02-07** Extraction of everything the server sees and stores
 
-Checklist di verifica:
+Verification checklist:
 
-- [x] Due telefoni reali completano l’abbinamento *(logica end-to-end verificata con repository/API di test; resta prova su due telefoni fisici)*
-- [x] Un nuovo telefono recupera tutti i dati con la **sola chiave di recupero** *(verificato in integrazione automatizzata; resta prova su telefono reale)*
-- [x] Un nuovo telefono si arruola da un altro telefono *(verificato in integrazione automatizzata; resta prova su telefono reale)*
-- [x] Un dispositivo revocato non può più autenticarsi *(verificato su backend PostgreSQL con `Sp02PairingAndSyncIntegrationTest`)*
-- [x] Il server non contiene **nulla** di leggibile: tipo degli eventi, testi, date delle capsule *(verificato con ispezione DB e schema ciphertext-only in `V2__sp02_pairing_and_sync.sql`)*
-- [x] Una busta manomessa o spostata tra coppie viene rifiutata *(verificato in `deep_sky_crypto_test.dart` tramite AAD canonico XChaCha20-Poly1305)*
-- [x] Due persone non tecniche completano abbinamento e conferma di salvataggio della chiave **senza istruzioni**
-- [x] ADR con esito e i punti da sottoporre a revisione indipendente *(bozza tecnica scritta in [ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md); inclusi in M2/`G-5` la verifica esplicita di esclusione dal backup automatico Android e la valutazione di `cryptography` senza `cryptography_flutter`)*
+- [x] Two real phones complete pairing *(end-to-end logic verified with test repository/API; test on two physical phones remains)*
+- [x] A new phone recovers all data with the **recovery key alone** *(verified in automated integration; test on real phone remains)*
+- [x] A new phone enrolls from another phone *(verified in automated integration; test on real phone remains)*
+- [x] A revoked device can no longer authenticate *(verified on PostgreSQL backend with `Sp02PairingAndSyncIntegrationTest`)*
+- [x] The server contains **nothing** readable: event types, texts, capsule dates *(verified by DB inspection and ciphertext-only schema in `V2__sp02_pairing_and_sync.sql`)*
+- [x] A tampered envelope or one moved between couples is rejected *(verified in `deep_sky_crypto_test.dart` via canonical XChaCha20-Poly1305 AAD)*
+- [x] Two non-technical people complete pairing and key backup confirmation **without instructions**
+- [x] ADR with outcome and points to submit for independent review *(technical draft written in [ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md); explicit verification of Android auto-backup exclusion and evaluation of `cryptography` without `cryptography_flutter` included in M2/`G-5`)*
 
-### 3.2 SP-01 · Push con FCM e configurazione a runtime
+### 3.2 SP-01 · Push with FCM and runtime configuration
 
-Ruolo: sviluppatore Android nativo e backend · Rif.: TC-13, AR-10, cap. 11 · Ramo: `proto/sp-01` · Bozza ADR: [ADR-0006](adr/0006-sp01-runtime-fcm-push.md)
+Role: native Android and backend developer · Ref.: TC-13, AR-10, ch. 11 · Branch: `proto/sp-01` · Draft ADR: [ADR-0006](adr/0006-sp01-runtime-fcm-push.md)
 
-- **SP01-01** Progetto Firebase di prova e endpoint del server che fornisce i parametri client (`GET /api/v1/push/config`, nessuna credenziale nel repo)
-- **SP01-02** Inizializzazione di Firebase a runtime con parametri salvati localmente, applicati all’avvio del processo (`DeepSkyApplication.onCreate`)
-- **SP01-03** Invio dal server di messaggi con chiavi di localizzazione generiche (`FcmHttpV1PushProvider` data-only HTTP v1)
-- **SP01-04** Matrice di prova su due telefoni reali
+- **SP01-01** Test Firebase project and server endpoint providing client parameters (`GET /api/v1/push/config`, no credentials in repo)
+- **SP01-02** Runtime Firebase initialization with locally saved parameters, applied at process startup (`DeepSkyApplication.onCreate`)
+- **SP01-03** Server sending messages with generic localization keys (`FcmHttpV1PushProvider` data-only HTTP v1)
+- **SP01-04** Test matrix on two real phones
 
-Checklist di verifica:
+Verification checklist:
 
-- [x] Notifica ricevuta con app aperta, in background *(compilato APK debug su `proto/sp-01`; richiede progetto Firebase di prova e 2 telefoni reali)*
-- [x] Notifica ricevuta con app **chiusa dal task switcher** *(compilato APK debug su `proto/sp-01`; richiede progetto Firebase di prova e 2 telefoni reali)*
-- [x] Notifica ricevuta dopo il riavvio del telefono
-- [x] Notifica ricevuta con schermo spento a lungo (modalità di risparmio del sistema) e con risparmio batteria attivo
-- [x] Comportamento con **arresto forzato** dalle impostazioni: ci si aspetta che non arrivi finché l’app non viene riaperta; verificato e documentato
-- [x] Il testo mostrato è quello generico composto dal telefono; nessun contenuto nel messaggio *(verificato su payload HTTP v1 data-only senza blocco `notification` in `Sp01FcmHttpClientTest` e risoluzione locale in `DeepSkyFirebaseMessagingService`)*
-- [x] Un token non più valido viene eliminato e ri-registrato *(rimozione su `404 UNREGISTERED` verificata in `Sp01PushIntegrationTest`; rotazione locale in `onNewToken` + `consumePendingPushToken`)*
-- [x] ADR con esito: se non affidabile a processo chiuso, si attiva il piano B (AR-10) *(bozza in [ADR-0006](adr/0006-sp01-runtime-fcm-push.md); in attesa della matrice su dispositivi reali)*
+- [x] Notification received with app open, in background *(debug APK compiled on `proto/sp-01`; requires test Firebase project and 2 real phones)*
+- [x] Notification received with app **closed from task switcher** *(debug APK compiled on `proto/sp-01`; requires test Firebase project and 2 real phones)*
+- [x] Notification received after phone reboot
+- [x] Notification received with screen off for a long time (system power-saving mode) and with battery saver active
+- [x] Behavior on **force stop** from settings: expected not to arrive until the app is reopened; verified and documented
+- [x] The displayed text is the generic one composed by the phone; no content in the message *(verified on data-only HTTP v1 payload without `notification` block in `Sp01FcmHttpClientTest` and local resolution in `DeepSkyFirebaseMessagingService`)*
+- [x] A no-longer-valid token is deleted and re-registered *(removal on `404 UNREGISTERED` verified in `Sp01PushIntegrationTest`; local rotation in `onNewToken` + `consumePendingPushToken`)*
+- [x] ADR with outcome: if not reliable when process is closed, plan B is activated (AR-10) *(draft in [ADR-0006](adr/0006-sp01-runtime-fcm-push.md); awaiting real-device matrix)*
 
-### 3.3 SP-04 · Home ibrida
+### 3.3 SP-04 · Hybrid home
 
-Ruolo: sviluppatore client, designer · Rif.: AR-07, AR-08, cap. 9 · Ramo: `proto/sp-04` · Bozza ADR: [ADR-0007](adr/0007-sp04-hybrid-home-scene.md)
+Role: client developer, designer · Ref.: AR-07, AR-08, ch. 9 · Branch: `proto/sp-04` · Draft ADR: [ADR-0007](adr/0007-sp04-hybrid-home-scene.md)
 
-- **SP04-01** Scena a livelli con asset provvisori (stanza giorno e notte, personaggi, pet, oggetti, luce) (`content/packs/sp04_room/`)
-- **SP04-02** Manifest minimo e suo lettore (`SceneManifestParser` + validazione `scripts/validate_content.py`)
-- **SP04-03** Home con barra fissa, card di stato, scena, card del countdown e navigazione, con scorrimento (`Sp04HybridHomePage`)
-- **SP04-04** Animazione di livello 1 con più livelli sovrapposti (luce, respiro del pet)
-- **SP04-05** Sostituzione di un asset tramite override e ritorno al valore predefinito (`AssetOverrideRegistry`)
-- **SP04-06** Misure su due telefoni reali e su emulatori con tre proporzioni di schermo *(layout e hit-box verificati in widget test su `9:16`, `9:20` e `16:10`; misure reali su telefoni/emulatori da eseguire)*
+- **SP04-01** Layered scene with provisional assets (day and night room, characters, pet, objects, light) (`content/packs/sp04_room/`)
+- **SP04-02** Minimal manifest and its reader (`SceneManifestParser` + `scripts/validate_content.py` validation)
+- **SP04-03** Home with fixed bar, status card, scene, countdown card, and navigation, with scrolling (`Sp04HybridHomePage`)
+- **SP04-04** Level 1 animation with multiple overlapping layers (light, pet breathing)
+- **SP04-05** Replacing an asset via override and returning to default (`AssetOverrideRegistry`)
+- **SP04-06** Measurements on two real phones and on emulators with three screen aspect ratios *(layout and hit-boxes verified in widget tests on `9:16`, `9:20`, and `16:10`; real measurements on phones/emulators to be executed)*
 
-Checklist di verifica:
+Verification checklist:
 
-- [x] **Soglie concordate prima di misurare**: proposta di partenza, 95% dei frame entro il budget (16,7 ms a 60 Hz) durante scorrimento e animazione sul telefono meno recente; memoria di picco entro una soglia fissata in base al telefono con meno RAM *(documentate in `docs/sp-04-hybrid-home.md` e `ADR-0007`, soglia RSS <= 180 MB)*
-- [x] Le soglie sono rispettate, oppure l’ADR elenca le misure da prendere (meno livelli, derivati più piccoli) *(da misurare su due telefoni fisici)*
-- [x] Aree di tocco corrette a tutte le proporzioni *(verificate in `hybrid_scene_test.dart` su viewport `390x693`, `360x800`, `800x500`)*
-- [x] Nessuna sovrapposizione di card semitrasparenti ai livelli animati *(separazione geometrica verificata in test su tutte e 3 le proporzioni)*
-- [x] “Riduci movimento” ferma le animazioni *(verificato in `hybrid_scene_test.dart`)*
-- [x] L’override cambia l’immagine senza toccare il manifest *(verificato con `AssetOverrideRegistry` in `hybrid_scene_test.dart`)*
-- [x] Verifica con un lettore di schermo su un telefono: ordine e etichette degli slot *(albero `Semantics` e `OrdinalSortKey` verificati nei test Flutter; resta verifica TalkBack su telefono reale)*
-- [x] Il designer valida che la composizione corrisponda alle intenzioni
+- [x] **Thresholds agreed before measuring**: starting proposal, 95% of frames within budget (16.7 ms at 60 Hz) during scrolling and animation on the oldest phone; peak memory within a threshold set based on the phone with least RAM *(documented in `docs/sp-04-hybrid-home.md` and `ADR-0007`, threshold RSS <= 180 MB)*
+- [x] Thresholds are met, or the ADR lists measures to take (fewer layers, smaller derivatives) *(to be measured on two physical phones)*
+- [x] Touch areas correct at all aspect ratios *(verified in `hybrid_scene_test.dart` on viewports `390x693`, `360x800`, `800x500`)*
+- [x] No overlap of semi-transparent cards over animated layers *(geometric separation verified in tests across all 3 aspect ratios)*
+- [x] "Reduce motion" stops animations *(verified in `hybrid_scene_test.dart`)*
+- [x] Override changes the image without touching the manifest *(verified with `AssetOverrideRegistry` in `hybrid_scene_test.dart`)*
+- [x] Screen reader check on a phone: slot order and labels *(`Semantics` tree and `OrdinalSortKey` verified in Flutter tests; TalkBack check on real phone remains)*
+- [x] Designer validates that composition matches intent
 
-### 3.4 SP-03 · Aggiornamento dell’APK
+### 3.4 SP-03 · APK updater
 
-Ruolo: sviluppatore Android nativo · Rif.: TC-10, 10.3 dell’Architettura, D-14 · Dipende da: SEC-04 · Ramo: `proto/sp-03` · Bozza ADR: [ADR-0008](adr/0008-sp03-apk-self-updater.md)
+Role: native Android developer · Ref.: TC-10, 10.3 of the Architecture, D-14 · Depends on: SEC-04 · Branch: `proto/sp-03` · Draft ADR: [ADR-0008](adr/0008-sp03-apk-self-updater.md)
 
-- **SP03-01** Release di prova con APK e manifest firmato (chiave di prova) *(struttura compatibile con `scripts/sign-release.*`; pubblicazione release reale su dispositivo da eseguire)*
-- **SP03-02** Controllo, scarico, verifica di hash e firma e installazione tramite il canale nativo (`ApkUpdateService` + `ApkInstallerCoordinator`)
-- **SP03-03** Flusso del permesso “Installa app sconosciute”
-- **SP03-04** Scenari di errore
+- **SP03-01** Test release with signed APK and manifest (test key) *(structure compatible with `scripts/sign-release.*`; real release publication on device to be executed)*
+- **SP03-02** Check, download, hash and signature verification, and installation via native channel (`ApkUpdateService` + `ApkInstallerCoordinator`)
+- **SP03-03** "Install unknown apps" permission flow
+- **SP03-04** Error scenarios
 
-Checklist di verifica:
+Verification checklist:
 
-- [x] Aggiornamento riuscito su due telefoni reali, dati e chiavi locali conservati *(APK debug compilato; installazione reale v1 -> v2 da provare su due telefoni)*
-- [x] Manifest alterato: rifiutato *(verificato in `apk_update_service_test.dart` con verifica Ed25519 sui byte grezzi -> `signatureInvalid`)*
-- [x] APK con firma diversa: rifiutato, senza perdita di dati *(pre-check certificati `PackageManager` in `ApkInstallerCoordinator.kt` + rifiuto hash SHA-256 in `apk_update_service_test.dart`)*
-- [x] Versione non superiore: rifiutata *(verificato in `apk_update_service_test.dart` -> `versionNotHigher`, e lato nativo)*
-- [x] Scarico interrotto: ripresa o ripetizione *(ripresa via header HTTP `Range` verificata dopo interruzione simulata in `apk_update_service_test.dart`)*
-- [x] Spazio insufficiente e permesso negato: messaggi in linguaggio semplice *(verificato in `apk_update_models.dart` e `apk_update_service_test.dart`)*
-- [x] Annotato **quante conferme** chiede Android sulle versioni dei due telefoni
-- [x] Verifica con il sorgente configurato su un repository diverso *(risoluzione e download da URL/repository alternativo verificati in `apk_update_service_test.dart`)*
-- [x] ADR con esito *(bozza scritta in [ADR-0008](adr/0008-sp03-apk-self-updater.md); manca esito su telefoni reali)*
+- [x] Update succeeded on two real phones, local data and keys preserved *(debug APK compiled; real v1 -> v2 installation to be tested on two phones)*
+- [x] Tampered manifest: rejected *(verified in `apk_update_service_test.dart` with Ed25519 verification on raw bytes -> `signatureInvalid`)*
+- [x] APK with different signature: rejected, with no data loss *(`PackageManager` certificate pre-check in `ApkInstallerCoordinator.kt` + SHA-256 hash rejection in `apk_update_service_test.dart`)*
+- [x] Non-higher version: rejected *(verified in `apk_update_service_test.dart` -> `versionNotHigher`, and native side)*
+- [x] Interrupted download: resume or retry *(resume via HTTP `Range` header verified after simulated interruption in `apk_update_service_test.dart`)*
+- [x] Insufficient space and permission denied: plain-language messages *(verified in `apk_update_models.dart` and `apk_update_service_test.dart`)*
+- [x] Noted **how many confirmations** Android asks for on the versions of the two phones
+- [x] Verified with source configured on a different repository *(resolution and download from alternative URL/repository verified in `apk_update_service_test.dart`)*
+- [x] ADR with outcome *(draft written in [ADR-0008](adr/0008-sp03-apk-self-updater.md); real-phone outcome missing)*
 
-### 3.5 SP-05 · Footprint del backend
+### 3.5 SP-05 · Backend footprint
 
-Ruolo: sviluppatore backend, release e infrastruttura · Rif.: TC-02, TC-17 · Dipende da: SRV-02 · Ramo: `proto/sp-05` · Bozza ADR: [ADR-0009](adr/0009-sp05-backend-footprint.md)
+Role: backend developer, release and infrastructure · Ref.: TC-02, TC-17 · Depends on: SRV-02 · Branch: `proto/sp-05` · Draft ADR: [ADR-0009](adr/0009-sp05-backend-footprint.md)
 
-- **SP05-01** Immagine e compose sulla VM ARM (`deploy/docker-compose.sp05.yml` pronto; esecuzione su VM ARM64 da eseguire)
-- **SP05-02** Carico sintetico con coppie simulate (da decine a poche centinaia), eventi e blob (`Sp05BenchmarkController` + `scripts/benchmark_sp05.py`)
-- **SP05-03** Misure con diversi limiti di memoria della JVM
-- **SP05-04** Raccomandazione sui limiti e sui requisiti minimi
+- **SP05-01** Image and compose on the ARM VM (`deploy/docker-compose.sp05.yml` ready; execution on ARM64 VM to be executed)
+- **SP05-02** Synthetic load with simulated couples (from tens to a few hundred), events, and blobs (`Sp05BenchmarkController` + `scripts/benchmark_sp05.py`)
+- **SP05-03** Measurements with different JVM memory limits
+- **SP05-04** Recommendation on limits and minimum requirements
 
-Checklist di verifica:
+Verification checklist:
 
-- [x] Memoria a riposo e sotto carico, CPU e tempo di avvio registrati *(integrazione PostgreSQL 17 e Actuator metriche verificati in `Sp05BenchmarkIntegrationTest`; resta esecuzione `benchmark_sp05.py` su VM ARM)*
-- [x] Nessuna interruzione per esaurimento di memoria con i limiti raccomandati
-- [x] Requisiti minimi per il self-hosting scritti, con i numeri misurati
-- [x] ADR con esito *(bozza e profili JVM preparati in [ADR-0009](adr/0009-sp05-backend-footprint.md); in attesa di misure su VM ARM)*
+- [x] Idle and under-load memory, CPU, and startup time recorded *(PostgreSQL 17 integration and Actuator metrics verified in `Sp05BenchmarkIntegrationTest`; `benchmark_sp05.py` execution on ARM VM remains)*
+- [x] No out-of-memory crashes with the recommended limits
+- [x] Minimum requirements for self-hosting written, with measured numbers
+- [x] ADR with outcome *(draft and JVM profiles prepared in [ADR-0009](adr/0009-sp05-backend-footprint.md); awaiting measurements on ARM VM)*
 
-### 3.6 Uscita da M1 (G-1)
+### 3.6 M1 Exit (G-1)
 
-- [x] Cinque ADR di esito completati *([ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md)–[ADR-0009](adr/0009-sp05-backend-footprint.md) aggiornati all’uscita `G-1`; `ADR-0007` e `ADR-0009` in stato `Accepted`, verifiche fisiche residue di `SP-01`/`SP-02`/`SP-03` tracciate in testa a M2)*
-- [x] Documento architetturale aggiornato alla v0.2 con le correzioni emerse *(esportato in [Documento architetturale v0.2](architecture.md), chiude `REP-05`)*
-- [x] Decisioni AR-xx confermate, corrette o riaperte esplicitamente *(tabella `AR-01`–`AR-11` e risposte `AD-01`–`AD-10` in [architecture.md](architecture.md))*
-- [x] Elenco dei rischi aggiornato *(tabella post-M1 in [Considerazioni tecniche cap. 11](technical-considerations.md#11-rischi-tecnici))*
-- [x] Elenco dei punti da sottoporre a revisione indipendente (G-5) *(sezione `G5-01`–`G5-09` in [architecture.md](architecture.md), incluse esclusione backup automatico Android e valutazione `cryptography` vs `cryptography_flutter`)*
-- [x] Dettaglio di M2 preparato a partire dagli esiti *(in [Piano operativo M2](m2-operative-plan.md), inclusa verifica esplicita Android Auto Backup)*
-- [x] Elenco del codice dei prototipi da promuovere in M2, con le pull request previste *(`PR-M2-01`–`PR-M2-07` dai rami `proto/sp-01`–`proto/sp-05` in [Piano operativo M2](m2-operative-plan.md))*
+- [x] Five outcome ADRs completed *([ADR-0005](adr/0005-sp02-e2ee-pairing-and-recovery.md)–[ADR-0009](adr/0009-sp05-backend-footprint.md) updated at `G-1` exit; `ADR-0007` and `ADR-0009` in `Accepted` status, remaining physical verifications for `SP-01`/`SP-02`/`SP-03` tracked at the top of M2)*
+- [x] Architectural document updated to v0.2 with the emerged corrections *(exported in [Architectural Document v0.2](architecture.md), closes `REP-05`)*
+- [x] AR-xx decisions confirmed, corrected, or explicitly reopened *(table `AR-01`–`AR-11` and answers `AD-01`–`AD-10` in [architecture.md](architecture.md))*
+- [x] Risk list updated *(post-M1 table in [Technical Considerations ch. 11](technical-considerations.md#11-rischi-tecnici))*
+- [x] List of points to submit for independent review (G-5) *(section `G5-01`–`G5-09` in [architecture.md](architecture.md), including Android auto-backup exclusion and `cryptography` vs `cryptography_flutter` evaluation)*
+- [x] M2 detail prepared from the outcomes *(in [M2 Operative Plan](m2-operative-plan.md), including explicit Android Auto Backup verification)*
+- [x] List of prototype code to promote in M2, with planned pull requests *(`PR-M2-01`–`PR-M2-07` from branches `proto/sp-01`–`proto/sp-05` in [M2 Operative Plan](m2-operative-plan.md))*
 
-## 4. Tracciabilità
+## 4. Traceability
 
-Ogni task cita gli ID dei documenti da cui discende. Un task che non può essere chiuso senza violare una decisione **\[Deciso\]** viene segnalato al promotore.
+Each task cites the IDs of the documents from which it derives. A task that cannot be closed without violating a **\[Decided\]** decision is reported to the sponsor.

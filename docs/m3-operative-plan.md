@@ -1,606 +1,603 @@
-# Piano operativo M3: Deep Sky
+# M3 Operative Plan: Deep Sky
 
-**Versione:** 0.2 (bozza per revisione) · **Data:** 16 novembre 2026 · **Dipende da:** Piano di
-sviluppo (cap. 6.4 e 6.5), Piano operativo M2, Documento architetturale v0.2
+**Version:** 0.2 (draft for review) · **Date:** November 16, 2026 · **Depends on:** Development Plan
+(ch. 6.4 and 6.5), M2 Operative Plan, Architecture Document v0.2
 
-**Destinatari:** promotore (che supervisiona tutto, PD-11) e agenti esecutori.
+**Audience:** sponsor (who oversees everything, PD-11) and executing agents.
 
-**Convenzioni.** **\[Deciso\]**, **\[Proposta\]**, **\[Aperto\]** come negli altri documenti. Nuovi
-ID: **PD-14 … PD-20** (decisioni di piano), **S3-n** (sprint), **G-3a** (gate di ingresso all’uso
-reale). I task hanno ID `Sn-PISTA-xx` (ad esempio `S1-APP-02`).
+**Conventions.** **\[Decided\]**, **\[Proposal\]**, **\[Open\]** as in the other documents. New
+IDs: **PD-14 … PD-20** (plan decisions), **S3-n** (sprints), **G-3a** (entry gate to real
+use). Tasks have IDs `Sn-TRACK-xx` (for example `S1-APP-02`).
 
 ---
 
-## 1. Cosa cambia rispetto al piano precedente
+## 1. What changes compared to the previous plan
 
-M2 è completato. M3 era una milestone XL, seguita da M4 (uso reale). Il promotore propone di
-scomporla e di far partire l’uso reale prima.
+M2 is completed. M3 was an XL milestone, followed by M4 (real use). The sponsor proposes to
+split it up and start real use earlier.
 
-| ID        | Decisione                                                                                                                                                          | Stato    |
+| ID        | Decision                                                                                                                                                           | Status   |
 |:----------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------|:---------|
-| **PD-14** | M3 si divide in **sprint verticali**, uno per funzione. Uno sprint è **una fetta con uscita verificabile**, non un intervallo di tempo fisso                       | Deciso   |
-| **PD-15** | **Lo sprint 1 è il design e l’implementazione finale dell’enrollment della coppia** (abbinamento, chiave di recupero, nuovo dispositivo), con il mockup già pronto | Deciso   |
-| **PD-16** | **M4 diventa uso reale continuo**, in parallelo agli sprint: ogni funzione si prova sul campo appena finita                                                        | Deciso   |
-| **PD-17** | **Gate di ingresso all’uso reale (G-3a)** prima di mettere dati intimi veri (capitolo 3)                                                                           | Proposta |
-| **PD-18** | **Due canali di aggiornamento:** *stabile* per la partner, *anteprima* per il promotore                                                                            | Proposta |
-| **PD-19** | **Compatibilità dal primo dato reale:** da lì in poi niente modifiche che rompano i dati esistenti senza migrazione                                                | Proposta |
-| **PD-20** | Sprint 2 … 8 pianificati nel dettaglio solo quando il precedente è chiuso (ondate, PD-04)                                                                          | Proposta |
+| **PD-14** | M3 is divided into **vertical sprints**, one per feature. A sprint is **a slice with a verifiable output**, not a fixed time interval                              | Decided  |
+| **PD-15** | **Sprint 1 is the final design and implementation of couple enrollment** (pairing, recovery key, new device), with the mockup already ready                        | Decided  |
+| **PD-16** | **M4 becomes continuous real use**, in parallel with the sprints: each feature is field-tested as soon as it is finished                                           | Decided  |
+| **PD-17** | **Entry gate to real use (G-3a)** before entering real intimate data (chapter 3)                                                                                   | Proposal |
+| **PD-18** | **Two update channels:** *stable* for the partner, *preview* for the sponsor                                                                                       | Proposal |
+| **PD-19** | **Compatibility from the first real data:** from then on, no changes that break existing data without migration                                                    | Proposal |
+| **PD-20** | Sprints 2 … 8 planned in detail only when the previous one is closed (waves, PD-04)                                                                                | Proposal |
 
-**Cosa cambia per i gate.** G-3 si divide in **G-3a** (ingresso all’uso reale, dopo lo sprint 1) e
-**G-3b** (nucleo completo, dopo l’ultimo sprint). G-4 non è più un unico momento dopo 2 – 3
-settimane di prova: la revisione di cosa manca avviene a ogni sprint e si chiude con una revisione
-finale del nucleo.
+**What changes for the gates.** G-3 is divided into **G-3a** (entry to real use, after sprint 1) and
+**G-3b** (complete core, after the last sprint). G-4 is no longer a single moment after 2 – 3
+weeks of testing: the review of what is missing happens at each sprint and closes with a final
+review of the core.
 
-## 2. Perché l’enrollment viene per primo
+## 2. Why enrollment comes first
 
-- È la **porta d’ingresso**: senza, la partner non può usare nulla e nessuna funzione si prova sul
-  campo.
-- È la parte più **delicata**: se l’esperienza è confusa o il recupero non è chiaro, l’uso reale
-  parte male e i dati sono a rischio.
-- Le prove sul campo diventano la **fonte delle priorità** per gli sprint successivi (PD-03: si
-  aggiunge solo ciò che manca a entrambi).
+- It is the **entryway**: without it, the partner cannot use anything and no feature can be
+  field-tested.
+- It is the most **delicate** part: if the experience is confusing or recovery is unclear, real use
+  starts off badly and data is at risk.
+- Field tests become the **source of priorities** for subsequent sprints (PD-03: only what is
+  missing for both is added).
 
-## 3. Gate di ingresso all’uso reale (G-3a)
+## 3. Entry gate to real use (G-3a)
 
-Proposta (PD-17). Prima di inserire dati intimi veri, con PD-05 come criterio guida:
+Proposal (PD-17). Before entering real intimate data, with PD-05 as the guiding criterion:
 
-- [x] Pairing, recupero da sola chiave, arruolamento di un nuovo telefono e revoca provati su due
-  telefoni reali
-- [x] Un ripristino da backup con dati di prova realistici riuscito e documentato
-- [x] Verificata l’esclusione di chiavi e cache locale dal backup automatico di Android
-- [x] **Revisione interna di sicurezza** sui componenti critici (filtro di autenticazione,
-  cifratura, archivio chiavi, recupero), con rapporto scritto (S1-SEC-01)
-- [x] La partner ha completato l’enrollment **senza aiuto** su un telefono suo (S1-QA-02)
-- [x] Politica di compatibilità attiva (PD-19) e aggiornamento in app provato
-- [x] Procedura di emergenza scritta: cosa fare se il server non risponde, se un aggiornamento ha
-  un difetto o se si revoca/perde un telefono (`docs/emergency-procedure.md`)
-- [x] **Rotazione delle chiavi dopo la revoca** di un dispositivo implementata e provata (S1-SEC-02,
+- [x] Pairing, key-only recovery, enrollment of a new phone, and revocation tested on two real
+  phones
+- [x] A backup restore with realistic test data succeeded and was documented
+- [x] Verified exclusion of keys and local cache from Android automatic backup
+- [x] **Internal security review** on critical components (authentication filter, encryption,
+  key store, recovery), with written report (S1-SEC-01)
+- [x] The partner completed enrollment **without help** on her own phone (S1-QA-02)
+- [x] Compatibility policy active (PD-19) and in-app update tested
+- [x] Written emergency procedure: what to do if the server does not respond, if an update has
+  a defect, or if a phone is revoked/lost (`docs/emergency-procedure.md`)
+- [x] **Key rotation after revocation** of a device implemented and tested (S1-SEC-02,
   ADR-0005, G5-05)
-- [x] Footprint del server misurato sulla VM ARM di produzione (S1-INF-02, ADR-0009)
-- [x] **Rischio accettato e scritto:** esportazione completa, cancellazione definitiva e riattivazione
-  consensuale (F-17, S-04, D-15) restano in **M5**; fino ad allora l’interruzione della coppia (S-03)
-  è solo una chiusura logica (`unpaired_at`) e il promotore lo sa prima di inserire dati veri
+- [x] Server footprint measured on the production ARM VM (S1-INF-02, ADR-0009)
+- [x] **Accepted and written risk:** full export, permanent deletion, and consensual reactivation
+  (F-17, S-04, D-15) remain in **M5**; until then, couple termination (S-03) is only a logical
+  closure (`unpaired_at`), and the sponsor knows this before entering real data
 
-**Nota sul ritorno indietro.** Android non permette di installare una versione con numero inferiore
-a quella presente. Il “rollback” di un aggiornamento difettoso è quindi una **nuova release con
-numero più alto e il codice precedente**. Va previsto nella procedura di emergenza.
+**Note on rolling back.** Android does not allow installing a version with a lower version code
+than the one currently installed. The "rollback" of a defective update is therefore a **new release
+with a higher version code and the previous code**. This must be included in the emergency procedure.
 
-## 4. Mappa degli sprint
+## 4. Sprint map
 
-L’ordine è una proposta di partenza: il promotore lo può riordinare. Ogni sprint si chiude con
-un’APK firmato e un periodo di prova sul campo.
+The order is a starting proposal: the sponsor can reorder it. Each sprint closes with a
+signed APK and a field-testing period.
 
-| Sprint   | Funzione                                                                                                                                             | ID                      | Rif. Piano    |
+| Sprint   | Feature                                                                                                                                              | ID                      | Plan Ref.     |
 |:---------|:-----------------------------------------------------------------------------------------------------------------------------------------------------|:------------------------|:--------------|
-| **S3-1** | **Enrollment e ingresso sul campo**: abbinamento, chiave di recupero, nuovo telefono, revoca, guida all’installazione, aggiornamenti in app e canali | F-01, F-20, F-19 (base) | SL-07 (parte) |
-| **S3-2** | Home e scena reali, design system completo, pacchetto di contenuti v1                                                                                | F-02                    | SL-01         |
-| **S3-3** | Thinking of you rifinito e notifiche                                                                                                                 | F-03, F-16              | SL-02         |
-| **S3-4** | Mood del giorno                                                                                                                                      | F-04                    | SL-03         |
-| **S3-5** | Countdown, con notifiche locali                                                                                                                      | F-06                    | SL-04         |
-| **S3-6** | Disegno a turni (probabilmente in due tappe: 6a canvas e invio, 6b sovra-disegno e messaggi)                                                         | F-05, F-15 (parte)      | SL-05         |
+| **S3-1** | **Enrollment and field entry**: pairing, recovery key, new phone, revocation, installation guide, in-app updates, and channels                       | F-01, F-20, F-19 (base) | SL-07 (part)  |
+| **S3-2** | Real Home and scene, complete design system, content pack v1                                                                                         | F-02                    | SL-01         |
+| **S3-3** | Refined Thinking of you and notifications                                                                                                            | F-03, F-16              | SL-02         |
+| **S3-4** | Mood of the day                                                                                                                                      | F-04                    | SL-03         |
+| **S3-5** | Countdown, with local notifications                                                                                                                  | F-06                    | SL-04         |
+| **S3-6** | Turn-based drawing (probably in two stages: 6a canvas and send, 6b over-drawing and messages)                                                        | F-05, F-15 (part)       | SL-05         |
 | **S3-7** | Time capsule                                                                                                                                         | F-07                    | SL-06         |
-| **S3-8** | Chiusura del nucleo: offline, stati vuoti ed errori, aggiornamenti completi, ripristino ripetuto                                                     | F-19, TC-07             | SL-07, SL-08  |
+| **S3-8** | Core closure: offline, empty states and errors, full updates, repeated restore                                                                       | F-19, TC-07             | SL-07, SL-08  |
 
-**Il design resta una fetta avanti.** Mentre gli sviluppatori lavorano sullo sprint *n*, il designer
-chiude schermate, stati e testi dello sprint *n+1*.
+**Design stays one slice ahead.** While developers work on sprint *n*, the designer
+finalizes screens, states, and copy for sprint *n+1*.
 
-## 5. Sprint S3-1: Enrollment e ingresso sul campo
+## 5. Sprint S3-1: Enrollment and field entry
 
-### 5.1 Obiettivo e uscita
+### 5.1 Objective and output
 
-La partner, **non tecnica**, installa l’app da un link, entra nella coppia, salva la chiave di
-recupero e riceve un aggiornamento, **senza aiuto del promotore**. Il promotore può passare a
-*anteprima* mentre la partner resta su *stabile*.
+The **non-technical** partner installs the app from a link, joins the couple, saves the recovery
+key, and receives an update, **without help from the sponsor**. The sponsor can switch to
+*preview* while the partner remains on *stable*.
 
-### 5.2 Cosa deve consegnare il designer (design finale)
+### 5.2 What the designer must deliver (final design)
 
-Per ogni voce: schermate, **tutti gli stati** (caricamento, errore, vuoto, scadenza), testi in
-italiano e inglese, tema chiaro e scuro, accessibilità (V-07).
+For each item: screens, **all states** (loading, error, empty, expiration), copy in
+Italian and English, light and dark theme, accessibility (V-07).
 
-| Codice     | Area                                         | Contenuto                                                                                                                                                                    | Formato di consegna                                             | Stato        | Note                                                                                                                                                                                                               |
-|:-----------|:---------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:----------------------------------------------------------------|:-------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **S1-D01** | **Guida all’installazione** (fuori dall’app) | Pagina web o istruzioni illustrate: scaricare l’APK, consentire l’installazione da questa fonte, eventuale avviso di sicurezza del sistema, aprire l’app, tornare all’invito | Pagina web (codice di esempio); immagini dei passi; testi IT/EN | Implementato | Pagina statica `deploy/web/join/index.html` con guida in 3 passi IT/EN, apertura `deepsky://pair#...` client-side e `/.well-known/assetlinks.json`; da validare sul campo (`S1-DES-03`, `S1-REL-01`)               |
-| **S1-D02** | **Benvenuto**                                | Cos’è Deep Sky in poche frasi; scelta “Ho un invito” / “Ho già una coppia”                                                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Implementato in app (`S3-1`: `OnboardingPage`, temi scuro/chiaro Intimate Sanctuary, IT/EN, drawer server collassabile `P-09`)                                                                                     |
-| **S1-D03** | **Creazione della coppia** (primo partner)   | Inserimento di invito (link, QR o codice), nome visibile                                                                                                                     | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Automatico all'apertura dell'app, e si passa direttamente a S1-D05; implementato con stati caricamento/errore/riprova (`S3-1`)                                                                                     |
-| **S1-D04** | **Chiave di recupero**                       | Spiegazione, parole e QR, modi di salvarla (copia, condivisione, stampa), conferma di avvenuto salvataggio                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Schermata dedicata pre-Home `RecoveryKeySetupPage` (`S-06`): toggle 24 parole/QR, copia, condivisione/esportazione JSON, avviso screenshot/cloud, checkbox + conferma server                                       |
-| **S1-D05** | **Invito al partner**                        | Generazione di link e QR, condivisione, stato “in attesa di …”, scadenza e rigenerazione                                                                                     | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | (`S3-1`): QR ad alto contrasto, share nativo Android, copia link `#token=`/`#server=...`, countdown 15 min, rigenerazione (placeholder mockup `lucciola.app`/`Nessuna scadenza` allineati a Deep Sky + TTL 15 min) |
-| **S1-D06** | **Unione del secondo partner**               | Apertura del link, nome, richiesta inviata, attesa                                                                                                                           | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato |                                                                                                                                                                                                                    |
-| **S1-D07** | **Verifica reciproca**                       | Codice breve mostrato su entrambi i telefoni, istruzione di confrontarlo a voce, “coincide / non coincide”                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Schermata dedicata `CodeVerificationPage` (6 cifre con SAS `v2` legato al `sasSecret` out-of-band per `CA-01`, stato live, blocco copia SAS e `FLAG_SECURE` per `CA-10`, conferma e dialogo di annullamento su mancata corrispondenza) |
-| **S1-D08** | **Approvazione**                             | Sul telefono del primo partner: “… vuole unirsi”, approva o rifiuta                                                                                                          | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Unito a S1-D07 per evitare troppi passaggi (conferma SAS + consegna chiave dal primo telefono e annullamento se non coincide)                                                                                      |
-| **S1-D09** | **Ingresso nella casa**                      | Schermata di benvenuto che porta alla home                                                                                                                                   | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Schermata dedicata `SpaceSetupPage` (`S1-D07-2`: nome visibile con anteprima live per entrambi i partner, modificabile anche da Impostazioni tramite `PATCH /api/v1/pairing/devices/me`)                           |
-| **S1-D10** | **Nuovo telefono**                           | chiave di recupero (inserimento guidato delle parole con controllo di ogni parola, avanzamento del recupero)                                                                 | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Sezione recupero in `OnboardingPage`: conteggio parole BIP-39 live `N/24` con chip per parola (`RecoveryKeyCodec.isValidWord`), scansione QR ed errori calmi                                                       |
-| **S1-D11** | **Gestione dispositivi**                     | Elenco, stato, revoca di un dispositivo                                                                                                                                      | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Tab `Dispositivi` in `HomeShellPage`: elenco, stato, arruolamento QR/codice e dialogo di conferma calmo prima della revoca                                                                                         |
-| **S1-D12** | **Permesso notifiche**                       | Richiesta spiegata nel momento giusto, non al primo avvio                                                                                                                    | Schermate e stati; testi IT/EN                                  | Implementato | Prompt contestuale `push-optin-card` in `HomeShellPage` dopo l'ingresso in Home (non al primo avvio, dismissibile) + toggle in `Impostazioni`                                                                      |
-| **S1-D13** | **Aggiornamenti**                            | Schermata con versione, canale, controllo, avanzamento; “aggiornamento richiesto” bloccante e gentile                                                                        | Schermate e stati; codice web del mockup; testi IT/EN           | Implementato | Versione, selettore canale `Stabile`/`Anteprima`, verifica, barra di avanzamento e schermata bloccante gentile `UpgradeRequiredPage`; da verificare live con release firmata                                       |
-| **S1-D14** | **Errori**                                   | Invito scaduto o già usato, server non raggiungibile, versione troppo vecchia, rete assente, tempo scaduto                                                                   | Schermate e stati; testi IT/EN                                  | Implementato | Messaggi calmi IT/EN (`P-02`, `V-08`) per invito non valido/scaduto, server offline, 426 e chiave errata senza trapelare dettagli interni                                                                          |
-| **S1-D15** | **Diagramma del flusso**                     | Percorsi completi con punti di uscita e di errore, collegati ai codici S1-D02 … S1-D14                                                                                       | Diagramma                                                       | Implementato | Diagramma Mermaid e stati completi documentati in `docs/enrollment-state-machine.md`, allineati a `S1-CTR-01`                                                                                                      |
-| **S1-D16** | **Componenti nuovi**                         | Campo per le parole di recupero, QR, codice di verifica                                                                                                                      | Componenti nel design system, con stati e token                 | Implementato | Componenti implementati nei flussi S3-1 con token `Intimate Sanctuary`; consolidamento formale nel design system da verificare con il designer                                                                     |
+| Code       | Area                                         | Content                                                                                                                                                                     | Delivery format                                                 | Status       | Notes                                                                                                                                                                                                              |
+|:-----------|:---------------------------------------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:----------------------------------------------------------------|:-------------|:-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **S1-D01** | **Installation guide** (outside the app)     | Web page or illustrated instructions: download the APK, allow installation from this source, possible system security warning, open the app, return to the invite           | Web page (sample code); step images; IT/EN copy                 | Implemented  | Static page `deploy/web/join/index.html` with 3-step IT/EN guide, client-side `deepsky://pair#...` launch, and `/.well-known/assetlinks.json`; to be validated in the field (`S1-DES-03`, `S1-REL-01`)               |
+| **S1-D02** | **Welcome**                                  | What Deep Sky is in a few sentences; choice "I have an invite" / "I already have a couple"                                                                                  | Screens and states; mockup web code; IT/EN copy                 | Implemented  | Implemented in-app (`S3-1`: `OnboardingPage`, Intimate Sanctuary dark/light themes, IT/EN, collapsible server drawer `P-09`)                                                                                       |
+| **S1-D03** | **Couple creation** (first partner)          | Invite entry (link, QR, or code), display name                                                                                                                              | Screens and states; mockup web code; IT/EN copy                 | Implemented  | Automatic on app launch, proceeding directly to S1-D05; implemented with loading/error/retry states (`S3-1`)                                                                                                       |
+| **S1-D04** | **Recovery key**                             | Explanation, words and QR, ways to save it (copy, share, print), confirmation of saving                                                                                     | Screens and states; mockup web code; IT/EN copy                 | Implemented  | Dedicated pre-Home screen `RecoveryKeySetupPage` (`S-06`): 24-word/QR toggle, copy, JSON share/export, screenshot/cloud warning, checkbox + server confirmation                                                      |
+| **S1-D05** | **Partner invite**                           | Link and QR generation, sharing, "waiting for …" state, expiration, and regeneration                                                                                        | Screens and states; mockup web code; IT/EN copy                 | Implemented  | (`S3-1`): High-contrast QR, native Android share, copy `#token=`/`#server=...` link, 15 min countdown, regeneration (mockup placeholders `lucciola.app`/`No expiration` aligned to Deep Sky + 15 min TTL)           |
+| **S1-D06** | **Second partner joining**                   | Opening the link, name, request sent, waiting                                                                                                                               | Screens and states; mockup web code; IT/EN copy                 | Implemented  |                                                                                                                                                                                                                    |
+| **S1-D07** | **Mutual verification**                      | Short code shown on both phones, instruction to compare it verbally, "matches / does not match"                                                                             | Screens and states; mockup web code; IT/EN copy                 | Implemented  | Dedicated screen `CodeVerificationPage` (6 digits with `v2` SAS bound to out-of-band `sasSecret` per `CA-01`, live status, SAS copy block and `FLAG_SECURE` per `CA-10`, confirmation and cancel dialog on mismatch) |
+| **S1-D08** | **Approval**                                 | On the first partner's phone: "… wants to join", approve or reject                                                                                                          | Screens and states; mockup web code; IT/EN copy                 | Implemented  | Merged into S1-D07 to avoid too many steps (SAS confirmation + key delivery from the first phone and cancellation if it does not match)                                                                            |
+| **S1-D09** | **Entering the home**                        | Welcome screen that leads to the home                                                                                                                                       | Screens and states; mockup web code; IT/EN copy                 | Implemented  | Dedicated screen `SpaceSetupPage` (`S1-D07-2`: display name with live preview for both partners, also editable from Settings via `PATCH /api/v1/pairing/devices/me`)                                                |
+| **S1-D10** | **New phone**                                | recovery key (guided word entry with per-word check, recovery progress)                                                                                                     | Screens and states; mockup web code; IT/EN copy                 | Implemented  | Recovery section in `OnboardingPage`: live BIP-39 word count `N/24` with per-word chips (`RecoveryKeyCodec.isValidWord`), QR scan, and calm errors                                                                |
+| **S1-D11** | **Device management**                        | List, status, revocation of a device                                                                                                                                        | Screens and states; mockup web code; IT/EN copy                 | Implemented  | `Devices` tab in `HomeShellPage`: list, status, QR/code enrollment, and calm confirmation dialog before revocation                                                                                                 |
+| **S1-D12** | **Notification permission**                  | Request explained at the right moment, not on first launch                                                                                                                  | Screens and states; IT/EN copy                                  | Implemented  | Contextual prompt `push-optin-card` in `HomeShellPage` after entering Home (not on first launch, dismissible) + toggle in `Settings`                                                                               |
+| **S1-D13** | **Updates**                                  | Screen with version, channel, check, progress; blocking and gentle "update required"                                                                                        | Screens and states; mockup web code; IT/EN copy                 | Implemented  | Version, `Stable`/`Preview` channel selector, check, progress bar, and gentle blocking screen `UpgradeRequiredPage`; to be verified live with signed release                                                       |
+| **S1-D14** | **Errors**                                   | Expired or already-used invite, unreachable server, version too old, no network, timeout                                                                                    | Screens and states; IT/EN copy                                  | Implemented  | Calm IT/EN messages (`P-02`, `V-08`) for invalid/expired invite, offline server, 426, and wrong key without leaking internal details                                                                               |
+| **S1-D15** | **Flow diagram**                             | Complete paths with exit and error points, linked to codes S1-D02 … S1-D14                                                                                                  | Diagram                                                         | Implemented  | Mermaid diagram and full states documented in `docs/enrollment-state-machine.md`, aligned to `S1-CTR-01`                                                                                                           |
+| **S1-D16** | **New components**                           | Recovery word field, QR, verification code                                                                                                                                  | Components in the design system, with states and tokens         | Implemented  | Components implemented in S3-1 flows with `Intimate Sanctuary` tokens; formal consolidation in the design system to be verified with the designer                                                                  |
 
-**Stato.** *Consegnato* (approvato dal promotore), *Parziale* (manca uno stato, un testo, un tema o
-il codice del mockup), *Da consegnare*, *Da verificare* (non ancora confrontato con il mockup già
-esistente). Una voce è **Consegnata** solo quando ha schermate per tutti gli stati, testi IT/EN,
-tema chiaro e scuro e, dove previsto, il codice web del mockup.
+**Status.** *Delivered* (approved by the sponsor), *Partial* (a state, copy, theme, or mockup
+code is missing), *To be delivered*, *To be verified* (not yet compared against the existing
+mockup). An item is **Delivered** only when it has screens for all states, IT/EN copy, light
+and dark themes, and, where expected, the mockup web code.
 
-**Aperto (DD-12).** Si può rivedere la chiave di recupero dopo la prima volta? Ipotesi: sì, ma solo
-dopo aver confermato l’identità sul telefono e con un avviso.
+**Open (DD-12).** Can the recovery key be viewed again after the first time? Hypothesis: yes, but
+only after confirming identity on the phone and with a warning.
 
-### 5.3 Task
+### 5.3 Tasks
 
-**S1-CTR-01 · Macchina a stati dell’enrollment** — Ruolo: architetto · Rif.: cap. 7
-dell’Architettura
+**S1-CTR-01 · Enrollment state machine** — Role: architect · Ref.: Architecture
+ch. 7
 
-- [x] Stati e transizioni descritti (creazione, invito, richiesta, verifica, approvazione, recupero,
-  revoca) *(`docs/enrollment-state-machine.md`)*
-- [x] Errori con **codici stabili** e mappatura sui messaggi dell’interfaccia *(
+- [x] States and transitions described (creation, invite, request, verification, approval, recovery,
+  revocation) *(`docs/enrollment-state-machine.md`)*
+- [x] Errors with **stable codes** and mapping to UI messages *(
   `docs/enrollment-state-machine.md`)*
-- [x] Versione del protocollo di enrollment dichiarata *(`docs/enrollment-state-machine.md`)*
-- [x] Approvato dal designer: ogni stato ha una schermata *(bozza completa pronta per revisione)*
+- [x] Enrollment protocol version declared *(`docs/enrollment-state-machine.md`)*
+- [x] Approved by the designer: every state has a screen *(complete draft ready for review)*
 
-**S1-DES-01 · Flusso e schermate finali** — Ruolo: designer
+**S1-DES-01 · Final flow and screens** — Role: designer
 
-- [x] Tutte le aree del 5.2 consegnate con stati, testi IT/EN, tema chiaro e scuro
-- [x] Diagramma del flusso con i punti di uscita e di errore *(bozza in
+- [x] All areas of 5.2 delivered with states, IT/EN copy, light and dark themes
+- [x] Flow diagram with exit and error points *(draft in
   `docs/enrollment-state-machine.md`
-  da validare)*
-- [x] Componenti nuovi (campo per le parole, QR, codice di verifica) nel design system
-- [x] Approvazione del promotore
+  to be validated)*
+- [x] New components (word field, QR, verification code) in the design system
+- [x] Sponsor approval
 
-**S1-DES-02 · Prova di comprensibilità sul mockup** — Ruolo: designer con promotore
+**S1-DES-02 · Comprehensibility test on the mockup** — Role: designer with sponsor
 
-- [x] Prototipo cliccabile provato dalla partner **prima** dell’implementazione
-- [x] Note su dove si ferma, cosa non capisce, cosa fraintende
-- [x] Correzioni incorporate o motivate
+- [x] Clickable prototype tested by the partner **before** implementation
+- [x] Notes on where she stops, what she does not understand, what she misunderstands
+- [x] Corrections incorporated or justified
 
-**S1-DES-03 · Guida all’installazione** — Ruolo: designer e redattore
+**S1-DES-03 · Installation guide** — Role: designer and technical writer
 
-- [x] Pagina o documento con passi illustrati, in italiano e inglese *(
+- [x] Page or document with illustrated steps, in Italian and English *(
   `deploy/web/join/index.html`)*
-- [x] Provata sul telefono della partner da qualcuno che non l’ha scritta
+- [x] Tested on the partner's phone by someone who did not write it
 
-**S1-INF-01 · Pagina di installazione e verifica dei link** — Ruolo: release e infrastruttura ·
-Rif.: AR-11
+**S1-INF-01 · Installation page and link verification** — Role: release and infrastructure ·
+Ref.: AR-11
 
-- [x] Pagina statica su `deepsky.vectevo.com` con la guida e il link all’ultima release stabile *(
-  `deploy/web/join/index.html`, servita via `deploy/Caddyfile` e `deploy/docker-compose.yml`)*
-- [x] File di associazione tra dominio e app (asset links) pubblicato con l’impronta pubblica del
-  certificato *(SHA-256 della chiave `deep-sky-release` configurato in `deploy/web/.well-known/assetlinks.json` con controllo CI in `.github/workflows/ci.yml` per `CA-20`; verificare corrispondenza con il `.p12` al rilascio in `S1-REL-01`)*
-- [x] Un link d’invito apre l’app se installata, la pagina di installazione se non lo è *(
-  intent-filter `autoVerify` in `AndroidManifest.xml` + `MainActivity`/`PlatformBridgePlugin` e
-  fallback JS in `/join` implementati; da verificare live su dominio e telefono reale)*
-- [x] **Token d’invito fuori da path URL e log**: l’invito resta nel frammento (`#token=`) su web/app e viaggia nel body JSON su `POST /api/v1/pairing/invites/accept` e `/status` (il server riceve il token grezzo per verificarne l’hash SHA-256, ma non finisce nei log di Caddy o Spring; da verificare con log di produzione al deploy)
-- [x] Alternativa funzionante: inserimento manuale del codice
+- [x] Static page on `deepsky.vectevo.com` with the guide and link to the latest stable release *(
+  `deploy/web/join/index.html`, served via `deploy/Caddyfile` and `deploy/docker-compose.yml`)*
+- [x] Domain-to-app association file (asset links) published with the public fingerprint of the
+  certificate *(SHA-256 of the `deep-sky-release` key configured in `deploy/web/.well-known/assetlinks.json` with CI check in `.github/workflows/ci.yml` for `CA-20`; verify match with the `.p12` at release in `S1-REL-01`)*
+- [x] An invite link opens the app if installed, or the installation page if not *(
+  `autoVerify` intent-filter in `AndroidManifest.xml` + `MainActivity`/`PlatformBridgePlugin` and
+  JS fallback in `/join` implemented; to be verified live on domain and real phone)*
+- [x] **Invite token out of URL path and logs**: the invite remains in the fragment (`#token=`) on web/app and travels in the JSON body on `POST /api/v1/pairing/invites/accept` and `/status` (the server receives the raw token to verify its SHA-256 hash, but it does not end up in Caddy or Spring logs; to be verified with production logs on deploy)
+- [x] Working fallback: manual code entry
 
-**S1-SRV-01 · Creazione degli inviti** — Ruolo: sviluppatore backend · Rif.: AR-02
+**S1-SRV-01 · Invite creation** — Role: backend developer · Ref.: AR-02
 
-- [x] Comando che crea un invito e ne stampa **link e QR**
-- [x] Monouso, con scadenza; un invito riscattato o scaduto è rifiutato
-- [x] Limite di tentativi sul riscatto; nessuna possibilità di scoprire inviti validi per tentativi
-  *(`RouteGroup.INVITE_REDEEM` in `PublicEndpointRateLimiter` + risposta uniforme `409 Conflict` in
-  `PairingService.acceptInvite`; verificato con `PairingHardeningUnitTest`)*
-- [x] Pulizia periodica degli inviti scaduti *(`PairingCleanupService` con finestra
-  `INVITE_RETENTION_GRACE = 15m`; compilato e analizzato, integration test DB in attesa di Docker)*
+- [x] Command that creates an invite and prints its **link and QR**
+- [x] Single-use, with expiration; a redeemed or expired invite is rejected
+- [x] Attempt rate limit on redemption; no possibility to discover valid invites by guessing
+  *(`RouteGroup.INVITE_REDEEM` in `PublicEndpointRateLimiter` + uniform `409 Conflict` response in
+  `PairingService.acceptInvite`; verified with `PairingHardeningUnitTest`)*
+- [x] Periodic cleanup of expired invites *(`PairingCleanupService` with
+  `INVITE_RETENTION_GRACE = 15m` window; compiled and analyzed, DB integration test awaiting Docker)*
 
-**S1-SRV-02 · Segnali dell’enrollment** — Ruolo: sviluppatore backend
+**S1-SRV-02 · Enrollment signals** — Role: backend developer
 
-- [x] Il primo partner riceve un segnale generico quando c’è una richiesta da approvare *(
-  `wakeup.pairing_request` in `PushService`, `PairingService` e `DeepSkyFirebaseMessagingService`)*
-- [x] Il segnale non contiene nomi né altri contenuti (S-02)
-- [x] Richieste non approvate scadono *(`PairingCleanupService` revoca dispositivi `INVITE_JOIN` /
-  `ENROLLMENT` non approvati oltre `UNAPPROVED_DEVICE_TTL = 30m`)*
+- [x] First partner receives a generic signal when there is a request to approve *(
+  `wakeup.pairing_request` in `PushService`, `PairingService`, and `DeepSkyFirebaseMessagingService`)*
+- [x] The signal contains no names or other content (S-02)
+- [x] Unapproved requests expire *(`PairingCleanupService` revokes unapproved `INVITE_JOIN` /
+  `ENROLLMENT` devices beyond `UNAPPROVED_DEVICE_TTL = 30m`)*
 
-**S1-APP-01 · Guscio dell’app** — Ruolo: sviluppatore client
+**S1-APP-01 · App shell** — Role: client developer
 
-- [x] Navigazione, stato di sessione e gestione dei link d’invito *(`InviteLinkCodec` `#token=`/
+- [x] Navigation, session state, and invite link handling *(`InviteLinkCodec` `#token=`/
   `#server=`,
-  bridge deep link Android `MainActivity`/`PlatformBridgePlugin`/`NativeBridge`, instradamento verso
-  `CodeVerificationPage` `S1-D07`, `SpaceSetupPage` `S1-D09`/`S1-D07-2` e `RecoveryKeySetupPage`
+  Android deep link bridge `MainActivity`/`PlatformBridgePlugin`/`NativeBridge`, routing to
+  `CodeVerificationPage` `S1-D07`, `SpaceSetupPage` `S1-D09`/`S1-D07-2`, and `RecoveryKeySetupPage`
   `S1-D04`)*
-- [x] Tema dai token del design system *(token `Intimate Sanctuary` scuro + chiaro armonizzato
-  applicati in `DeepSkyTheme`; font OFL `Plus Jakarta Sans`/`Nunito Sans` da integrare in bundle
-  quando i `.ttf` saranno disponibili)*
-- [x] Stati globali: non abbinato, in attesa, abbinato, versione obsoleta *(aggiunto
-  `AppBootPhase.waiting` con persistenza invito pendente su cold restart)*
+- [x] Theme from design system tokens *(harmonized dark + light `Intimate Sanctuary` tokens
+  applied in `DeepSkyTheme`; OFL fonts `Plus Jakarta Sans`/`Nunito Sans` to be bundled
+  when the `.ttf` files are available)*
+- [x] Global states: unpaired, waiting, paired, outdated version *(added
+  `AppBootPhase.waiting` with pending invite persistence across cold restart)*
 
-**S1-APP-02 · Primo partner** — Ruolo: sviluppatore client · Dipende da: S1-APP-01
+**S1-APP-02 · First partner** — Role: client developer · Depends on: S1-APP-01
 
-- [x] Creazione della coppia da invito *(creazione automatica all'avvio per `S1-D03` e schermata
-  transitoria `SpaceSetupPage` `S1-D09`/`S1-D07-2` implementate)*
-- [x] Chiave di recupero con **conferma obbligatoria** del salvataggio *(schermata dedicata pre-Home
-  `RecoveryKeySetupPage` `S1-D04` con 24 parole/QR, copia/esportazione JSON, avviso S-06 e conferma
-  obbligatoria su server)*
-- [x] Invito al partner con stato e rigenerazione *(QR, share nativo, link compatto, scadenza 15
-  min, verifica manuale e rigenerazione implementati in `WelcomeInvitePanel`)*
-- [x] Approvazione della richiesta con verifica reciproca *(implementata schermata dedicata
-  `CodeVerificationPage` `S1-D07`/`S1-D08` con confronto SAS 6 cifre, conferma e annullamento su
-  mancata corrispondenza)*
+- [x] Couple creation from invite *(automatic creation at startup for `S1-D03` and transient screen
+  `SpaceSetupPage` `S1-D09`/`S1-D07-2` implemented)*
+- [x] Recovery key with **mandatory confirmation** of saving *(dedicated pre-Home screen
+  `RecoveryKeySetupPage` `S1-D04` with 24 words/QR, JSON copy/export, S-06 warning, and mandatory
+  server confirmation)*
+- [x] Partner invite with status and regeneration *(QR, native share, compact link, 15 min
+  expiration, manual check, and regeneration implemented in `WelcomeInvitePanel`)*
+- [x] Request approval with mutual verification *(implemented dedicated screen
+  `CodeVerificationPage` `S1-D07`/`S1-D08` with 6-digit SAS comparison, confirmation, and cancellation on
+  mismatch)*
 
-**S1-APP-03 · Secondo partner** — Ruolo: sviluppatore client · Dipende da: S1-APP-01
+**S1-APP-03 · Second partner** — Role: client developer · Depends on: S1-APP-01
 
-- [x] Unione da link o codice, nome, attesa *(tab `Unisciti` con incolla/link + schermata dedicata
-  `SpaceSetupPage` `S1-D07-2` dopo verifica)*
-- [x] Verifica reciproca; gestione di “non coincide” *(schermata dedicata `CodeVerificationPage`
-  `S1-D07` con dialogo di conferma annullamento e rientro su `Unisciti`)*
-- [x] Ingresso nella casa dopo l’approvazione *(flusso `CodeVerificationPage` -> `SpaceSetupPage` ->
+- [x] Join from link or code, name, waiting *(`Join` tab with paste/link + dedicated screen
+  `SpaceSetupPage` `S1-D07-2` after verification)*
+- [x] Mutual verification; "does not match" handling *(dedicated screen `CodeVerificationPage`
+  `S1-D07` with cancellation confirmation dialog and return to `Join`)*
+- [x] Entering the home after approval *(flow `CodeVerificationPage` -> `SpaceSetupPage` ->
   `RecoveryKeySetupPage` -> `HomeShellPage`)*
 
-**S1-APP-04 · Nuovo telefono** — Ruolo: sviluppatore client
+**S1-APP-04 · New phone** — Role: client developer
 
-- [x] Via altro telefono: QR o codice, verifica, approvazione
-- [x] Via chiave di recupero: inserimento guidato, avanzamento, ripristino dei dati *(chip parola
-  per parola con validazione `RecoveryKeyCodec.isValidWord` e contatore `N/24`)*
-- [x] Una chiave errata dà messaggi comprensibili, senza rivelare nulla di più *(
+- [x] Via another phone: QR or code, verification, approval
+- [x] Via recovery key: guided entry, progress, data restore *(word-by-word chip
+  with `RecoveryKeyCodec.isValidWord` validation and `N/24` counter)*
+- [x] A wrong key gives understandable messages, without revealing anything more *(
   `_CalmUserException` IT/EN)*
 
-**S1-APP-05 · Dispositivi e permessi** — Ruolo: sviluppatore client
+**S1-APP-05 · Devices and permissions** — Role: client developer
 
-- [x] Elenco dispositivi e revoca *(tab `Dispositivi` con arruolamento, elenco live e dialogo di
-  conferma calmo prima della revoca)*
-- [x] Permesso notifiche richiesto nel momento previsto dal design *(`push-optin-card` contestuale
-  dopo l'ingresso in Home, dismissibile, oltre al controllo in `Impostazioni`)*
-- [x] Impostazioni minime *(lingua IT/EN, tema notte/giorno, riduzione movimento, editor nome
-  visibile con `PATCH /api/v1/pairing/devices/me`, notifiche, aggiornamenti e canale)*
+- [x] Device list and revocation *(`Devices` tab with enrollment, live list, and calm
+  confirmation dialog before revocation)*
+- [x] Notification permission requested at the moment planned by the design *(contextual `push-optin-card`
+  after entering Home, dismissible, in addition to the toggle in `Settings`)*
+- [x] Minimal settings *(IT/EN language, night/day theme, reduce motion, display name editor
+  with `PATCH /api/v1/pairing/devices/me`, notifications, updates, and channel)*
 
-**S1-UPD-01 · Aggiornamenti e canali** — Ruolo: sviluppatore Android nativo · Rif.: F-19, PD-18
+**S1-UPD-01 · Updates and channels** — Role: native Android developer · Ref.: F-19, PD-18
 
-- [x] Schermata aggiornamenti con versione, canale e avanzamento *(`Impostazioni` +
+- [x] Updates screen with version, channel, and progress *(`Settings` +
   `UpgradeRequiredPage`)*
-- [x] Canale **stabile** (release normali) e **anteprima** (anche pre-release), selezionabile dalle
-  impostazioni *(`UpdateChannel.stable`/`preview` con persistenza locale e risoluzione GitHub
-  Releases)*
-- [x] Versione minima imposta dal server con schermata bloccante gentile *(`UpgradeRequiredPage` su
+- [x] **Stable** channel (normal releases) and **preview** channel (including pre-releases), selectable from
+  settings *(`UpdateChannel.stable`/`preview` with local persistence and GitHub Releases resolution)*
+- [x] Minimum version enforced by the server with gentle blocking screen *(`UpgradeRequiredPage` on
   HTTP 426)*
-- [ ] Provato: la partner su stabile non riceve una anteprima *(logica coperta da unit test; da
-  verificare sul campo con release firmate)*
+- [ ] Tested: the partner on stable does not receive a preview *(logic covered by unit tests; to be
+  verified in the field with signed releases)*
 
-**S1-SEC-01 · Revisione interna di sicurezza** — Ruolo: revisore di sicurezza, non l’autore del
-codice
+**S1-SEC-01 · Internal security review** — Role: security reviewer, not the author of the
+code
 
-- [x] Filtro di autenticazione, cifratura, archivio chiavi, recupero, arruolamento e revoca
-  esaminati *(`docs/code-audit-2026-11-16.md`)*
-- [x] Rapporto scritto con rilievi e decisioni; i rilievi alti (`CA-01`, `CA-02`, `CA-03`) sono
-  implementati e verificati nei test unitari/widget/WebMvc *(restano integration test DB su Docker e
-  verifica finale sul campo per G-3a)*
-- [x] Blocco del recupero per tentativi ripetuti: oltre al limite per IP già presente (`PublicEndpointRateLimiter`), implementato limite sliding-window **per coppia/chiave** (`HTTP 429`, `PairingService` su `/api/v1/recovery/challenges` e `/complete`, documentato in `ADR-0005` `G5-03`)
-- [x] Verificato che la rotazione chiavi dopo revoca (S1-SEC-02, CA-02, ADR-0012) sia coperta dal rapporto
-- [x] Elenco dei punti da passare alla revisione indipendente (G-5), incluso G5-09 (libreria
-  crittografica Dart pura contro backend nativo): **rinviato di proposito** a G-5, la dipendenza non
-  cambia in M3 (`ADR-0010`, `docs/architecture.md` cap. 5 `G5-01`..`G5-09`, `docs/code-audit-2026-11-16.md` §8)
+- [x] Authentication filter, encryption, key store, recovery, enrollment, and revocation
+  examined *(`docs/code-audit-2026-11-16.md`)*
+- [x] Written report with findings and decisions; high findings (`CA-01`, `CA-02`, `CA-03`) are
+  implemented and verified in unit/widget/WebMvc tests *(DB integration tests on Docker and
+  final field verification for G-3a remain)*
+- [x] Recovery lockout on repeated attempts: in addition to the existing per-IP limit (`PublicEndpointRateLimiter`), implemented **per-couple/key** sliding-window limit (`HTTP 429`, `PairingService` on `/api/v1/recovery/challenges` and `/complete`, documented in `ADR-0005` `G5-03`)
+- [x] Verified that key rotation after revocation (S1-SEC-02, CA-02, ADR-0012) is covered by the report
+- [x] List of items to pass to the independent review (G-5), including G5-09 (pure Dart cryptographic
+  library vs native backend): **intentionally deferred** to G-5, dependency does not
+  change in M3 (`ADR-0010`, `docs/architecture.md` ch. 5 `G5-01`..`G5-09`, `docs/code-audit-2026-11-16.md` §8)
 
-**S1-SEC-02 · Rotazione delle chiavi dopo la revoca** — Ruolo: architetto, sviluppatore client e
-backend, revisore di sicurezza · Rif.: S-06, AD-01, G5-05, ADR-0005, ADR-0012 · Dipende da: S1-APP-05
+**S1-SEC-02 · Key rotation after revocation** — Role: architect, client and backend
+developer, security reviewer · Ref.: S-06, AD-01, G5-05, ADR-0005, ADR-0012 · Depends on: S1-APP-05
 
-Implementata in codice e schema DB (`ADR-0012`, `V5__epoch_key_rotation.sql`, `CA-02`): la revoca di
-un altro dispositivo incrementa atomicamente `keyEpoch`, ruota `recoverySeed` e `recoveryAuthPublicKey`
-e preserva le buste storiche nel `recovery_keyring`.
+Implemented in code and DB schema (`ADR-0012`, `V5__epoch_key_rotation.sql`, `CA-02`): revoking
+another device atomically increments `keyEpoch`, rotates `recoverySeed` and `recoveryAuthPublicKey`,
+and preserves historical envelopes in `recovery_keyring`.
 
-- [x] Progetto scritto: quando si incrementa `keyEpoch`, chi genera la nuova chiave, come raggiunge
-  il dispositivo superstite (consegna cifrata X25519 `EPOCH_ROTATION`), cosa succede se il
-  superstite è offline o se resta un solo telefono (`recovery_keyring`) *(ADR-0012)*
-- [x] Aggiornamento del formato (nuova epoca `v2` nelle buste e negli snapshot con `V5__epoch_key_rotation.sql`,
-  PD-19); le buste `epoch = 1` restano leggibili tramite `epochSecrets[1]` e `recovery_keyring`
-- [x] Il dispositivo revocato non può decifrare nulla di ciò che è scritto dopo la rotazione
-  *(test automatici in `deep_sky_crypto_test`, `pairing_and_sync_repository_test`, `deep_sky_e2e_flow_test`,
+- [x] Written design: when `keyEpoch` is incremented, who generates the new key, how it reaches
+  the surviving device (encrypted X25519 delivery `EPOCH_ROTATION`), what happens if the
+  survivor is offline or if only one phone remains (`recovery_keyring`) *(ADR-0012)*
+- [x] Format update (new `v2` epoch in envelopes and snapshots with `V5__epoch_key_rotation.sql`,
+  PD-19); `epoch = 1` envelopes remain readable via `epochSecrets[1]` and `recovery_keyring`
+- [x] The revoked device cannot decrypt anything written after rotation
+  *(automated tests in `deep_sky_crypto_test`, `pairing_and_sync_repository_test`, `deep_sky_e2e_flow_test`,
   `PairingServiceUnitTest`, `SyncServiceUnitTest`)*
-- [x] Provato su due telefoni reali: revoca, rotazione, il telefono superstite continua a funzionare
-- [x] Interazione con la chiave di recupero chiarita (`recoverySeed` ruotato + nuova conferma su
-  `RecoveryKeySetupPage` per `ADR-0012`; revisione finale testi IT/EN in carico al designer)
-- [ ] Rivista da chi non l’ha scritta (S1-SEC-01); ADR pubblicato (`ADR-0012`) che sostituisce
-  la parte interessata di ADR-0005
+- [x] Tested on two real phones: revocation, rotation, the surviving phone continues to work
+- [x] Interaction with recovery key clarified (`recoverySeed` rotated + new confirmation on
+  `RecoveryKeySetupPage` per `ADR-0012`; final IT/EN copy review assigned to the designer)
+- [ ] Reviewed by someone who did not write it (S1-SEC-01); ADR published (`ADR-0012`) replacing
+  the affected part of ADR-0005
 
-**S1-INF-02 · Footprint su VM ARM** — Ruolo: release e infrastruttura · Rif.: TC-02, TC-03, ADR-0009
+**S1-INF-02 · Footprint on ARM VM** — Role: release and infrastructure · Ref.: TC-02, TC-03, ADR-0009
 
-- [x] Compose di produzione (profilo Balanced) misurato sulla VM ARM: avvio, memoria a riposo e
-  sotto carico, assenza di OOM
-- [x] Requisiti minimi di self-hosting aggiornati con le misure reali
+- [x] Production Compose (Balanced profile) measured on the ARM VM: startup, idle memory and
+  under load, absence of OOM
+- [x] Minimum self-hosting requirements updated with real measurements
 
-**S1-QA-01 · Prove di punta a punta** — Ruolo: QA
+**S1-QA-01 · End-to-end tests** — Role: QA
 
-- [x] Tutti i flussi su **due telefoni reali**
-- [x] Interruzioni a metà: rete assente, app chiusa, rotazione, tasto indietro, scadenza dell’invito
-- [x] Compatibilità tra versione *n − 1* e *n* (PD-19) *(coperta da test automatici client `test/data/pd19_compatibility_test.dart` e server `PairingServiceUnitTest` per identity legacy, key delivery v1/v2 e buste epoch 1/2)*
+- [x] All flows on **two real phones**
+- [x] Mid-flow interruptions: no network, app closed, rotation, back button, invite expiration
+- [x] Compatibility between version *n − 1* and *n* (PD-19) *(covered by client automated tests `test/data/pd19_compatibility_test.dart` and server `PairingServiceUnitTest` for legacy identity, v1/v2 key delivery, and epoch 1/2 envelopes)*
 
-**S1-QA-02 · Prova con la partner** — Ruolo: promotore con QA
+**S1-QA-02 · Test with the partner** — Role: sponsor with QA
 
-- [x] Protocollo scritto: consenso, **nessun aiuto** durante la prova, cosa osservare (dove si
-  ferma, cosa non capisce, tempi)
-- [x] La partner completa installazione, enrollment e salvataggio della chiave su un telefono suo
-- [x] Un test di comprensione: sa dire cosa succede se perde il telefono?
-- [x] Note raccolte e problemi trasformati in task
+- [x] Written protocol: consent, **no help** during the test, what to observe (where she
+  stops, what she does not understand, timings)
+- [x] The partner completes installation, enrollment, and key saving on her own phone
+- [x] A comprehension test: can she say what happens if she loses her phone?
+- [x] Notes collected and issues turned into tasks
 
-**S1-DOC-01 · Procedura di emergenza** — Ruolo: redattore
+**S1-DOC-01 · Emergency procedure** — Role: technical writer
 
-- [x] Cosa fare se il server non risponde, se un aggiornamento è difettoso (nuova release con numero
-  più alto), se si perde un telefono o la chiave *(`docs/emergency-procedure.md`)*
-- [x] Notifiche ferme dopo “Termina” / Force Stop da Impostazioni: la consegna riprende alla
-  riapertura dell’app (ADR-0006); riportato nella procedura e nella guida per la partner
+- [x] What to do if the server does not respond, if an update is defective (new release with higher
+  version code), if a phone or the key is lost *(`docs/emergency-procedure.md`)*
+- [x] Notifications stopped after "Force Stop" from Settings: delivery resumes when
+  reopening the app (ADR-0006); documented in the procedure and in the partner guide
 
-**S1-REL-01 · Prima release sul campo** — Ruolo: release e infrastruttura
+**S1-REL-01 · First field release** — Role: release and infrastructure
 
-- [x] Release stabile firmata in locale, installata dal link sul telefono della partner
-- [x] Una seconda release ricevuta in app senza intervento
-- [ ] Release di anteprima solo sul telefono del promotore
+- [x] Locally signed stable release, installed from the link on the partner's phone
+- [x] A second release received in-app without intervention
+- [ ] Preview release only on the sponsor's phone
 
-### 5.4 Uscita da S3-1 (G-3a)
+### 5.4 Exit from S3-1 (G-3a)
 
-- [ ] Tutti i task chiusi con evidenza e approvati
-- [ ] Tutti i punti del capitolo 3 spuntati
-- [x] Elenco di cosa la partner ha trovato difficile, con priorità
-- [x] Decisione del promotore: si inizia a usare dati reali
+- [ ] All tasks closed with evidence and approved
+- [ ] All items in chapter 3 checked off
+- [x] List of what the partner found difficult, prioritized
+- [x] Sponsor decision: start using real data
 
-## 6. Sprint S3-2: Home e scena reali, design system completo, pacchetto di contenuti v1
+## 6. Sprint S3-2: Real Home and scene, complete design system, content pack v1
 
-### 6.1 Obiettivo e uscita
+### 6.1 Objective and output
 
-La coppia apre **la vera casa del nucleo** (`F-02`, `SL-01`, mockup in `docs/design/S3-2/`), non più la stanza pilota `ds2-pilot-room` di M1/M2, procedendo per **micro-pacchetti verticali di contenuti (1–2 grafiche per volta)** così da non bloccare lo sviluppo sulla produzione artistica completa:
+The couple opens **the real home of the core** (`F-02`, `SL-01`, mockup in `docs/design/S3-2/`), no longer the pilot room `ds2-pilot-room` from M1/M2, proceeding in **vertical content micro-packs (1–2 graphics at a time)** so as not to block development on full artistic production:
 
-- il **design system completo** (`DS-3`, `Intimate Sanctuary`, `docs/design/S3-2/DESIGN.md`) è consolidato con i font OFL inclusi nel bundle (`Plus Jakarta Sans` e `Nunito Sans`, con testi `OFL.txt` registrati in `LicenseRegistry`, `N-06`), token completi chiaro/scuro (`V-06`) e componenti condivisi (`S1-D16`);
-- **muro = sfondo dell’app + pavimento continuo fino a fondo pagina:** il muro non è un’immagine opaca con vignettatura ma è lo **sfondo stesso dell’app**, i cui colori cambiano con l’ora del giorno (`giorno`, `crepuscolo`, `notte`); dalla linea del battiscopa in giù prosegue il **pavimento della stanza fino a fondo pagina**, così che l’arredo e (da `S3-5`) il **Countdown** sembrino poggiati direttamente sul pavimento della casa;
-- **stanza a micro-pacchetti (`v1.0` → `v1.1` → `v1.2`) senza elementi di funzioni future (`V-09`):**
-  - **`v1.0.0` (Stanza base e finestra del cielo):** pavimento continuo con battiscopa (`floor`) + finestra ad arco (`window`) che mostra **solo il cielo** dell’ora locale (`giorno`, `crepuscolo`, `notte`, senza meteo/temperatura per non richiedere posizione GPS `S-05`);
-  - **`v1.1.0` (Arredo e “luce lasciata accesa” `F-03`):** divano e tappeto scontornati (`couch`, `rug`) + **lampada da terra (`floor_lamp`)**, che rappresenta la **“luce lasciata accesa”** del Design Brief 4.2 (`calm` a riposo, `lit` con bagliore caldo ambra quando c’è un pensiero ricevuto non visto / recente, toccabile per mandare un *Ti penso*);
-  - **`v1.2.0` (Presenza nella stanza):** i due partner seduti sul divano (`partner_a`, `partner_b`) + il cagnolino addormentato sul tappeto come **elemento decorativo statico** (le reazioni e pose dinamiche del pet restano in `M6`, `F-09`);
-  - **assenti in `S3-2` (`V-09`):** barra del mood (`S3-4`), card del countdown sul pavimento (`S3-5`), cornice/leggio disegno (`S3-6`), mensola con busta sigillata (`S3-7`), bacheca in sughero (`M5`) e diario `NOI` (`M7`);
-- **card superiore “Ti penso” a doppio stato (ponte con `S3-3`, `F-03`, `DD-04`):**
-  - se c’è un gesto *Ti penso* ricevuto dal partner **non ancora visto localmente e più recente di 6 ore**, mostra il banner *“\<Partner\> ti ha pensato”* (con eventuale nota) e il pulsante **`♥ Ricambia`**;
-  - altrimenti mostra al suo posto il controllo rapido per **inviare un “Ti penso”** con messaggio facoltativo;
-- **header e barra di navigazione essenziali:** in alto a sinistra il titolo `Casa` e in alto a destra **un solo pulsante per `Impostazioni`** (rimossi i due pallini del mockup e qualsiasi pallino verde di presenza online `P-07`, `S-05`); in basso **solo 2 tab attivi in `S3-2`: `Casa` e `Noi`** (coppia e dispositivi), aggiungendo `Gesti` e `Ricordi` solo quando nasceranno le rispettive funzioni;
-- **separazione rigorosa tra stato locale e snapshot condiviso (`P-07`, `S-05`):** lo stato `lit` della lampada e il banner *“ti ha pensato”* (`< 6h` e non visto), l’ora dell’ultima apertura (per il messaggio di bentornato dopo giorni di assenza) e la fascia oraria del cielo sono **proprietà strettamente locali al singolo dispositivo** (`LocalSceneViewState`), mai sincronizzate nello snapshot E2EE condiviso (`CoupleRoomSnapshot`);
-- l’orientamento dell’app è **bloccato in verticale (`portraitUp`)** per le schermate standard, ma la scena è predisposta con sviluppo orizzontale più ampio (per scorrimento orizzontale morbido e futura modalità orizzontale a tutto schermo opzionale per la sola scena);
-- i **pacchetti di contenuti firmati** (`CNT-01`, `AR-09`, `TC-10`, `G5-07`) sono scaricati **file per file** (solo gli asset con SHA-256 nuovo), verificati sul client tramite una **lista di chiavi pubbliche Ed25519 con `keyId`** sui byte grezzi prima del parsing JSON, con guardia anti-downgrade persistente, rollback automatico all’**ultimo pacchetto funzionante** e **due modalità di aggiornamento**:
-  1. **automatico in background:** solo su rete non a consumo (Wi-Fi di default), preparato in `staged/` e attivato al prossimo avvio;
-  2. **pulsante esplicito “Aggiorna grafiche” in Impostazioni:** scarica subito anche su rete a consumo, svuota le texture precedenti dalla `imageCache` e **ricarica immediatamente l’interfaccia** senza chiudere e riaprire l’app;
-- sul telefono fisico meno recente sono rispettate le soglie di **`ADR-0007`**: una sola variante oraria decodificata in memoria alla volta (con `.evict()` delle varianti non attive e tetto esplicito a `imageCache`), **≥ 95% dei frame entro 16,7 ms** (60 Hz) e **RSS di picco ≤ 180 MB**.
+- the **complete design system** (`DS-3`, `Intimate Sanctuary`, `docs/design/S3-2/DESIGN.md`) is consolidated with the OFL fonts bundled (`Plus Jakarta Sans` and `Nunito Sans`, with `OFL.txt` texts registered in `LicenseRegistry`, `N-06`), complete light/dark tokens (`V-06`), and shared components (`S1-D16`);
+- **wall = app background + continuous floor to bottom of page:** the wall is not an opaque image with vignetting, but is the **app background itself**, whose colors change with the time of day (`day`, `twilight`, `night`); from the baseboard line downward, the **room floor continues to the bottom of the page**, so that the furniture and (from `S3-5`) the **Countdown** appear to rest directly on the floor of the home;
+- **room in micro-packs (`v1.0` → `v1.1` → `v1.2`) without elements of future features (`V-09`):**
+  - **`v1.0.0` (Base room and sky window):** continuous floor with baseboard (`floor`) + arched window (`window`) showing **only the sky** for the local time (`day`, `twilight`, `night`, without weather/temperature so as not to require GPS location `S-05`);
+  - **`v1.1.0` (Furniture and "light left on" `F-03`):** cut-out couch and rug (`couch`, `rug`) + **floor lamp (`floor_lamp`)**, which represents the **"light left on"** from Design Brief 4.2 (`calm` at rest, `lit` with a warm amber glow when there is an unseen / recent received thought, tappable to send a *Thinking of you*);
+  - **`v1.2.0` (Presence in the room):** the two partners sitting on the couch (`partner_a`, `partner_b`) + the sleeping puppy on the rug as a **static decorative element** (dynamic pet reactions and poses remain in `M6`, `F-09`);
+  - **absent in `S3-2` (`V-09`):** mood bar (`S3-4`), countdown card on the floor (`S3-5`), drawing frame/easel (`S3-6`), shelf with sealed envelope (`S3-7`), corkboard (`M5`), and `US` diary (`M7`);
+- **top "Thinking of you" card with dual state (bridge with `S3-3`, `F-03`, `DD-04`):**
+  - if there is a *Thinking of you* gesture received from the partner **not yet seen locally and more recent than 6 hours**, it shows the banner *"\<Partner\> thought of you"* (with optional note) and the **`♥ Send back`** button;
+  - otherwise, it shows in its place the quick control to **send a "Thinking of you"** with an optional message;
+- **essential header and navigation bar:** at the top left, the title `Home` and at the top right **a single button for `Settings`** (removed the two dots from the mockup and any green online presence dot `P-07`, `S-05`); at the bottom **only 2 active tabs in `S3-2`: `Home` and `Us`** (couple and devices), adding `Gestures` and `Memories` only when their respective features are born;
+- **strict separation between local state and shared snapshot (`P-07`, `S-05`):** the `lit` state of the lamp and the *"thought of you"* banner (`< 6h` and unseen), the last-opened timestamp (for the welcome-back message after days of absence), and the sky time-of-day band are **strictly local properties of the individual device** (`LocalSceneViewState`), never synchronized in the shared E2EE snapshot (`CoupleRoomSnapshot`);
+- app orientation is **locked to portrait (`portraitUp`)** for standard screens, but the scene is laid out with a wider horizontal span (for smooth horizontal panning and a future optional fullscreen landscape mode for the scene alone);
+- **signed content packs** (`CNT-01`, `AR-09`, `TC-10`, `G5-07`) are downloaded **file by file** (only assets with a new SHA-256), verified on the client via a **list of Ed25519 public keys with `keyId`** on the raw bytes before JSON parsing, with persistent anti-downgrade guard, automatic rollback to the **last known good pack**, and **two update modes**:
+  1. **automatic in background:** only on unmetered networks (Wi-Fi by default), prepared in `staged/` and activated on next launch;
+  2. **explicit "Update graphics" button in Settings:** downloads immediately even on metered networks, evicts previous textures from `imageCache`, and **immediately reloads the UI** without closing and reopening the app;
+- on the oldest physical phone, the **`ADR-0007`** thresholds are met: only one time-of-day variant decoded in memory at a time (with `.evict()` of inactive variants and an explicit cap on `imageCache`), **≥ 95% of frames within 16.7 ms** (60 Hz), and **peak RSS ≤ 180 MB**.
 
-### 6.2 Cosa deve consegnare il designer (design finale)
+### 6.2 What the designer must deliver (final design)
 
-Per ogni voce: schermate o artefatti, **tutti gli stati** (giorno/crepuscolo/notte, casa calma, pensiero non letto `< 6h`, ritorno dopo giorni di assenza, caricamento, offline), testi in italiano e inglese (`V-10`, `V-11`, `V-12`), tema chiaro e scuro (`V-06`), accessibilità (`V-07`). In parallelo, il designer consegna schermate e stati di **S3-3** (*Thinking of you e notifiche*, una fetta avanti).
+For each item: screens or artifacts, **all states** (day/twilight/night, calm home, unread thought `< 6h`, return after days of absence, loading, offline), copy in Italian and English (`V-10`, `V-11`, `V-12`), light and dark theme (`V-06`), accessibility (`V-07`). In parallel, the designer delivers screens and states for **S3-3** (*Thinking of you and notifications*, one slice ahead).
 
-| Codice     | Area                                                       | Contenuto                                                                                                                                                                                                                                                           | Formato di consegna                                                         | Stato         | Note                                                                                                                                                                                                           |
-|:-----------|:-----------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:----------------------------------------------------------------------------|:--------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **S2-D01** | **Design system completo (`DS-3`)**                        | Token definitivi da `docs/design/S3-2/DESIGN.md` (palette giorno/crepuscolo/notte, tipografia `Plus Jakarta Sans` + `Nunito Sans`, spaziature, raggi, elevazioni, movimento), iconografia, guida microcopy e consolidamento componenti `S1-D16`                     | Specifica token JSON/MD (`DESIGN.md`); file font `.ttf` + `OFL.txt`; stati  | Implementato  | Token muro-sfondo giorno/crepuscolo/notte (chiaro/scuro) completati in `docs/design/S3-2/DESIGN.md` e `DeepSkyTokens`; font OFL `Plus Jakarta Sans` e `Nunito Sans` inclusi in `assets/fonts/` e registrati in `LicenseRegistry` (`N-06`) |
-| **S2-D02** | **Composizione senza muro opaco + pavimento continuo**     | Rimozione del muro opaco dall’illustrazione (il muro è lo sfondo dell’app che cambia colore durante il giorno) e **pavimento con battiscopa che prosegue fino a fondo pagina** (così in `S3-5` il countdown poggerà sul pavimento)                                  | Asset PNG trasparenti per micro-pacchetti `v1.0`, `v1.1`, `v1.2`            | Parziale (`v1.0.0` implementato) | Micro-pacchetto `v1.0.0` (`floor.png` + `window_*`) integrato in `content/masters/v1/` e derivati `content/packs/v1/assets/`; `v1.1.0` (`rug`, `couch`, `floor_lamp`) e `v1.2.0` (`couple_on_couch`, `pet_sleeping`) in attesa di consegna artistica |
-| **S2-D03** | **Finestra del cielo e lampada “luce lasciata accesa”**    | **Finestra ad arco (`window`):** mostra solo il cielo (`giorno`/`crepuscolo`/`notte`, senza meteo `14°C` per `S-05`). **Lampada da terra (`floor_lamp`):** rappresenta la “luce lasciata accesa” di `F-03` (`calm` vs `lit` con bagliore ambra su pensiero `< 6h`) | Livelli PNG separati (`A-01`, `A-04`); regole di fascia oraria              | Parziale (`window` implementato; `floor_lamp` pronto in engine) | `window_frame.png` + 3 cieli consegnati e attivi in `v1.0.0`; `HybridSceneCanvas` e `SceneStateMapper` già pronti per `floor_lamp` (`calm`/`lit` + alone `RadialGradient` ambra) all’arrivo di `v1.1.0` |
-| **S2-D04** | **Piano dei 3 micro-pacchetti di `S3-2` (`A-09`, `V-09`)** | **`v1.0.0`:** pavimento + finestra cielo. **`v1.1.0`:** divano + tappeto + lampada da terra (`calm`/`lit`). **`v1.2.0`:** i due partner sul divano + cagnolino addormentato statico. **Assenti** bacheca, mensola capsula/diario, barra mood e countdown           | Tabella slot (`A-09`); `manifest.json` validato; livelli PNG scontornati    | Parziale (`v1.0.0` consegnato e validato) | `content/packs/v1/manifest.json` (`v1.0.0`) validato da `scripts/validate_content.py` entro il budget `DD-10` (`1,02 MB`); tabella slot `v1.0–v1.2` in `docs/design/S3-2/asset-catalog-v1.md` |
-| **S2-D05** | **Schermata Home (`F-02`, `DS-4`)**                        | Layout da `docs/design/S3-2/code.html` adattato a `S3-2`: header con titolo `Casa` a sinistra e **un solo pulsante `Impostazioni` a destra**; card superiore *Ti penso* a doppio stato (`< 6h` non letto con `Ricambia` vs invio rapido); scena su muro-sfondo e pavimento; **2 soli tab in basso (`Casa`, `Noi`)** | Schermate e stati; codice web del mockup; testi IT/EN                       | Implementato  | Implementato in `HomeShellPage` + `SettingsPage` con muro-sfondo dinamico, pavimento continuo, card *Ti penso* a doppio stato, header a singolo pulsante `Impostazioni`, 2 tab (`Casa`/`Noi`) e golden scuro/chiaro |
-| **S2-D06** | **Navigazione accessibile oltre la scena (`DD-04`)**       | La card superiore *Ti penso* (invio rapido / `Ricambia`) e i 2 tab inferiori (`Casa`, `Noi`) + pulsante `Impostazioni` in alto a destra garantiscono accesso completo anche senza toccare la lampada illustrata, con ordine `OrdinalSortKey` per TalkBack (`V-07`)  | Specifica stati e ordine `OrdinalSortKey`; testi IT/EN                      | Implementato  | Card superiore con `OrdinalSortKey(0)`, aree touch >= `48×48`, layout adattivo senza overflow al 200% di scala testo |
-| **S2-D07** | **Casa spoglia e bentornato dopo giorni di assenza**       | Aspetto e testi della Home all’inizio dell’uso e nel momento del **ritorno dopo giorni di assenza** calcolato solo sull’ultima apertura locale del dispositivo (`P-02`, `P-03`, `P-07`, Design Brief cap. 7)                                                        | Schermate e stati; testi IT/EN                                              | Implementato  | Card dismissibile `welcome-back-card` (`>= 3 giorni` da `lastOpenedAtLocal`), testi IT/EN calmi, zero contatori di assenza e zero sync server (`S-05`) |
-| **S2-D08** | **Catalogo asset `v1` e Style Bible (`DS-5`)**             | Style Bible aggiornata (`A-03`), catalogo incrementale degli asset dei micro-pacchetti `v1.0`–`v1.2` (`A-07`: ID, slot, dimensioni master, hash SHA-256, prompt, strumento AI e termini `A-08`), verifica trasparenza su muro chiaro/crepuscolo/notte (`A-04`)       | Documento catalogo + Style Bible; specifica master (`content/masters/`)     | Parziale (`v1.0.0` completo tranne prompt/strumento AI/termini) | Creati `content/LICENSE-ASSETS` (`CC-BY-4.0` con esclusione nome/logo/icona) e `docs/design/S3-2/asset-catalog-v1.md` con SHA-256 di master e derivati; prompt, strumento AI e termini (`A-08`) **da fornire dal designer/promotore**; da aggiornare con `v1.1.0`/`v1.2.0` alla consegna artistica |
-| **S2-D09** | **Aggiornamento pacchetto contenuti (auto + pulsante forzato)** | In Impostazioni: versione del pacchetto grafico attivo e **pulsante esplicito “Aggiorna grafiche”** che scarica subito (anche su rete a consumo) e ricarica la UI a caldo; banner di sola lettura offline (`N-03`, `TC-07`, `V-08`)                                 | Schermate e stati; testi IT/EN                                              | Implementato  | Card `settings-graphics-card` in `SettingsPage` con versione attiva, pulsante `Aggiorna grafiche` (download immediato + eviction cache + hot reload) e banner offline `N-03` |
-| **S2-D10** | **Design in anticipo per S3-3 (*Thinking of you*)**        | Gesto “ti penso” rifinito (`F-03`), nota breve facoltativa, effetto “vibrazione sul cuore” / aptica, reazione della lampada da terra, testi delle notifiche generiche (`F-16`, `S-02`), canale Android e impostazioni di quiete                                     | Schermate e stati; codice web del mockup; testi IT/EN                       | Consegnato (in attesa approvazione promotore) | Specifica completa scritta in `docs/design/S3-3/thinking-of-you-spec.md` (flussi, aptica, notifiche generiche IT/EN, canale Android e ore di quiete) |
+| Code       | Area                                                       | Content                                                                                                                                                                                                                                                           | Delivery format                                                         | Status        | Notes                                                                                                                                                                                                          |
+|:-----------|:-----------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------|:--------------|:---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **S2-D01** | **Complete design system (`DS-3`)**                        | Final tokens from `docs/design/S3-2/DESIGN.md` (day/twilight/night palette, `Plus Jakarta Sans` + `Nunito Sans` typography, spacing, radii, elevations, motion), iconography, microcopy guide, and `S1-D16` component consolidation                         | JSON/MD token spec (`DESIGN.md`); `.ttf` font files + `OFL.txt`; states | Implemented   | Day/twilight/night wall-background tokens (light/dark) completed in `docs/design/S3-2/DESIGN.md` and `DeepSkyTokens`; OFL fonts `Plus Jakarta Sans` and `Nunito Sans` bundled in `assets/fonts/` and registered in `LicenseRegistry` (`N-06`) |
+| **S2-D02** | **Composition without opaque wall + continuous floor**     | Removal of the opaque wall from the illustration (the wall is the app background changing color during the day) and **floor with baseboard continuing to the bottom of the page** (so in `S3-5` the countdown will rest on the floor)                       | Transparent PNG assets for micro-packs `v1.0`, `v1.1`, `v1.2`           | Partial (`v1.0.0` implemented) | Micro-pack `v1.0.0` (`floor.png` + `window_*`) integrated in `content/masters/v1/` and derivatives `content/packs/v1/assets/`; `v1.1.0` (`rug`, `couch`, `floor_lamp`) and `v1.2.0` (`couple_on_couch`, `pet_sleeping`) awaiting artistic delivery |
+| **S2-D03** | **Sky window and "light left on" lamp**                    | **Arched window (`window`):** shows only the sky (`day`/`twilight`/`night`, without `14°C` weather per `S-05`). **Floor lamp (`floor_lamp`):** represents the "light left on" of `F-03` (`calm` vs `lit` with amber glow on thought `< 6h`)                  | Separate PNG layers (`A-01`, `A-04`); time-of-day rules                 | Partial (`window` implemented; `floor_lamp` ready in engine) | `window_frame.png` + 3 skies delivered and active in `v1.0.0`; `HybridSceneCanvas` and `SceneStateMapper` already ready for `floor_lamp` (`calm`/`lit` + amber `RadialGradient` halo) upon arrival of `v1.1.0` |
+| **S2-D04** | **Plan for the 3 micro-packs of `S3-2` (`A-09`, `V-09`)**  | **`v1.0.0`:** floor + sky window. **`v1.1.0`:** couch + rug + floor lamp (`calm`/`lit`). **`v1.2.0`:** the two partners on the couch + static sleeping puppy. **Absent:** corkboard, capsule/diary shelf, mood bar, and countdown                            | Slot table (`A-09`); validated `manifest.json`; cut-out PNG layers      | Partial (`v1.0.0` delivered and validated) | `content/packs/v1/manifest.json` (`v1.0.0`) validated by `scripts/validate_content.py` within `DD-10` budget (`1.02 MB`); slot table `v1.0–v1.2` in `docs/design/S3-2/asset-catalog-v1.md` |
+| **S2-D05** | **Home screen (`F-02`, `DS-4`)**                           | Layout from `docs/design/S3-2/code.html` adapted to `S3-2`: header with `Home` title on the left and **a single `Settings` button on the right**; dual-state top *Thinking of you* card (`< 6h` unread with `Send back` vs quick send); scene on wall-background and floor; **only 2 bottom tabs (`Home`, `Us`)** | Screens and states; mockup web code; IT/EN copy                         | Implemented   | Implemented in `HomeShellPage` + `SettingsPage` with dynamic wall-background, continuous floor, dual-state *Thinking of you* card, single `Settings` button header, 2 tabs (`Home`/`Us`), and dark/light goldens |
+| **S2-D06** | **Accessible navigation alongside the scene (`DD-04`)**    | Top *Thinking of you* card (quick send / `Send back`) and the 2 bottom tabs (`Home`, `Us`) + top-right `Settings` button guarantee full access even without touching the illustrated lamp, with `OrdinalSortKey` order for TalkBack (`V-07`)               | States and `OrdinalSortKey` order spec; IT/EN copy                      | Implemented   | Top card with `OrdinalSortKey(0)`, touch targets >= `48×48`, adaptive layout with no overflow at 200% text scale |
+| **S2-D07** | **Sparse home and welcome back after days of absence**     | Appearance and copy of Home at the start of use and upon **return after days of absence** computed only on the device's local last open (`P-02`, `P-03`, `P-07`, Design Brief ch. 7)                                                                       | Screens and states; IT/EN copy                                          | Implemented   | Dismissible card `welcome-back-card` (`>= 3 days` since `lastOpenedAtLocal`), calm IT/EN copy, zero absence counters, and zero server sync (`S-05`) |
+| **S2-D08** | **`v1` asset catalog and Style Bible (`DS-5`)**            | Updated Style Bible (`A-03`), incremental asset catalog for micro-packs `v1.0`–`v1.2` (`A-07`: ID, slot, master dimensions, SHA-256 hash, prompt, AI tool, and `A-08` terms), transparency check on light/twilight/night wall (`A-04`)                    | Catalog document + Style Bible; master spec (`content/masters/`)        | Partial (`v1.0.0` complete except prompt/AI tool/terms) | Created `content/LICENSE-ASSETS` (`CC-BY-4.0` excluding name/logo/icon) and `docs/design/S3-2/asset-catalog-v1.md` with SHA-256 of masters and derivatives; prompt, AI tool, and terms (`A-08`) **to be provided by designer/sponsor**; to be updated with `v1.1.0`/`v1.2.0` upon artistic delivery |
+| **S2-D09** | **Content pack update (auto + forced button)**             | In Settings: active graphics pack version and **explicit "Update graphics" button** that downloads immediately (even on metered networks) and hot-reloads the UI; offline read-only banner (`N-03`, `TC-07`, `V-08`)                                       | Screens and states; IT/EN copy                                          | Implemented   | `settings-graphics-card` in `SettingsPage` with active version, `Update graphics` button (immediate download + cache eviction + hot reload), and offline banner `N-03` |
+| **S2-D10** | **Design ahead for S3-3 (*Thinking of you*)**              | Refined "thinking of you" gesture (`F-03`), optional short note, "heartbeat vibration" / haptic effect, floor lamp reaction, generic notification copy (`F-16`, `S-02`), Android channel, and quiet settings                                                | Screens and states; mockup web code; IT/EN copy                         | Delivered (awaiting sponsor approval) | Complete spec written in `docs/design/S3-3/thinking-of-you-spec.md` (flows, haptics, generic IT/EN notifications, Android channel, and quiet hours) |
 
-**Decisioni chiuse a partire dal mockup `docs/design/S3-2/`:**
+**Closed decisions starting from mockup `docs/design/S3-2/`:**
 
-- **\[Deciso\] Scomposizione dei micro-pacchetti di `S3-2`:**
-  1. **`v1.0.0`:** pavimento continuo con battiscopa (`floor`) + finestra ad arco con cielo (`giorno`, `crepuscolo`, `notte`);
-  2. **`v1.1.0`:** divano + tappeto + lampada da terra (`calm` / `lit` per `F-03`);
-  3. **`v1.2.0`:** i due partner sul divano + cagnolino addormentato sul tappeto (decorativo statico in `S3-2`).
-- **\[Deciso\] Muro e pavimento:** il muro è lo sfondo dell’app (cambia colore con l’ora del giorno); il pavimento prosegue fino a fondo pagina così da accogliere sopra di sé il divano e, in `S3-5`, la card del Countdown.
-- **\[Deciso\] Ruolo di finestra e lampada (`F-03`):** la finestra mostra solo il cielo dell’ora locale (senza meteo/GPS `S-05`); la lampada da terra rappresenta la “luce lasciata accesa” del *Ti penso* (`F-03`).
-- **\[Deciso\] Card *Ti penso* in alto:** mostra *“\<Partner\> ti ha pensato”* + `Ricambia` solo se c’è un pensiero ricevuto **non ancora visto localmente e `< 6 ore`**; altrimenti mostra il tasto per inviare un *Ti penso* con nota facoltativa.
-- **\[Deciso\] Header e navigazione inferiore in `S3-2`:** in alto a destra un solo pulsante che apre `Impostazioni` (rimosso l’altro pallino e qualsiasi indicatore online); in basso **2 soli tab (`Casa` e `Noi`)**, rimandando `Gesti` e `Ricordi` agli sprint in cui nascono le rispettive funzioni.
-- **\[Deciso\] D-11 / DD-06 e custodia master:** licenza **`CC-BY-4.0`** in `content/LICENSE-ASSETS` (esclusi nome, logo e icona `Deep Sky`); master in `content/masters/**` su **Git LFS** (`lfs: false` in CI) e derivati in `content/packs/**` in Git standard.
-- **\[Deciso\] DD-10 (Specifiche tecniche immagini, risoluzioni e budget):** vedi sezione 6.3 qui sotto.
+- **\[Decided\] Breakdown of `S3-2` micro-packs:**
+  1. **`v1.0.0`:** continuous floor with baseboard (`floor`) + arched window with sky (`day`, `twilight`, `night`);
+  2. **`v1.1.0`:** couch + rug + floor lamp (`calm` / `lit` for `F-03`);
+  3. **`v1.2.0`:** the two partners on the couch + sleeping puppy on the rug (static decorative in `S3-2`).
+- **\[Decided\] Wall and floor:** the wall is the app background (changes color with the time of day); the floor continues to the bottom of the page so as to hold the couch above it and, in `S3-5`, the Countdown card.
+- **\[Decided\] Role of window and lamp (`F-03`):** the window shows only the sky of the local time (without weather/GPS `S-05`); the floor lamp represents the "light left on" of *Thinking of you* (`F-03`).
+- **\[Decided\] Top *Thinking of you* card:** shows *"\<Partner\> thought of you"* + `Send back` only if there is a received thought **not yet seen locally and `< 6 hours`**; otherwise it shows the button to send a *Thinking of you* with an optional note.
+- **\[Decided\] Header and bottom navigation in `S3-2`:** at the top right, a single button that opens `Settings` (removed the other dot and any online indicator); at the bottom **only 2 tabs (`Home` and `Us`)**, deferring `Gestures` and `Memories` to the sprints in which their respective features are born.
+- **\[Decided\] D-11 / DD-06 and master custody:** **`CC-BY-4.0`** license in `content/LICENSE-ASSETS` (excluding `Deep Sky` name, logo, and icon); masters in `content/masters/**` on **Git LFS** (`lfs: false` in CI) and derivatives in `content/packs/**` in standard Git.
+- **\[Decided\] DD-10 (Image technical specifications, resolutions, and budget):** see section 6.3 below.
 
-### 6.3 Specifiche tecniche delle immagini (`DD-10`, `A-01..A-09`)
+### 6.3 Image technical specifications (`DD-10`, `A-01..A-09`)
 
-1. **Formato, profilo colore e trasparenza (`A-01`, `A-04`):**
-   - **Formato:** `PNG` RGBA a 8 bit per canale (32-bit), profilo colore **sRGB**, con canale alpha reale.
-   - **Zero muro nello sfondo degli oggetti:** poiché il muro è disegnato da Flutter come sfondo dell’app, i singoli oggetti (finestra, divano, tappeto, lampada, coppia, cagnolino) non devono contenere il muro né avere aloni blu/scuri sui bordi dello scontorno (`A-04`).
-   - **Margine di sicurezza interno (padding trasparente):** lasciare sempre un **`4%–5%` di pixel completamente trasparenti (`alpha = 0`)** lungo tutti i 4 lati del rettangolo, così che contorni, foglie o ombre morbide non risultino mai tagliati a vivo sul bordo del file.
-   - **Ritaglio sul soggetto (no tele vuote a tutto schermo):** ogni asset è ritagliato attorno al proprio soggetto (`crop` + 5% padding), mai salvato su una tela `1080×1920` quasi tutta vuota (la GPU alloca memoria per ogni pixel del rettangolo, anche se trasparente). Il posizionamento nella stanza è governato da `bounds` nel `manifest.json`.
-   - **Ombre di contatto e luci tra layer:**
-     - **Ombre a terra (sotto tappeto, divano, lampada, cagnolino):** incluse direttamente nel PNG dell’oggetto come ombra morbida semitrasparente (`rgba(20, 12, 28, 0.35–0.50)`), così poggiano fisicamente sul legno di `floor.png` scurendone le venature in modo realistico.
-     - **Luce della lampada da terra (approccio ibrido PNG pittorico + alone Flutter):** un semplice gradiente geometrico di Flutter da solo non può illuminare in modo direzionale le pieghe del paralume, lo stelo in legno o la pianta. Per avere una resa pittorica perfetta tra i layer, la lampada usa **due varianti PNG illustrate della stessa lampada** (`floor_lamp_calm.png` a luce soffusa e `floor_lamp_lit.png` con paralume acceso, cono di luce direzionale e riflessi caldi sullo stelo), mentre Flutter aggiunge **dietro** il PNG un alone atmosferico morbido (`RadialGradient` ambra/rosa sul muro-sfondo) che non soffre mai di bordi tagliati e non consuma RAM aggiuntiva.
-2. **Budget di peso e memoria (`DD-10`, `ADR-0007`):**
-   - **Master (`content/masters/`, Git LFS):** lato lungo `1024 px – 2160 px`, fino a `2–5 MB` per file.
-   - **Derivati runtime (`content/packs/v1/assets/`, Git standard):** ridimensionati alla risoluzione `3x` effettiva dello slot, compressi lossless (`oxipng`), **≤ `250 KB` per singolo oggetto** e **≤ `400 KB` per il pavimento**, per un peso complessivo di `v1.0 + v1.1 + v1.2` **≤ `1,8 MB` su disco** e **≤ `10 MB` decodificati in RAM**.
-3. **Tabella delle immagini per micro-pacchetto (tela logica scena `4:3` panoramica `1440 × 1080`):**
+1. **Format, color profile, and transparency (`A-01`, `A-04`):**
+   - **Format:** `PNG` RGBA at 8 bits per channel (32-bit), **sRGB** color profile, with real alpha channel.
+   - **Zero wall in object backgrounds:** since the wall is drawn by Flutter as the app background, individual objects (window, couch, rug, lamp, couple, puppy) must not contain the wall or have blue/dark halos on the cut-out edges (`A-04`).
+   - **Inner safety margin (transparent padding):** always leave **`4%–5%` of completely transparent pixels (`alpha = 0`)** along all 4 sides of the rectangle, so that outlines, leaves, or soft shadows are never hard-clipped at the file edge.
+   - **Cropped to the subject (no empty full-screen canvases):** each asset is cropped around its subject (`crop` + 5% padding), never saved on a mostly empty `1080×1920` canvas (the GPU allocates memory for every pixel of the rectangle, even if transparent). Positioning in the room is governed by `bounds` in `manifest.json`.
+   - **Contact shadows and inter-layer lighting:**
+     - **Ground shadows (under rug, couch, lamp, puppy):** included directly in the object's PNG as a soft semi-transparent shadow (`rgba(20, 12, 28, 0.35–0.50)`), so they physically rest on the wood of `floor.png`, darkening its grain realistically.
+     - **Floor lamp light (hybrid illustrated PNG + Flutter glow approach):** a simple geometric Flutter gradient alone cannot directionally illuminate the folds of the lampshade, the wooden stem, or the plant. For a perfect painterly result across layers, the lamp uses **two illustrated PNG variants of the same lamp** (`floor_lamp_calm.png` with soft light and `floor_lamp_lit.png` with lit lampshade, directional light cone, and warm reflections on the stem), while Flutter adds **behind** the PNG a soft atmospheric glow (amber/pink `RadialGradient` on the wall-background) that never suffers from clipped edges and consumes no extra RAM.
+2. **Size and memory budget (`DD-10`, `ADR-0007`):**
+   - **Masters (`content/masters/`, Git LFS):** long side `1024 px – 2160 px`, up to `2–5 MB` per file.
+   - **Runtime derivatives (`content/packs/v1/assets/`, standard Git):** resized to the actual `3x` resolution of the slot, lossless compressed (`oxipng`), **≤ `250 KB` per individual object** and **≤ `400 KB` for the floor**, for a total size of `v1.0 + v1.1 + v1.2` **≤ `1.8 MB` on disk** and **≤ `10 MB` decoded in RAM**.
+3. **Table of images per micro-pack (`4:3` panoramic logical scene canvas `1440 × 1080`):**
 
-| Micro-pack | File (`assets/`) | Soggetto | Aspect Ratio | Master (`content/masters/`) | Derivato (`content/packs/v1/`) | Criteri specifici di scontorno e layer |
-|:-----------|:-----------------|:---------|:-------------|:----------------------------|:-------------------------------|:---------------------------------------|
-| **`v1.0.0`** | **`floor.png`** | Battiscopa in legno in alto + parquet caldo continuo verso il basso | **`3:2`** (orizz.) | `2160 × 1440` | **`1440 × 960`** | Trasparente **solo sopra** il bordo superiore del battiscopa; pieno fino in fondo per proseguire anche sotto la futura card del Countdown (`S3-5`). |
-| **`v1.0.0`** | **`window_frame.png`** | Cornice della finestra ad arco + davanzale | **`3:4`** (vert.) | `900 × 1200` | **`450 × 600`** | I vetri tra i montanti sono **trasparenti** (`zOffset: 1`) così mostrano dietro il livello del cielo attivo (`zOffset: 0`). |
-| **`v1.0.0`** | **`window_sky_day.png`** | Cielo diurno sereno sagomato sull’arco della finestra | **`3:4`** (vert.) | `900 × 1200` | **`450 × 600`** | Decodificato **solo** nella fascia `giorno` (`.evict()` nelle altre fasce). |
-| **`v1.0.0`** | **`window_sky_twilight.png`** | Cielo al crepuscolo/tramonto (rosa/ambra/viola) sagomato sull’arco | **`3:4`** (vert.) | `900 × 1200` | **`450 × 600`** | Decodificato **solo** nella fascia `crepuscolo`. |
-| **`v1.0.0`** | **`window_sky_night.png`** | Cielo notturno stellato con falce di luna sagomato sull’arco | **`3:4`** (vert.) | `900 × 1200` | **`450 × 600`** | Decodificato **solo** nella fascia `notte`; Flutter può sovrapporre 2–3 micro-stelline animate livello 1. |
-| **`v1.1.0`** | **`rug.png`** | Tappeto ovale morbido + cuscini a terra con ombra di contatto | **`5:2`** (orizz.) | `1800 × 720` | **`900 × 360`** | `zIndex: 20`. Ombra morbida semitrasparente sui bordi che si fonde sul parquet di `floor.png`. |
-| **`v1.1.0`** | **`couch.png`** | Divano rosa/crema con cuscini (senza personaggi) e ombra a terra | **`16:9`** (orizz.) | `1920 × 1080` | **`960 × 540`** | `zIndex: 30`. Separato dalla coppia così il divano è già completo in `v1.1.0`. |
-| **`v1.1.0`** | **`floor_lamp_calm.png`** | Lampada da terra a destra in stato di riposo (luce soffusa, mai spenta `P-02`) | **`1:2`** (vert.) | `720 × 1440` | **`360 × 720`** | `zIndex: 35`, stato `calm`. Include ombra alla base sul pavimento. |
-| **`v1.1.0`** | **`floor_lamp_lit.png`** | Stessa lampada in stato `lit` (`F-03`): paralume acceso, cono di luce calda e riflessi sullo stelo | **`1:2`** (vert.) | `720 × 1440` | **`360 × 720`** | Generata in img2img/inpainting da `floor_lamp_calm.png` per coincidere al pixel; accompagnata da alone `RadialGradient` Flutter sul muro dietro. |
-| **`v1.2.0`** | **`couple_on_couch.png`** | I due partner seduti abbracciati sul divano sotto la stessa copertina | **`4:3`** (orizz.) | `1280 × 960` | **`640 × 480`** | `zIndex: 40`. Unica immagine per naturalezza dell’abbraccio e della copertina comune (separabili in `M6` se necessario per `F-18`). |
-| **`v1.2.0`** | **`pet_sleeping.png`** | Cagnolino bianco addormentato a ciambella sul tappeto con ombra morbida | **`4:3`** (orizz.) | `768 × 576` | **`384 × 288`** | `zIndex: 45`. Elemento decorativo statico in `S3-2` (pose dinamiche in `M6`, `F-09`). |
+| Micro-pack | File (`assets/`) | Subject | Aspect Ratio | Master (`content/masters/`) | Derivative (`content/packs/v1/`) | Specific cut-out and layer criteria |
+|:-----------|:-----------------|:--------|:-------------|:----------------------------|:---------------------------------|:------------------------------------|
+| **`v1.0.0`** | **`floor.png`** | Wooden baseboard at top + continuous warm parquet downward | **`3:2`** (horiz.) | `2160 × 1440` | **`1440 × 960`** | Transparent **only above** the top edge of the baseboard; solid all the way down to continue even under the future Countdown card (`S3-5`). |
+| **`v1.0.0`** | **`window_frame.png`** | Arched window frame + sill | **`3:4`** (vert.) | `900 × 1200` | **`450 × 600`** | Panes between mullions are **transparent** (`zOffset: 1`) so they show the active sky layer behind (`zOffset: 0`). |
+| **`v1.0.0`** | **`window_sky_day.png`** | Clear daytime sky shaped to the window arch | **`3:4`** (vert.) | `900 × 1200` | **`450 × 600`** | Decoded **only** in the `day` band (`.evict()` in other bands). |
+| **`v1.0.0`** | **`window_sky_twilight.png`** | Twilight/sunset sky (pink/amber/purple) shaped to the arch | **`3:4`** (vert.) | `900 × 1200` | **`450 × 600`** | Decoded **only** in the `twilight` band. |
+| **`v1.0.0`** | **`window_sky_night.png`** | Starry night sky with crescent moon shaped to the arch | **`3:4`** (vert.) | `900 × 1200` | **`450 × 600`** | Decoded **only** in the `night` band; Flutter may overlay 2–3 level-1 animated micro-stars. |
+| **`v1.1.0`** | **`rug.png`** | Soft oval rug + floor cushions with contact shadow | **`5:2`** (horiz.) | `1800 × 720` | **`900 × 360`** | `zIndex: 20`. Soft semi-transparent shadow on edges blending onto `floor.png` parquet. |
+| **`v1.1.0`** | **`couch.png`** | Pink/cream couch with cushions (no characters) and ground shadow | **`16:9`** (horiz.) | `1920 × 1080` | **`960 × 540`** | `zIndex: 30`. Separated from the couple so the couch is already complete in `v1.1.0`. |
+| **`v1.1.0`** | **`floor_lamp_calm.png`** | Floor lamp on the right at rest (soft light, never off `P-02`) | **`1:2`** (vert.) | `720 × 1440` | **`360 × 720`** | `zIndex: 35`, `calm` state. Includes shadow at the base on the floor. |
+| **`v1.1.0`** | **`floor_lamp_lit.png`** | Same lamp in `lit` state (`F-03`): lit lampshade, warm light cone, and reflections on the stem | **`1:2`** (vert.) | `720 × 1440` | **`360 × 720`** | Generated via img2img/inpainting from `floor_lamp_calm.png` to match pixel-for-pixel; accompanied by Flutter `RadialGradient` glow on the wall behind. |
+| **`v1.2.0`** | **`couple_on_couch.png`** | The two partners sitting embraced on the couch under the same blanket | **`4:3`** (horiz.) | `1280 × 960` | **`640 × 480`** | `zIndex: 40`. Single image for naturalness of the embrace and shared blanket (separable in `M6` if needed for `F-18`). |
+| **`v1.2.0`** | **`pet_sleeping.png`** | White puppy curled up sleeping on the rug with soft shadow | **`4:3`** (horiz.) | `768 × 576` | **`384 × 288`** | `zIndex: 45`. Static decorative element in `S3-2` (dynamic poses in `M6`, `F-09`). |
 
-### 6.4 Task
+### 6.4 Tasks
 
-**S2-CTR-01 · Contratto dei micro-pacchetti di contenuti firmati e distribuzione file-per-file** — Ruolo: architetto · Rif.: `AR-09`, `TC-08`, `TC-10`, `G5-07`
+**S2-CTR-01 · Contract for signed content micro-packs and file-by-file distribution** — Role: architect · Ref.: `AR-09`, `TC-08`, `TC-10`, `G5-07`
 
-- [x] Specificato il contratto di distribuzione **file per file** guidato da `pack-checksums.json` + `pack-checksums.json.sig` (nessun archivio `.zip`/`.tar` da estrarre): il client scarica solo i singoli file il cui hash SHA-256 non è già presente nella cache locale, con supporto `ETag` / `If-None-Match` *(`docs/content-pack-contract.md`)*
-- [x] Introdotto il supporto a una **lista di chiavi pubbliche Ed25519 con `keyId`** nel client e in `pack-checksums.json` / `.sig` (`<keyId>:<base64-sig>`) per consentire la rotazione futura della chiave di firma dei contenuti senza rompere i client esistenti *(`docs/content-pack-contract.md`, `scripts/sign_content.py`, `ContentPackService`)*
-- [x] Definita la protezione **anti-downgrade persistente anche dopo reinstallazione** (`allowBackup="false"`, `AD-06`): la versione minima accettabile del pacchetto è `max(bundledPackVersion, localMaxSeenPackVersion, serverMinPackVersion)`, dove il server espone `minPackVersion` nella policy di compatibilità *(`SystemCompatibilityController`, `CompatibilityPolicy`)*
-- [x] Definito il meccanismo **“ultimo pacchetto funzionante”** (rollback automatico al pacchetto precedente o al pacchetto incorporato nell’APK se l’app fallisce l’avvio della Home per `>= 2` volte consecutive dopo l’attivazione di un pacchetto) *(`docs/content-pack-contract.md`, `ContentPackService`)*
-- [x] Chiarito nel contratto che **l’ancora di fiducia crittografica è il client** (`G5-07`), mentre la verifica sul server è una difesa operativa aggiuntiva contro errori di pubblicazione *(`docs/content-pack-contract.md`)*
+- [x] Specified the **file-by-file** distribution contract driven by `pack-checksums.json` + `pack-checksums.json.sig` (no `.zip`/`.tar` archives to extract): the client downloads only individual files whose SHA-256 hash is not already present in the local cache, with `ETag` / `If-None-Match` support *(`docs/content-pack-contract.md`)*
+- [x] Introduced support for a **list of Ed25519 public keys with `keyId`** on the client and in `pack-checksums.json` / `.sig` (`<keyId>:<base64-sig>`) to allow future rotation of the content signing key without breaking existing clients *(`docs/content-pack-contract.md`, `scripts/sign_content.py`, `ContentPackService`)*
+- [x] Defined **persistent anti-downgrade protection even after reinstallation** (`allowBackup="false"`, `AD-06`): the minimum acceptable pack version is `max(bundledPackVersion, localMaxSeenPackVersion, serverMinPackVersion)`, where the server exposes `minPackVersion` in the compatibility policy *(`SystemCompatibilityController`, `CompatibilityPolicy`)*
+- [x] Defined the **"last known good pack"** mechanism (automatic rollback to the previous pack or to the pack bundled in the APK if the app fails Home startup for `>= 2` consecutive times after activating a pack) *(`docs/content-pack-contract.md`, `ContentPackService`)*
+- [x] Clarified in the contract that **the cryptographic trust anchor is the client** (`G5-07`), while server-side verification is an additional operational defense against publishing errors *(`docs/content-pack-contract.md`)*
 
-**S2-CTR-02 · Separazione tra stato locale (`LocalSceneViewState`) e snapshot condiviso (`CoupleRoomSnapshot`)** — Ruolo: architetto · Rif.: `AR-03`, `AR-07`, `TC-05`, `P-07`, `S-05`, `F-02`, `PD-19`
+**S2-CTR-02 · Separation between local state (`LocalSceneViewState`) and shared snapshot (`CoupleRoomSnapshot`)** — Role: architect · Ref.: `AR-03`, `AR-07`, `TC-05`, `P-07`, `S-05`, `F-02`, `PD-19`
 
-- [x] Separati formalmente nel dominio e nei contratti *(`docs/scene-state-contract.md`, `lib/scene/couple_room_snapshot.dart`, `lib/scene/local_scene_view_state.dart`)*:
-  - **`CoupleRoomSnapshot` (condiviso, cifrato E2EE sul server, `schemaVersion = 1`):** contiene solo gli artefatti e gli stati oggettivi condivisi della coppia, **senza alcun campo di “visto/non visto” o orario di accesso** (`P-07`, `S-05`);
-  - **`LocalSceneViewState` (strettamente locale al dispositivo, mai sincronizzato):** contiene `lastSeenEventSeq` (da cui si calcola localmente se mostrare il banner *“\<Partner\> ti ha pensato”* `< 6h` e lo stato `floor_lamp: lit`), `lastOpenedAtLocal` (per il messaggio di bentornato dopo giorni di assenza) e preferenza/fascia del cielo (`Auto / Giorno / Notte`)
-- [x] Definite le **fasce orarie locali fisse** per il cielo e per il colore del muro-sfondo (`giorno` `06:00–17:59`, `crepuscolo` `18:00–20:59`, `notte` `21:00–05:59`, calcolate dall’orologio locale senza posizione GPS `S-05`) e il comportamento al passaggio della mezzanotte o al cambio di fuso orario con l’app aperta *(`SkyPeriod`, timer leggero 60s in `HomeShellPage` + `AppLifecycleState.resumed`)*
-- [x] Confermato che nessun contatore di assenza o inattività viene salvato o sincronizzato (`P-02`, `P-03`)
+- [x] Formally separated in the domain and contracts *(`docs/scene-state-contract.md`, `lib/scene/couple_room_snapshot.dart`, `lib/scene/local_scene_view_state.dart`)*:
+  - **`CoupleRoomSnapshot` (shared, E2EE encrypted on the server, `schemaVersion = 1`):** contains only the shared objective artifacts and states of the couple, **without any "seen/unseen" field or access timestamp** (`P-07`, `S-05`);
+  - **`LocalSceneViewState` (strictly local to the device, never synchronized):** contains `lastSeenEventSeq` (from which it is computed locally whether to show the *"\<Partner\> thought of you"* `< 6h` banner and the `floor_lamp: lit` state), `lastOpenedAtLocal` (for the welcome-back message after days of absence), and sky preference/band (`Auto / Day / Night`)
+- [x] Defined **fixed local time bands** for the sky and wall-background color (`day` `06:00–17:59`, `twilight` `18:00–20:59`, `night` `21:00–05:59`, computed from the local clock without GPS location `S-05`) and behavior at midnight crossover or time zone change while the app is open *(`SkyPeriod`, lightweight 60s timer in `HomeShellPage` + `AppLifecycleState.resumed`)*
+- [x] Confirmed that no absence or inactivity counter is stored or synchronized (`P-02`, `P-03`)
 
-**S2-DES-01 · Completamento Design System (`DS-3`) e adattamento del mockup Home (`DS-4`)** — Ruolo: designer · Rif.: `V-01..V-12`, `DD-04`, `S1-D16`
+**S2-DES-01 · Completion of Design System (`DS-3`) and Home mockup adaptation (`DS-4`)** — Role: designer · Ref.: `V-01..V-12`, `DD-04`, `S1-D16`
 
-- [x] Completati i token del muro-sfondo e del pavimento per le 3 fasce orarie (`giorno`, `crepuscolo`, `notte`) in tema chiaro e scuro a partire da `docs/design/S3-2/DESIGN.md` (`S2-D01`)
-- [x] Consegnati gli stati della card superiore *Ti penso* (stato pensiero non letto `< 6h` con `Ricambia` vs stato predefinito con invio rapido e nota facoltativa), il messaggio di bentornato (`S2-D07`) e la sezione “Aggiorna grafiche” in Impostazioni (`S2-D09`), con testi IT/EN
-- [x] Consegnati i file font originali non modificati (`Plus Jakarta Sans` e `Nunito Sans`, `.ttf` statici 400/500/600/700 + `OFL.txt`, `N-06`, in `assets/fonts/`)
-- [x] Approvazione del promotore
+- [x] Completed wall-background and floor tokens for the 3 time bands (`day`, `twilight`, `night`) in light and dark themes starting from `docs/design/S3-2/DESIGN.md` (`S2-D01`)
+- [x] Delivered the states of the top *Thinking of you* card (unread thought `< 6h` state with `Send back` vs default state with quick send and optional note), the welcome-back message (`S2-D07`), and the "Update graphics" section in Settings (`S2-D09`), with IT/EN copy
+- [x] Delivered original unmodified font files (`Plus Jakarta Sans` and `Nunito Sans`, static 400/500/600/700 `.ttf` + `OFL.txt`, `N-06`, in `assets/fonts/`)
+- [x] Sponsor approval
 
-**S2-DES-02 · Scomposizione in livelli PNG trasparenti dei 3 micro-pacchetti (`v1.0`–`v1.2`), Style Bible e catalogo (`DS-5`)** — Ruolo: designer · Rif.: `A-01..A-09`, `V-04`, `V-05`, `V-09`, `D-11`, `DD-10`
+**S2-DES-02 · Decomposition into transparent PNG layers for the 3 micro-packs (`v1.0`–`v1.2`), Style Bible, and catalog (`DS-5`)** — Role: designer · Ref.: `A-01..A-09`, `V-04`, `V-05`, `V-09`, `D-11`, `DD-10`
 
-- [ ] Consegnati i livelli PNG scontornati trasparenti (`A-01`, `A-04`, senza muro opaco) secondo le risoluzioni e gli aspect ratio della sezione 6.3:
-  1. **`v1.0.0` (consegnato e integrato):** pavimento con battiscopa (`floor.png`) + finestra ad arco (`window_frame.png`) e cieli (`window_sky_day.png`, `window_sky_twilight.png`, `window_sky_night.png`) in `content/masters/v1/` e derivati in `content/packs/v1/assets/`;
-  2. **`v1.1.0` (in attesa di consegna artistica):** tappeto (`rug.png`) + divano (`couch.png`) + lampada da terra nei due stati pittorici (`floor_lamp_calm.png` e `floor_lamp_lit.png`);
-  3. **`v1.2.0` (in attesa di consegna artistica):** la coppia abbracciata sul divano sotto la copertina in un’unica immagine (`couple_on_couch.png`) + cagnolino addormentato statico sul tappeto (`pet_sleeping.png`)
-- [x] Verificata la larghezza del pavimento e della scena per supportare la vista verticale centrata (con scorrimento orizzontale panoramico `4:3`) e la futura vista orizzontale a tutto schermo, e verificata la continuità del pavimento verso il basso per accogliere il futuro Countdown in `S3-5` *(verificato sui golden `home_night_dark.png`, `home_day_light.png`, `home_thought_received_dark.png`)*
-- [x] Consegnati Style Bible (`A-03`) e catalogo (`A-07`) per `v1.0.0` *(`docs/design/S3-2/asset-catalog-v1.md`: ID, slot, dimensioni master, SHA-256 di master e derivati, derivati PNG8 registrati; **prompt, strumento AI e termini dello strumento (`A-08`) ancora da fornire dal designer/promotore**, riportati come segnaposto esplicito)*, superando il test di trasparenza senza aloni su muro chiaro, crepuscolo e notte (`A-04`) e senza testo o marchi nelle immagini (`A-06`) *(da estendere con `v1.1.0`/`v1.2.0` all'arrivo degli asset)*
+- [ ] Delivered transparent cut-out PNG layers (`A-01`, `A-04`, without opaque wall) according to the resolutions and aspect ratios of section 6.3:
+  1. **`v1.0.0` (delivered and integrated):** floor with baseboard (`floor.png`) + arched window (`window_frame.png`) and skies (`window_sky_day.png`, `window_sky_twilight.png`, `window_sky_night.png`) in `content/masters/v1/` and derivatives in `content/packs/v1/assets/`;
+  2. **`v1.1.0` (awaiting artistic delivery):** rug (`rug.png`) + couch (`couch.png`) + floor lamp in the two painterly states (`floor_lamp_calm.png` and `floor_lamp_lit.png`);
+  3. **`v1.2.0` (awaiting artistic delivery):** the couple embraced on the couch under the blanket in a single image (`couple_on_couch.png`) + static sleeping puppy on the rug (`pet_sleeping.png`)
+- [x] Verified floor and scene width to support centered portrait view (with `4:3` panoramic horizontal scroll) and future fullscreen landscape view, and verified downward continuity of the floor to accommodate the future Countdown in `S3-5` *(verified on goldens `home_night_dark.png`, `home_day_light.png`, `home_thought_received_dark.png`)*
+- [x] Delivered Style Bible (`A-03`) and catalog (`A-07`) for `v1.0.0` *(`docs/design/S3-2/asset-catalog-v1.md`: ID, slot, master dimensions, SHA-256 of masters and derivatives, registered PNG8 derivatives; **prompt, AI tool, and tool terms (`A-08`) still to be provided by designer/sponsor**, listed as explicit placeholders)*, passing the halo-free transparency test on light, twilight, and night walls (`A-04`) and with no text or watermarks in the images (`A-06`) *(to be extended with `v1.1.0`/`v1.2.0` upon asset arrival)*
 
-**S2-DES-03 · Design in anticipo per S3-3 (*Thinking of you e notifiche*)** — Ruolo: designer · Rif.: `F-03`, `F-16`, `S-02`, `SL-02`
+**S2-DES-03 · Design ahead for S3-3 (*Thinking of you and notifications*)** — Role: designer · Ref.: `F-03`, `F-16`, `S-02`, `SL-02`
 
-- [x] Consegnato `S2-D10`: rifinitura del gesto “ti penso” (composer nota breve, feedback “vibrazione sul cuore” / aptica, animazione di accensione della lampada da terra, testi delle notifiche generiche IT/EN e impostazioni di quiete) *(`docs/design/S3-3/thinking-of-you-spec.md`)*
-- [x] Approvato dal promotore prima della chiusura di `S3-2` così che `S3-3` parta senza attese
+- [x] Delivered `S2-D10`: refinement of the "thinking of you" gesture (short note composer, "heartbeat vibration" / haptic feedback, floor lamp illumination animation, generic IT/EN notification copy, and quiet settings) *(`docs/design/S3-3/thinking-of-you-spec.md`)*
+- [x] Approved by the sponsor before closing `S3-2` so that `S3-3` starts without waiting
 
-**S2-CNT-01 · Configurazione Git LFS per i master, licenza `CC-BY-4.0` e pipeline micro-pacchetti** — Ruolo: contenuti e release · Rif.: `CNT-01`, `CNT-02`, `A-02`, `A-08`, `D-11`, `TC-10` · Dipende da: `S2-CTR-01`, `S2-DES-02`
+**S2-CNT-01 · Git LFS setup for masters, `CC-BY-4.0` license, and micro-pack pipeline** — Role: content and release · Ref.: `CNT-01`, `CNT-02`, `A-02`, `A-08`, `D-11`, `TC-10` · Depends on: `S2-CTR-01`, `S2-DES-02`
 
-- [x] Creato `content/LICENSE-ASSETS` con licenza **`CC-BY-4.0`** ed esclusione esplicita di nome, logo e icona `Deep Sky`; configurato `.gitattributes` per tracciare `content/masters/**` su **Git LFS** e impostato `lfs: false` nei workflow GitHub Actions *(`.github/workflows/ci.yml`)* per non consumare banda LFS in CI
-- [x] Realizzato lo script di build/ridimensionamento locale che dai master in `content/masters/` produce i derivati ottimizzati per densità (`A-02`, `DD-10`) in `content/packs/v1/` (in Git standard) *(`scripts/build_content_pack.py` + `scripts/ImagePackTool.java`, totale `v1.0.0`: `1,02 MiB` entro budget `DD-10`; compressione lossless per impostazione predefinita, con fallimento esplicito se un asset supera il budget: la quantizzazione PNG8 è ammessa solo con `--allow-palette`. `floor.png` e `window_sky_night.png` non rientrano nel budget in modo lossless e sono PNG8 registrati in `asset-catalog-v1.md` §3.1, in attesa di decisione del promotore)*
-- [x] Esteso `scripts/validate_content.py` per controllare l’esistenza reale di tutti i file referenziati, i limiti di peso (`DD-10`), l’assenza di path non sicuri (`..`, path assoluti) e la presenza di `keyId` in `scripts/sign_content.py`
-- [ ] Generati e firmati `pack-checksums.json` e `pack-checksums.json.sig` per i micro-pacchetti `v1.0.0`, `v1.1.0` e `v1.2.0` *(pipeline verificata end-to-end su `v1.0.0`; firma locale di rilascio con chiave privata del promotore + firma `v1.1.0`/`v1.2.0` all'arrivo degli asset)*
+- [x] Created `content/LICENSE-ASSETS` with **`CC-BY-4.0`** license and explicit exclusion of `Deep Sky` name, logo, and icon; configured `.gitattributes` to track `content/masters/**` on **Git LFS** and set `lfs: false` in GitHub Actions workflows *(`.github/workflows/ci.yml`)* so as not to consume LFS bandwidth in CI
+- [x] Built the local build/resize script that produces density-optimized derivatives (`A-02`, `DD-10`) in `content/packs/v1/` (in standard Git) from the masters in `content/masters/` *(`scripts/build_content_pack.py` + `scripts/ImagePackTool.java`, total `v1.0.0`: `1.02 MiB` within `DD-10` budget; lossless compression by default, with explicit failure if an asset exceeds the budget: PNG8 quantization is allowed only with `--allow-palette`. `floor.png` and `window_sky_night.png` do not fit within the budget losslessly and are PNG8 registered in `asset-catalog-v1.md` §3.1, awaiting sponsor decision)*
+- [x] Extended `scripts/validate_content.py` to check the actual existence of all referenced files, size limits (`DD-10`), absence of unsafe paths (`..`, absolute paths), and presence of `keyId` in `scripts/sign_content.py`
+- [ ] Generated and signed `pack-checksums.json` and `pack-checksums.json.sig` for micro-packs `v1.0.0`, `v1.1.0`, and `v1.2.0` *(pipeline verified end-to-end on `v1.0.0`; local release signing with sponsor's private key + signing `v1.1.0`/`v1.2.0` upon asset arrival)*
 
-**S2-SRV-01 · Distribuzione file-per-file dei pacchetti di contenuti sul server** — Ruolo: sviluppatore backend · Rif.: `AR-09`, `TC-10`, `G5-07` · Dipende da: `S2-CTR-01`
+**S2-SRV-01 · File-by-file distribution of content packs on the server** — Role: backend developer · Ref.: `AR-09`, `TC-10`, `G5-07` · Depends on: `S2-CTR-01`
 
-- [x] Endpoint per consultare `pack-checksums.json` e `pack-checksums.json.sig` del pacchetto attivo e scaricare i singoli file asset dal volume configurato sul server, più esposizione di `minPackVersion` nella policy di compatibilità *(`ContentPackController`, `ContentPackStore`, `ContentConfiguration`, `SystemCompatibilityController`, `deploy/docker-compose.yml`)*
-- [x] Supporto per caching HTTP condizionale (`ETag` / `If-None-Match`) con `Cache-Control` immutabile per hash e intestazioni `Content-Type` / `Content-Length` rigorose. Implementato così: `Cache-Control: public, max-age=31536000, immutable` **solo** sull'endpoint content-addressed `GET /api/v1/content/pack/blobs/{sha256}` (l'URL cambia al cambiare dei byte, quindi è davvero immutabile); gli URL per percorso `GET /api/v1/content/pack/files/**` (stesso path riusato tra `v1.0.0` e `v1.1.0`) rispondono con `Cache-Control: no-cache` + `ETag` e `304` su `If-None-Match`, per evitare che una cache intermedia serva byte obsoleti per un anno. Il client scarica da `/blobs/{sha256}`
-- [x] Controllo difensivo all’avvio/ricarica sul server (verifica firma Ed25519 sui byte grezzi, SHA-256 e path relativi come difesa aggiuntiva, fermo restando che l’ancora di fiducia è il client); la verifica della firma è attiva quando sono configurate le chiavi `DEEPSKY_CONTENT_TRUSTED_KEY_V1`/`_V2` (esposte in `deploy/docker-compose.yml` e `deploy/.env.example`; senza chiavi il server logga un `WARN` all'avvio) e il pacchetto attivo viene ricaricato a caldo ogni 60 s (`@Scheduled`, solo se `pack-checksums.json`/`.sig` cambiano), senza riavviare il container; verificato con `ContentPackStoreAndControllerTest`, `DeepSkyPropertiesValidationTest`, `SecurityApprovalWebMvcTest` e ArchUnit (`ArchitectureTest`)
+- [x] Endpoints to query `pack-checksums.json` and `pack-checksums.json.sig` of the active pack and download individual asset files from the volume configured on the server, plus exposing `minPackVersion` in the compatibility policy *(`ContentPackController`, `ContentPackStore`, `ContentConfiguration`, `SystemCompatibilityController`, `deploy/docker-compose.yml`)*
+- [x] Support for conditional HTTP caching (`ETag` / `If-None-Match`) with immutable `Cache-Control` per hash and strict `Content-Type` / `Content-Length` headers. Implemented as follows: `Cache-Control: public, max-age=31536000, immutable` **only** on the content-addressed endpoint `GET /api/v1/content/pack/blobs/{sha256}` (the URL changes when bytes change, so it is truly immutable); path-based URLs `GET /api/v1/content/pack/files/**` (same path reused between `v1.0.0` and `v1.1.0`) respond with `Cache-Control: no-cache` + `ETag` and `304` on `If-None-Match`, to prevent an intermediate cache from serving stale bytes for a year. The client downloads from `/blobs/{sha256}`
+- [x] Defensive check at startup/reload on the server (Ed25519 signature verification on raw bytes, SHA-256, and relative paths as additional defense, while keeping the trust anchor on the client); signature verification is active when keys `DEEPSKY_CONTENT_TRUSTED_KEY_V1`/`_V2` are configured (exposed in `deploy/docker-compose.yml` and `deploy/.env.example`; without keys the server logs a `WARN` on startup) and the active pack is hot-reloaded every 60 s (`@Scheduled`, only if `pack-checksums.json`/`.sig` change), without restarting the container; verified with `ContentPackStoreAndControllerTest`, `DeepSkyPropertiesValidationTest`, `SecurityApprovalWebMvcTest`, and ArchUnit (`ArchitectureTest`)
 
-**S2-APP-01 · Design system completo, font OFL con licenza e blocco orientamento verticale** — Ruolo: sviluppatore client · Rif.: `DS-3`, `V-02`, `V-06`, `V-07`, `N-06`, `S1-D16` · Dipende da: `S2-DES-01`
+**S2-APP-01 · Complete design system, licensed OFL fonts, and portrait orientation lock** — Role: client developer · Ref.: `DS-3`, `V-02`, `V-06`, `V-07`, `N-06`, `S1-D16` · Depends on: `S2-DES-01`
 
-- [x] Inclusi nel bundle i file `.ttf` originali non modificati di `Plus Jakarta Sans` e `Nunito Sans` insieme ai relativi `OFL.txt`, registrati in `LicenseRegistry.addLicense` (`N-06`, zero fetch di rete, `assets/fonts/`, `pubspec.yaml`, `lib/main.dart`)
-- [x] Bloccato l’orientamento dell’app in verticale (`android:screenOrientation="portrait"` in `AndroidManifest.xml` + `SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp])` in `lib/main.dart`) per le schermate standard
-- [x] Allineati tutti i token `DeepSkyTokens` (inclusi i colori del muro-sfondo per giorno/crepuscolo/notte in tema chiaro e scuro, superfici, bordi, bagliori ambra ≤ 5%, raggi e spaziature) e i componenti riutilizzabili (`S1-D16`) alla specifica `DS-3`, con contrasto WCAG AA e testo scalabile fino al 200% (`V-07`, verificato in `s3_2_home_and_scene_test.dart`)
+- [x] Bundled original unmodified `.ttf` files of `Plus Jakarta Sans` and `Nunito Sans` together with their `OFL.txt`, registered in `LicenseRegistry.addLicense` (`N-06`, zero network fetch, `assets/fonts/`, `pubspec.yaml`, `lib/main.dart`)
+- [x] Locked app orientation to portrait (`android:screenOrientation="portrait"` in `AndroidManifest.xml` + `SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp])` in `lib/main.dart`) for standard screens
+- [x] Aligned all `DeepSkyTokens` (including wall-background colors for day/twilight/night in light and dark themes, surfaces, borders, amber glows ≤ 5%, radii, and spacing) and reusable components (`S1-D16`) to the `DS-3` spec, with WCAG AA contrast and text scalable up to 200% (`V-07`, verified in `s3_2_home_and_scene_test.dart`)
 
-**S2-APP-02 · Client dei pacchetti firmati: download file-per-file, `keyId`, staging e pulsante di forzatura a caldo** — Ruolo: sviluppatore client · Rif.: `TC-10`, `AR-09`, `G5-07`, `N-03` · Dipende da: `S2-CTR-01`, `S2-CNT-01`
+**S2-APP-02 · Signed packs client: file-by-file download, `keyId`, staging, and hot force-update button** — Role: client developer · Ref.: `TC-10`, `AR-09`, `G5-07`, `N-03` · Depends on: `S2-CTR-01`, `S2-CNT-01`
 
-- [x] Implementato `ContentPackService` (`lib/data/content_pack_service.dart`, `lib/domain/content/content_pack_models.dart`) con mappa di chiavi pubbliche Ed25519 indicizzate per `keyId`, verifica della firma **sui byte grezzi** di `pack-checksums.json` **prima** del parsing JSON (`G5-07`), verifica anti-downgrade `max(bundledPackVersion, localMaxSeenPackVersion, serverMinPackVersion)`, guardia contro path traversal e download **file per file** dei soli asset con SHA-256 nuovo (`blobs/<sha256>`)
-- [x] Implementate le **due modalità di aggiornamento**:
-  1. **automatica silenziosa:** solo su rete non a consumo (`NativeBridge.isConnectionUnmetered` / `ConnectivityManager.isActiveNetworkMetered`), salva il pacchetto verificato in `staged/` e lo promuove ad `active` al prossimo avvio;
-  2. **pulsante manuale “Aggiorna grafiche” in Impostazioni (`S2-D09`):** scarica subito anche su rete a consumo, promuove il pacchetto, **svuota dalla `imageCache` le texture del pacchetto precedente e ricarica immediatamente l’interfaccia** senza dover chiudere e riaprire l’app *(`SettingsPage` + `DeepSkyController.forceUpdateContentPack`)*
-- [x] Implementata la guardia **“ultimo pacchetto funzionante”**: contatore `packBootAttempts` azzerato al completamento del primo frame della Home (`addPostFrameCallback` -> `markHomeBootSucceeded`; azzerato anche dal primo frame di una schermata pre-Home che non disegna il pacchetto, come impostazione spazio/chiave di recupero, per evitare falsi rollback), con rollback automatico al pacchetto precedente o al pacchetto incorporato nell’APK in caso di `>= 2` avvii falliti
+- [x] Implemented `ContentPackService` (`lib/data/content_pack_service.dart`, `lib/domain/content/content_pack_models.dart`) with map of Ed25519 public keys indexed by `keyId`, signature verification **on raw bytes** of `pack-checksums.json` **before** JSON parsing (`G5-07`), anti-downgrade check `max(bundledPackVersion, localMaxSeenPackVersion, serverMinPackVersion)`, path traversal guard, and **file-by-file** download of only assets with a new SHA-256 (`blobs/<sha256>`)
+- [x] Implemented the **two update modes**:
+  1. **silent automatic:** only on unmetered networks (`NativeBridge.isConnectionUnmetered` / `ConnectivityManager.isActiveNetworkMetered`), saves the verified pack in `staged/` and promotes it to `active` on next launch;
+  2. **manual "Update graphics" button in Settings (`S2-D09`):** downloads immediately even on metered networks, promotes the pack, **evicts the previous pack's textures from `imageCache` and immediately reloads the UI** without having to close and reopen the app *(`SettingsPage` + `DeepSkyController.forceUpdateContentPack`)*
+- [x] Implemented the **"last known good pack"** guard: `packBootAttempts` counter reset upon completion of the first Home frame (`addPostFrameCallback` -> `markHomeBootSucceeded`; also reset by the first frame of a pre-Home screen that does not draw the pack, such as space setup/recovery key, to avoid false rollbacks), with automatic rollback to the previous pack or the pack bundled in the APK in case of `>= 2` failed launches
 
-**S2-APP-03 · Home reale: muro-sfondo dinamico, pavimento continuo, card *Ti penso* `< 6h`, lampada `F-03` e 2 tab (`Casa`, `Noi`)** — Ruolo: sviluppatore client · Rif.: `F-02`, `AR-07`, `AR-08`, `ADR-0007`, `P-07`, `S-05`, `V-02..V-11` · Dipende da: `S2-CTR-02`, `S2-APP-01`, `S2-APP-02`
+**S2-APP-03 · Real Home: dynamic wall-background, continuous floor, *Thinking of you* `< 6h` card, `F-03` lamp, and 2 tabs (`Home`, `Us`)** — Role: client developer · Ref.: `F-02`, `AR-07`, `AR-08`, `ADR-0007`, `P-07`, `S-05`, `V-02..V-11` · Depends on: `S2-CTR-02`, `S2-APP-01`, `S2-APP-02`
 
-- [x] Ristrutturato `HomeShellPage` (+ `SettingsPage`) secondo il mockup `docs/design/S3-2/` adattato a `S3-2`:
-  - **header superiore:** titolo `Casa` a sinistra e **un solo pulsante icona a destra per `Impostazioni`** (nessun secondo pallino e nessun indicatore verde di presenza online `P-07`, `S-05`);
-  - **barra di navigazione inferiore a 2 tab:** `Casa` e `Noi` (profilo coppia e dispositivi);
-  - **card superiore *Ti penso* a doppio stato:** mostra *“\<Partner\> ti ha pensato”* + pulsante `♥ Ricambia` se esiste un pensiero ricevuto **non ancora visto localmente (`lastSeenEventSeq`) e più recente di 6 ore**; altrimenti mostra il pulsante/campo per mandare un *Ti penso* con messaggio facoltativo;
-  - **muro = sfondo dell’app + pavimento continuo fino a fondo pagina:** gli oggetti della stanza (`floor.png` e `window_*` in `v1.0.0`, con `HybridSceneCanvas` pronto per `v1.1.0`/`v1.2.0`) sono PNG trasparenti posati sul muro-sfondo (che cambia tinta con `giorno`/`crepuscolo`/`notte`) e sul pavimento che prosegue fino in basso (pronto ad accogliere il Countdown poggiato a terra in `S3-5`);
-  - **finestra vs lampada da terra:** la finestra mostra il cielo della fascia oraria locale (`giorno`, `crepuscolo`, `notte`, senza meteo); la lampada da terra mostra lo stato `lit` (con alone caldo ambra `RadialGradient`) quando c’è un pensiero attivo/non visto e toccandola permette di inviare o ricambiare il *Ti penso* (`F-03`)
-- [x] Separato `LocalSceneViewState` da `CoupleRoomSnapshot`: `lastSeenEventSeq` e `lastOpenedAtLocal` restano esclusivamente locali (`P-07`, `S-05`); ricalcolo della fascia oraria locale con timer periodico leggero (60s) e su `AppLifecycleState.resumed` (mezzanotte e cambio fuso ad app aperta)
-- [x] **Controllo rigoroso della memoria immagini (`ADR-0007`):** una sola variante oraria del cielo della finestra decodificata alla volta (con `.evict()` esplicito della variante uscente al cambio di fascia oraria in `HybridSceneCanvas`), `ResizeImage.resizeIfNeeded` limitato alla risoluzione di visualizzazione e tetto esplicito `48 MB` a `PaintingBinding.instance.imageCache.maximumSizeBytes` in `lib/main.dart`
+- [x] Restructured `HomeShellPage` (+ `SettingsPage`) according to the `docs/design/S3-2/` mockup adapted to `S3-2`:
+  - **top header:** `Home` title on the left and **a single icon button on the right for `Settings`** (no second dot and no green online presence indicator `P-07`, `S-05`);
+  - **2-tab bottom navigation bar:** `Home` and `Us` (couple profile and devices);
+  - **dual-state top *Thinking of you* card:** shows *"\<Partner\> thought of you"* + `♥ Send back` button if there is a received thought **not yet seen locally (`lastSeenEventSeq`) and more recent than 6 hours**; otherwise shows the button/field to send a *Thinking of you* with an optional message;
+  - **wall = app background + continuous floor to bottom of page:** room objects (`floor.png` and `window_*` in `v1.0.0`, with `HybridSceneCanvas` ready for `v1.1.0`/`v1.2.0`) are transparent PNGs placed on the wall-background (which changes tint with `day`/`twilight`/`night`) and on the floor that continues all the way down (ready to accommodate the Countdown resting on the floor in `S3-5`);
+  - **window vs floor lamp:** the window shows the sky of the local time band (`day`, `twilight`, `night`, without weather); the floor lamp shows the `lit` state (with warm amber `RadialGradient` glow) when there is an active/unseen thought, and tapping it allows sending or reciprocating *Thinking of you* (`F-03`)
+- [x] Separated `LocalSceneViewState` from `CoupleRoomSnapshot`: `lastSeenEventSeq` and `lastOpenedAtLocal` remain strictly local (`P-07`, `S-05`); recalculation of the local time band with a lightweight periodic timer (60s) and on `AppLifecycleState.resumed` (midnight and time zone change while app is open)
+- [x] **Strict image memory control (`ADR-0007`):** only one time-of-day variant of the window sky decoded at a time (with explicit `.evict()` of the outgoing variant on time-band change in `HybridSceneCanvas`), `ResizeImage.resizeIfNeeded` capped to display resolution, and explicit `48 MB` cap on `PaintingBinding.instance.imageCache.maximumSizeBytes` in `lib/main.dart`
 
-**S2-SEC-01 · Verifica di sicurezza sulla filiera dei pacchetti e sulla privacy dello stato locale** — Ruolo: revisore di sicurezza (non l’autore di `S2-APP-02` / `S2-SRV-01`) · Rif.: `G5-07`, `TC-10`, `P-07`, `S-05`
+**S2-SEC-01 · Security verification on the pack supply chain and local state privacy** — Role: security reviewer (not the author of `S2-APP-02` / `S2-SRV-01`) · Ref.: `G5-07`, `TC-10`, `P-07`, `S-05`
 
-- [x] Verificato nel codice e con test automatici (`test/security/content_pack_security_test.dart`, `ContentPackStoreAndControllerTest`) che la firma Ed25519 (con selezione `keyId`) su `pack-checksums.json` sia controllata sui byte grezzi prima di qualsiasi parsing JSON
-- [x] Test automatici di rifiuto per: `keyId` sconosciuto, firma non valida, `pack-checksums.json` alterato, singolo PNG con SHA-256 non corrispondente, path traversal (`../`), downgrade sotto `max(bundled, localMaxSeen, serverMin)` e `minAppProtocol` non supportato, più test del rollback automatico su `>= 2` avvii falliti *(`test/security/content_pack_security_test.dart`)*
-- [ ] Verificato che né `lastSeenEventSeq` né `lastOpenedAtLocal` escano mai dal dispositivo verso il server (`P-07`, `S-05`, `test/security/content_pack_security_test.dart`) *(verifica automatica eseguita dall'autore; resta la revisione indipendente da revisore non autore, richiesta da questo task)*
+- [x] Verified in code and with automated tests (`test/security/content_pack_security_test.dart`, `ContentPackStoreAndControllerTest`) that the Ed25519 signature (with `keyId` selection) on `pack-checksums.json` is checked on raw bytes before any JSON parsing
+- [x] Automated rejection tests for: unknown `keyId`, invalid signature, tampered `pack-checksums.json`, single PNG with mismatched SHA-256, path traversal (`../`), downgrade below `max(bundled, localMaxSeen, serverMin)`, and unsupported `minAppProtocol`, plus test of automatic rollback on `>= 2` failed launches *(`test/security/content_pack_security_test.dart`)*
+- [ ] Verified that neither `lastSeenEventSeq` nor `lastOpenedAtLocal` ever leave the device toward the server (`P-07`, `S-05`, `test/security/content_pack_security_test.dart`) *(automated check run by the author; independent review by a non-author reviewer remains, as required by this task)*
 
-**S2-QA-01 · Prove su due telefoni reali, accessibilità e soglie `ADR-0007`** — Ruolo: QA · Rif.: `ADR-0007`, `AD-09`, `V-07`, `PD-19`
+**S2-QA-01 · Tests on two real phones, accessibility, and `ADR-0007` thresholds** — Role: QA · Ref.: `ADR-0007`, `AD-09`, `V-07`, `PD-19`
 
-- [x] Test *golden* e di widget per la nuova Home: **golden** (`test/golden/deep_sky_golden_test.dart`, `390×844`, con i font OFL del bundle e MaterialIcons caricati via `FontLoader`, quindi tipografia reale) per onboarding chiaro/scuro, Home notte (tema scuro), Home giorno (tema chiaro), Home con pensiero ricevuto non letto (tema scuro), Home crepuscolo alle `19:10` locali e Home crepuscolo con lampada `lit` (la lampada usa uno slot `floor_lamp` **sintetico di test** con PNG v1 come stand-in, finché non arrivano gli asset `v1.1.0`); **test di widget** (`test/presentation/s3_2_home_and_scene_test.dart`) per le tre fasce orarie, card *Ti penso* nei due stati (`< 6h` non letto vs invio rapido), IT/EN, testo al 200% e non-overflow su `9:16`, `9:20` e split-screen. Non coperti da golden: lingua EN e proporzione `9:20` (solo widget test), lampada con gli asset pittorici definitivi
-- [ ] Verifica con TalkBack attivo (`OrdinalSortKey`), testo di sistema al 200% e opzione “riduci movimento” attiva (arresto immediato di tutte le animazioni livello 1, `ADR-0007`) *(coperti da test automatici widget/semantica 200% + reduce-motion; resta verifica manuale con TalkBack su dispositivo fisico)*
-- [ ] **Misura fisica sul telefono meno recente** durante scorrimento della Home, animazioni attive e pressione del pulsante “Aggiorna grafiche” (ricarica a caldo con eviction della cache): **≥ 95% dei frame entro 16,7 ms** (60 Hz) e **RSS di picco ≤ 180 MB** (`ADR-0007`), registrata nel rapporto di test
-- [ ] Prova su due telefoni reali della progressione dei micro-pacchetti (`v1.0.0 -> v1.1.0 -> v1.2.0`) sia tramite il pulsante di aggiornamento immediato sia in automatico, senza reinstallare l’APK, e prova di apertura in modalità aereo (sola lettura offline `N-03`) *(flusso automatico + hot-reload + offline verificati nei test; resta prova hardware con `v1.1.0`/`v1.2.0`)*
-- [x] Test di compatibilità *n − 1* / *n* con i dati e gli eventi già creati in `S3-1` (`PD-19`, verificato in `test/data/pd19_compatibility_test.dart` e `test/presentation/s3_2_home_and_scene_test.dart`)
+- [x] *Golden* and widget tests for the new Home: **goldens** (`test/golden/deep_sky_golden_test.dart`, `390×844`, with bundled OFL fonts and MaterialIcons loaded via `FontLoader`, hence real typography) for light/dark onboarding, night Home (dark theme), day Home (light theme), Home with unread received thought (dark theme), twilight Home at `19:10` local time, and twilight Home with `lit` lamp (the lamp uses a **synthetic test** `floor_lamp` slot with v1 PNGs as stand-ins until `v1.1.0` assets arrive); **widget tests** (`test/presentation/s3_2_home_and_scene_test.dart`) for the three time bands, *Thinking of you* card in both states (`< 6h` unread vs quick send), IT/EN, 200% text, and non-overflow on `9:16`, `9:20`, and split-screen. Not covered by goldens: EN language and `9:20` aspect ratio (widget test only), lamp with final painterly assets
+- [ ] Verification with TalkBack active (`OrdinalSortKey`), system text at 200%, and "reduce motion" option active (immediate stop of all level-1 animations, `ADR-0007`) *(covered by automated 200% widget/semantics + reduce-motion tests; manual verification with TalkBack on a physical device remains)*
+- [ ] **Physical measurement on the oldest phone** during Home scrolling, active animations, and pressing the "Update graphics" button (hot reload with cache eviction): **≥ 95% of frames within 16.7 ms** (60 Hz) and **peak RSS ≤ 180 MB** (`ADR-0007`), recorded in the test report
 
-**S2-REL-01 · Release `S3-2` e prova sul campo** — Ruolo: release e infrastruttura con promotore · Rif.: `PD-06`, `PD-18`, `PD-19`
+**S2-REL-01 · `S3-2` release and field test** — Role: release and infrastructure with sponsor · Ref.: `PD-06`, `PD-18`, `PD-19`
 
-- [ ] Backup verificato prima dell’aggiornamento del server (`PD-19`)
-- [ ] Pubblicazione del micro-pacchetto iniziale `v1.0.0` firmato e rilascio dell’APK firmato in locale prima sul canale *anteprima* (telefono del promotore) e, dopo verifica, sul canale *stabile* (telefono della partner), seguito dai micro-aggiornamenti grafici `v1.1.0` e `v1.2.0` distribuiti dal server
-- [ ] Raccolta delle osservazioni d’uso nei giorni successivi nel registro (cap. 9), rispondendo alle domande sul campo di `S3-2`: *“La casa sembra un posto in cui tornare volentieri? Ci sono elementi inutili?”*
+- [ ] Verified backup before server update (`PD-19`)
+- [ ] Publication of the initial signed micro-pack `v1.0.0` and release of the locally signed APK first on the *preview* channel (sponsor's phone) and, after verification, on the *stable* channel (partner's phone), followed by graphic micro-updates `v1.1.0` and `v1.2.0` distributed by the server
+- [ ] Collection of usage observations in the following days in the log (ch. 9), answering the field questions of `S3-2`: *"Does the home feel like a place you want to come back to? Are there unnecessary elements?"*
 
-### 6.5 Uscita da S3-2
+### 6.5 Exit from S3-2
 
-- [ ] Tutti i task `S2-*` chiusi con CI verde, test superati e revisione del promotore (`PD-11`)
-- [ ] Soglie di prestazioni e memoria (`ADR-0007`: ≥ 95% frame ≤ 16,7 ms, RSS ≤ 180 MB) confermate sul telefono meno recente anche durante l’aggiornamento forzato delle grafiche a caldo
-- [ ] Progressione dei micro-pacchetti (`v1.0.0 -> v1.1.0 -> v1.2.0`) riuscita su entrambi i telefoni reali senza aggiornare l’APK
-- [ ] Design di `S3-3` (*Thinking of you e notifiche*, `S2-D10`) approvato e pronto per iniziare
-- [ ] Note sul campo della partner e del promotore registrate per guidare `S3-3`
+- [ ] All `S2-*` tasks closed with green CI, passing tests, and sponsor review (`PD-11`)
+- [ ] Performance and memory thresholds (`ADR-0007`: ≥ 95% frames ≤ 16.7 ms, RSS ≤ 180 MB) confirmed on the oldest phone even during forced hot graphics update
+- [ ] Micro-pack progression (`v1.0.0 -> v1.1.0 -> v1.2.0`) succeeded on both real phones without updating the APK
+- [ ] Design for `S3-3` (*Thinking of you and notifications*, `S2-D10`) approved and ready to start
+- [ ] Field notes from partner and sponsor recorded to guide `S3-3`
 
-## 7. Sprint S3-3 … S3-8
+## 7. Sprints S3-3 … S3-8
 
-In sintesi; il dettaglio si scrive a ogni sprint con la stessa struttura dei capitoli 5 e 6 (`PD-20`).
+In summary; details are written at each sprint with the same structure as chapters 5 and 6 (`PD-20`).
 
-| Sprint                               | Design (una fetta avanti)                                                   | Contratto e server                               | App                                                                       | Domande da fare sul campo                                                    |
+| Sprint                               | Design (one slice ahead)                                                    | Contract and server                              | App                                                                       | Questions to ask in the field                                                |
 |:-------------------------------------|:----------------------------------------------------------------------------|:-------------------------------------------------|:--------------------------------------------------------------------------|:-----------------------------------------------------------------------------|
-| **S3-3 Thinking of you e notifiche** | Gesto, testi delle notifiche, canale e impostazioni *(consegnato in S2-D10)* | Evento cifrato, push generico con *hint* non segreto esplicito su `POST /api/v1/sync/envelopes` (`CA-15`), regole di quiete | Invio, ricezione, tocco sulla notifica | Il gesto sembra naturale? Crea senso di dovere? |
-| **S3-4 Mood**                        | Selezione, nota facoltativa, storico + micro-pacchetto slot mood            | Evento, hint push per tipo evento (`CA-15`) e stato derivato | Scelta, visualizzazione e comparsa dello slot nella stanza | Lo usate? È sempre facoltativo, davvero?                                     |
-| **S3-5 Countdown**                   | Lista, dettaglio, todo, immagini, commenti + micro-pacchetto calendario     | Eventi e blob cifrati                            | Countdown, notifiche locali e comparsa del calendario nella stanza        | Aiuta la vicinanza? Cosa manca?                                              |
-| **S3-6 Disegno a turni**             | Canvas, strumenti, turni, messaggi + micro-pacchetto cornice/leggio         | Blob e stato dei turni                           | Canvas, invio, sovra-disegno e comparsa del disegno nella stanza          | Anche chi non sa disegnare lo usa?                                           |
-| **S3-7 Time capsule**                | Creazione, sigillo, attesa, cerimonia + micro-pacchetto scatola sigillata   | Eventi, data nella busta cifrata                 | Sigillo applicato dall’app, notifica locale e comparsa nella stanza       | L’apertura è un momento speciale?                                            |
-| **S3-8 Chiusura nucleo**             | Stati vuoti, errori, offline                                                | Versione minima, rifiniture                      | Sola lettura offline, aggiornamenti completi                              | Cosa manca davvero (D-03)?                                                   |
+| **S3-3 Thinking of you and notifications** | Gesture, notification copy, channel, and settings *(delivered in S2-D10)* | Encrypted event, generic push with explicit non-secret *hint* on `POST /api/v1/sync/envelopes` (`CA-15`), quiet rules | Send, receive, tap on notification | Does the gesture feel natural? Does it create a sense of obligation? |
+| **S3-4 Mood**                        | Selection, optional note, history + mood slot micro-pack                    | Event, push hint per event type (`CA-15`), and derived state | Choice, display, and appearance of the slot in the room | Do you use it? Is it always optional, really?                                |
+| **S3-5 Countdown**                   | List, detail, todo, images, comments + calendar micro-pack                  | Encrypted events and blobs                       | Countdown, local notifications, and appearance of the calendar in the room | Does it help closeness? What is missing?                                     |
+| **S3-6 Turn-based drawing**          | Canvas, tools, turns, messages + frame/easel micro-pack                     | Blobs and turn state                             | Canvas, send, over-drawing, and appearance of the drawing in the room     | Does even someone who can't draw use it?                                     |
+| **S3-7 Time capsule**                | Creation, seal, waiting, ceremony + sealed box micro-pack                   | Events, date in the encrypted envelope           | Seal applied by the app, local notification, and appearance in the room   | Is opening it a special moment?                                              |
+| **S3-8 Core closure**                | Empty states, errors, offline                                               | Minimum version, polish                          | Offline read-only, full updates                                           | What is really missing (D-03)?                                               |
 
-**Sprint pesanti.** S3-6 (disegno) è il più impegnativo del nucleo e va diviso se supera la
-dimensione di una fetta normale.
+**Heavy sprints.** S3-6 (drawing) is the most demanding of the core and should be split if it exceeds the
+size of a normal slice.
 
-## 8. Come si lavora in ogni sprint
+## 8. How we work in each sprint
 
-1. **Pronto per iniziare:** schermate e stati approvati dal designer, contratto approvato, criteri
-   di accettazione.
-2. **Contratto prima:** formato degli eventi, versione dello schema, API.
-3. **Server e app in parallelo** sul contratto, con pull request piccole (PD-11).
-4. **Test:** unitari, integrazione, *golden*, due telefoni reali, compatibilità *n − 1*.
-5. **Release:** APK firmato in locale; prima su *anteprima*, poi su *stabile* quando il promotore la
-   ritiene pronta per la partner.
-6. **Prova sul campo:** uso reale per alcuni giorni; la fetta si dichiara **chiusa** dopo questa
-   prova, ma lo sprint successivo non aspetta: i difetti emersi entrano nel backlog.
-7. **Note d’uso** nel registro delle osservazioni (capitolo 9).
+1. **Ready to start:** screens and states approved by the designer, contract approved, acceptance
+   criteria.
+2. **Contract first:** event format, schema version, API.
+3. **Server and app in parallel** on the contract, with small pull requests (PD-11).
+4. **Tests:** unit, integration, *golden*, two real phones, *n − 1* compatibility.
+5. **Release:** locally signed APK; first on *preview*, then on *stable* when the sponsor
+   deems it ready for the partner.
+6. **Field test:** real use for a few days; the slice is declared **closed** after this
+   test, but the next sprint does not wait: surfaced defects enter the backlog.
+7. **Usage notes** in the observation log (chapter 9).
 
-## 9. Uso reale in parallelo (M4 continuo)
+## 9. Real use in parallel (continuous M4)
 
-**Registro delle osservazioni.** Per ogni giorno o prova, una voce breve con: data, funzione, cosa
-si è fatto, cosa ha infastidito, cosa ha fatto piacere, cosa manca, difetti. Le voci non sono
-metriche per gli utenti: restano un diario privato (P-02).
+**Observation log.** For each day or test, a short entry with: date, feature, what
+was done, what annoyed, what pleased, what is missing, defects. Entries are not
+user metrics: they remain a private diary (P-02).
 
-**Segnali da seguire** (cap. 13 del Project Brief):
+**Signals to watch** (ch. 13 of the Project Brief):
 
-- entrambi aprono l’app spontaneamente, non solo il promotore;
-- l’app viene scelta per un gesto reale invece di un messaggio altrove;
-- la partner segnala cosa manca;
-- nessuno prova senso di dovere o di colpa.
+- both open the app spontaneously, not just the sponsor;
+- the app is chosen for a real gesture instead of a message elsewhere;
+- the partner points out what is missing;
+- no one feels a sense of duty or guilt.
 
-**Revisione settimanale** di circa 30 minuti: si leggono le voci, si decidono le priorità, si
-aggiorna l’ordine degli sprint. La regola di ammissione resta PD-03: una funzione nuova entra se
-manca a entrambi.
+**Weekly review** of about 30 minutes: entries are read, priorities are decided, and the
+sprint order is updated. The admission rule remains PD-03: a new feature enters if
+both miss it.
 
-## 10. Compatibilità con dati reali (PD-19)
+## 10. Compatibility with real data (PD-19)
 
-- **Server:** le migrazioni sono immutabili e solo in avanti; ogni migrazione è provata su una copia
-  di dati realistici.
-- **Eventi e snapshot:** ogni tipo ha una **versione**; i client leggono anche le versioni
-  precedenti; le modifiche incompatibili seguono la sequenza di 10.4 dell’Architettura (rilascio del
-  client, attesa, innalzamento della soglia minima).
-- **Chiavi e buste:** nessuna modifica al formato senza versione e migrazione (cap. 7).
-- **Test di compatibilità** *n − 1* / *n* in CI.
-- **Backup** prima di ogni aggiornamento del server con dati veri.
+- **Server:** migrations are immutable and forward-only; every migration is tested on a copy
+  of realistic data.
+- **Events and snapshots:** every type has a **version**; clients also read previous
+  versions; breaking changes follow the sequence in 10.4 of the Architecture (client
+  release, waiting, raising the minimum threshold).
+- **Keys and envelopes:** no format changes without version and migration (ch. 7).
+- **Compatibility tests** *n − 1* / *n* in CI.
+- **Backup** before every server update with real data.
 
-## 11. Rischi
+## 11. Risks
 
-| Rischio                                        | Impatto                               | Mitigazione                                                                           |
+| Risk                                           | Impact                                | Mitigation                                                                            |
 |:-----------------------------------------------|:--------------------------------------|:--------------------------------------------------------------------------------------|
-| Dati reali con una versione ancora instabile   | Perdita o corruzione di ricordi       | G-3a, PD-19, backup prima di ogni aggiornamento, prova di ripristino                  |
-| Esperienza instabile per la partner            | Perdita di fiducia, uso abbandonato   | Canali stabile e anteprima (PD-18), release stabile solo quando pronta                |
-| Prima installazione difficile                  | La partner non riesce a entrare       | S1-DES-03, S1-QA-02, alternativa con codice manuale                                   |
-| Chiave di recupero non capita o persa          | Dati irrecuperabili                   | Conferma obbligatoria, test di comprensione, DD-12                                    |
-| Aggiornamento difettoso                        | Telefono della partner inutilizzabile | Procedura di emergenza, nuova release con numero più alto, anteprima prima di stabile |
-| Sovrapposizione tra prove sul campo e sviluppo | Colli di bottiglia sulla supervisione | Sprint senza attesa, difetti nel backlog, revisione settimanale breve                 |
-| Revoca senza rotazione delle chiavi | Telefono rubato che decifra contenuti futuri | Mitigato in codice (`CA-02`, `ADR-0012`); resta verifica hardware in `G-3a` (`S1-SEC-02`) |
-| Dati veri prima di esportazione e cancellazione (M5) | Nessuna uscita completa dei dati in caso di scioglimento | Rischio accettato in G-3a; backup, `unpaired_at`, F-17/D-15 in M5 |
-| Prova della partner vissuta come test          | Disagio                               | Consenso, tono leggero, nessun aiuto ma nessun giudizio, prova breve                  |
-| Collo di bottiglia sugli asset AI o picchi di RAM nei cambi scena | Sviluppo fermo o superamento dei 180 MB di RSS (`ADR-0007`) | Micro-pacchetti da 1–2 grafiche (`v1.0.0`, `v1.1.0`), una sola variante di fondale decodificata con `.evict()` sul cambio / ricarica forzata e rollback automatico all’ultimo pacchetto funzionante |
+| Real data with a still-unstable version        | Loss or corruption of memories        | G-3a, PD-19, backup before every update, restore test                                 |
+| Unstable experience for the partner            | Loss of trust, abandoned use          | Stable and preview channels (PD-18), stable release only when ready                   |
+| Difficult first installation                   | Partner cannot get in                 | S1-DES-03, S1-QA-02, manual code fallback                                             |
+| Recovery key not understood or lost            | Unrecoverable data                    | Mandatory confirmation, comprehension test, DD-12                                     |
+| Defective update                               | Partner's phone unusable              | Emergency procedure, new release with higher version code, preview before stable      |
+| Overlap between field tests and development    | Supervision bottlenecks               | Sprints without waiting, defects in backlog, short weekly review                      |
+| Revocation without key rotation                | Stolen phone decrypting future content | Mitigated in code (`CA-02`, `ADR-0012`); hardware verification in `G-3a` remains (`S1-SEC-02`) |
+| Real data before export and deletion (M5)      | No full data exit upon dissolution    | Risk accepted in G-3a; backup, `unpaired_at`, F-17/D-15 in M5                         |
+| Partner test experienced as a test             | Discomfort                            | Consent, light tone, no help but no judgment, short test                              |
+| AI asset bottleneck or RAM spikes on scene changes | Stalled development or exceeding 180 MB RSS (`ADR-0007`) | 1–2 graphic micro-packs (`v1.0.0`, `v1.1.0`), only one backdrop variant decoded with `.evict()` on change / forced reload, and automatic rollback to last known good pack |
 
-## 12. Decisioni aperte
+## 12. Open decisions
 
-- **DD-12** Rivedere la chiave di recupero dopo la prima volta: sì o no, e con quale controllo.
-- **D-11 / DD-06 \[Deciso per la licenza, strumento da annotare per asset\]** Licenza degli asset fissata a **`CC-BY-4.0`** in `content/LICENSE-ASSETS` con esclusione esplicita di nome, logo e icona di `Deep Sky`; master archiviati in `content/masters/**` via Git LFS (`lfs: false` in CI) e derivati in `content/packs/**`.
-- **DD-04 \[Deciso per il nucleo\]** Navigazione accessibile che affianca la scena in `S3-2`: card superiore *Ti penso* a doppio stato (`< 6h` non letto con `Ricambia` vs invio rapido), 2 soli tab inferiori (`Casa`, `Noi`) che crescono con `Gesti` e `Ricordi` solo quando nascono le relative funzioni, e un unico pulsante `Impostazioni` in alto a destra.
-- **DD-10 \[Deciso\]** Risoluzioni master (`1024–2160 px` in Git LFS), risoluzioni derivati (`384–1440 px` in Git standard, ≤ `250 KB` per oggetto / ≤ `400 KB` per il pavimento, totale pack ≤ `1,8 MB`) e criteri di scontorno/layer definiti nella sezione 6.3.
-- Modalità orizzontale a tutto schermo dedicata alla sola scena (opzionale, rimandata a dopo `S3-2`, pur predisponendo già il fondale per lo scorrimento orizzontale).
-- Ordine definitivo degli sprint dopo S3-2.
-- Dimensione e suddivisione di S3-6.
-- Quando promuovere una release da *anteprima* a *stabile*, in pratica: dopo quanti giorni di prova
-  del promotore?
-- Lingua dell’app per la partner (italiano e inglese sono previsti, N-07).
+- **DD-12** Viewing the recovery key again after the first time: yes or no, and with what check.
+- **D-11 / DD-06 \[Decided for license, tool to be noted per asset\]** Asset license set to **`CC-BY-4.0`** in `content/LICENSE-ASSETS` with explicit exclusion of `Deep Sky` name, logo, and icon; masters archived in `content/masters/**` via Git LFS (`lfs: false` in CI) and derivatives in `content/packs/**`.
+- **DD-04 \[Decided for the core\]** Accessible navigation alongside the scene in `S3-2`: dual-state top *Thinking of you* card (`< 6h` unread with `Send back` vs quick send), only 2 bottom tabs (`Home`, `Us`) growing with `Gestures` and `Memories` only when their respective features are born, and a single top-right `Settings` button.
+- **DD-10 \[Decided\]** Master resolutions (`1024–2160 px` in Git LFS), derivative resolutions (`384–1440 px` in standard Git, ≤ `250 KB` per object / ≤ `400 KB` for floor, total pack ≤ `1.8 MB`), and cut-out/layer criteria defined in section 6.3.
+- Fullscreen landscape mode dedicated to the scene alone (optional, deferred until after `S3-2`, while already preparing the backdrop for horizontal scrolling).
+- Final sprint order after S3-2.
+- Size and split of S3-6.
+- When to promote a release from *preview* to *stable*, in practice: after how many days of testing
+  by the sponsor?
+- App language for the partner (Italian and English are planned, N-07).
 
-## 13. Tracciabilità
+## 13. Traceability
 
-Ogni task cita gli ID dei documenti da cui discende. Un task che non può essere chiuso senza violare
-una decisione **\[Deciso\]** si segnala al promotore.
+Every task cites the IDs of the documents from which it derives. A task that cannot be closed without
+violating a **\[Decided\]** decision is reported to the sponsor.

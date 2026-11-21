@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADRs)
 
-Reference: `REP-03`, [Piano di sviluppo](development-plan.md) section 2.2.
+Reference: `REP-03`, [Development Plan](development-plan.md) section 2.2.
 
 Significant architectural choices, version pins, contract changes, and M1 prototype outcomes (`SP-01`–`SP-05`) are recorded here. ADRs are immutable once accepted; later changes supersede previous ADRs rather than rewriting history.
 

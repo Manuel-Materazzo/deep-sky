@@ -1,57 +1,57 @@
-# Procedura di emergenza e recupero — Deep Sky (`S1-DOC-01`, `G-3a`)
+# Emergency and Recovery Procedure — Deep Sky (`S1-DOC-01`, `G-3a`)
 
-Documento operativo sintetico in linguaggio chiaro per gestire incidenti reali durante l'uso sul campo.
+Concise operational document in plain language for handling real incidents during field use.
 
 ---
 
-## 1. Il server non risponde / Rete assente
-1. **Non disinstallare e non premere «Scollega dispositivo».** L'app entra automaticamente in modalità sola lettura offline mostrando i ricordi già decifrati sul telefono.
-2. Verifica lato server (`deploy/`):
+## 1. Server Not Responding / No Network
+1. **Do not uninstall and do not tap "Unlink device".** The app automatically enters offline read-only mode, showing memories already decrypted on the phone.
+2. Check server-side (`deploy/`):
    ```bash
    docker compose ps
    curl -fsS https://deepsky.vectevo.com/actuator/health/liveness
    ```
-3. Se il container `api` o `db` è fermo:
+3. If the `api` or `db` container is stopped:
    ```bash
    cd deploy
    docker compose up -d
    docker compose logs --tail=100 api proxy
    ```
-4. Appena il server torna raggiungibile, tocca il pulsante di aggiornamento nella Home: la coda locale e la sincronizzazione riprendono senza perdere la coppia.
+4. As soon as the server becomes reachable again, tap the refresh button on the Home screen: the local queue and synchronization resume without losing the couple.
 
 ---
 
-## 2. Aggiornamento difettoso rilasciato sul canale *stabile* o *anteprima*
-**Regola Android (`m3-operative-plan.md` cap. 3):** Android **non permette** il downgrade di versione a un `versionCode` inferiore o uguale.
+## 2. Faulty Update Released on the *Stable* or *Preview* Channel
+**Android Rule (`m3-operative-plan.md` ch. 3):** Android **does not allow** downgrading to a `versionCode` less than or equal to the installed one.
 
-1. Se solo il telefono su canale **anteprima** ha un bug:
-   - Riporta il telefono su canale **stabile** nelle Impostazioni se necessario per le release future.
-   - Pubblica una nuova release su GitHub (con **`versionCode` strettamente maggiore**, es. `+1` rispetto alla build difettosa) contenente il fix o il codice del commit precedente funzionante, firmata con la stessa chiave keystore Android e manifest Ed25519 (`scripts/sign-release.*`).
-2. Se una vecchia versione client ha un bug critico bloccante verso il server:
-   - Dopo aver pubblicato l'APK corretto con `versionCode` maggiore, alza `DEEPSKY_MIN_CLIENT_VERSION_CODE` nel `.env` del server e riavvia `api`: i vecchi client riceveranno `HTTP 426` e mostreranno la schermata gentile «Aggiornamento richiesto» con scaricamento diretto.
-
----
-
-## 3. Smarrimento o sostituzione di UN telefono (l'altro partner ha ancora l'app)
-1. Sul telefono rimasto attivo, apri **Dispositivi**:
-   - Tocca **Revoca** accanto al telefono smarrito/vecchio e conferma. Il dispositivo revocato viene bloccato subito lato server (`HTTP 401`, token push rimosso) e la revoca **ruota automaticamente le chiavi di epoca e la Recovery Key** (`CA-02`, `ADR-0012`) così che il telefono revocato non possa leggere né recuperare nulla di futuro.
-   - Salva e conferma subito le **nuove 24 parole** mostrate dall'app (`RecoveryKeySetupPage`); le 24 parole precedenti non sono più valide per il recupero.
-   - Avvia un nuovo **arruolamento dispositivo** per generare QR / link temporaneo.
-2. Sul nuovo telefono:
-   - Installa l'APK ufficiale -> scegli **Unisciti** -> inquadra il QR o incolla il link.
-   - Confrontate a voce il codice SAS a 6 cifre e completate l'ingresso.
+1. If only the phone on the **preview** channel has a bug:
+   - Switch the phone back to the **stable** channel in Settings if needed for future releases.
+   - Publish a new release on GitHub (with a **strictly higher `versionCode`**, e.g., `+1` above the faulty build) containing the fix or the code from the previous working commit, signed with the same Android keystore key and Ed25519 manifest (`scripts/sign-release.*`).
+2. If an old client version has a critical blocking bug against the server:
+   - After publishing the fixed APK with a higher `versionCode`, raise `DEEPSKY_MIN_CLIENT_VERSION_CODE` in the server's `.env` and restart `api`: old clients will receive `HTTP 426` and display the gentle "Update required" screen with direct download.
 
 ---
 
-## 4. Entrambi i telefoni persi o ripristinati (Recupero autonomo con Recovery Key `F-20`)
-1. Installa l'APK ufficiale da `https://deepsky.vectevo.com/join` (o GitHub Releases).
-2. Apri l'app -> scheda **Recupera** (`S1-D10`).
-3. Inserisci le **24 parole BIP-39** nell'ordine esatto (oppure inquadra il QR di backup offline).
-   - Se utilizzi un server self-hosted personalizzato, apri il pannello server in basso e inserisci l'URL prima di confermare.
-4. Tocca **Ripristina e riaccendi la casa**: la chiave privata di recupero ricrea la sessione del nuovo dispositivo senza bisogno del vecchio telefono e decifra tutta la storia condivisa dal server.
-5. Una volta rientrato, apri **Dispositivi** e revoca eventuali telefoni vecchi non più in tuo possesso.
+## 3. Loss or Replacement of ONE Phone (the other partner still has the app)
+1. On the remaining active phone, open **Devices**:
+   - Tap **Revoke** next to the lost/old phone and confirm. The revoked device is immediately blocked on the server (`HTTP 401`, push token removed), and revocation **automatically rotates the epoch keys and the Recovery Key** (`CA-02`, `ADR-0012`) so the revoked phone cannot read or recover anything in the future.
+   - Immediately save and confirm the **new 24 words** shown by the app (`RecoveryKeySetupPage`); the previous 24 words are no longer valid for recovery.
+   - Start a new **device enrollment** to generate a temporary QR code / link.
+2. On the new phone:
+   - Install the official APK -> choose **Join** -> scan the QR code or paste the link.
+   - Compare the 6-digit SAS code verbally and complete joining.
 
 ---
 
-## 5. Perdita totale della Recovery Key
-Se **entrambi i telefoni** vanno persi **e** le 24 parole non sono state salvate, nessuno — neppure l'amministratore del server — può decifrare la stanza (`S-01`). L'unica strada è creare una nuova coppia dall'inizio e chiedere all'altro partner di fare altrettanto.
+## 4. Both Phones Lost or Reset (Autonomous Recovery with Recovery Key `F-20`)
+1. Install the official APK from `https://deepsky.vectevo.com/join` (or GitHub Releases).
+2. Open the app -> **Recover** tab (`S1-D10`).
+3. Enter the **24 BIP-39 words** in the exact order (or scan the offline backup QR code).
+   - If you use a custom self-hosted server, open the server panel at the bottom and enter the URL before confirming.
+4. Tap **Restore and relight the home**: the recovery private key recreates the new device's session without needing the old phone and decrypts the entire shared history from the server.
+5. Once back in, open **Devices** and revoke any old phones no longer in your possession.
+
+---
+
+## 5. Total Loss of the Recovery Key
+If **both phones** are lost **and** the 24 words were not saved, no one — not even the server administrator — can decrypt the room (`S-01`). The only path is to create a new couple from scratch and ask the other partner to do the same.

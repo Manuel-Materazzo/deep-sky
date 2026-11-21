@@ -14,9 +14,9 @@ All configuration is supplied via environment variables (or Docker secrets mappe
 | `deepsky.protocol.min-protocol-version` | `DEEPSKY_MIN_PROTOCOL_VERSION` | `1` | No (`1`) | Minimum E2EE/snapshot protocol version (`TC-05`, `8.2`) |
 | `deepsky.quotas.max-blob-bytes` | `DEEPSKY_MAX_BLOB_BYTES` | `10485760` (10 MiB) | No | Maximum single encrypted blob upload size (note `AU-21`: signed JSON `/api/v1/sync/envelopes` requests are additionally capped at 1 MiB in `DeviceAuthFilter`, giving ~750 KiB effective ciphertext per envelope after base64url) |
 | `deepsky.quotas.max-couple-storage-bytes` | `DEEPSKY_MAX_COUPLE_STORAGE_BYTES` | `1073741824` (1 GiB) | No | Total encrypted blob storage quota per couple |
-| `deepsky.content.packs-dir` | `DEEPSKY_CONTENT_PACKS_DIR` | `""` (compose: `/var/lib/deepsky/packs`, volume `pack_data`) | No | Directory dei micro-pacchetti di contenuti firmati serviti da `/api/v1/content/pack/**` |
-| `deepsky.content.min-pack-version` | `DEEPSKY_MIN_PACK_VERSION` | `1.0.0` | No | Versione minima del pacchetto esposta in `GET /api/v1/system/compatibility` (anti-downgrade, `AD-06`) |
-| `deepsky.content.trusted-public-keys.v1` / `.v2` | `DEEPSKY_CONTENT_TRUSTED_KEY_V1` / `DEEPSKY_CONTENT_TRUSTED_KEY_V2` | `""` (verifica firma disattivata) | Consigliato | Chiavi pubbliche Ed25519 (base64, 32 byte raw o SPKI 44 byte) per `keyId`. Se almeno una è impostata il server verifica la firma di `pack-checksums.json` e rifiuta `keyId` sconosciuti. Se è configurata la directory dei pacchetti ma nessuna chiave, il server logga un `WARN` all'avvio (resta attiva solo la verifica SHA-256/path; l'ancora di fiducia è comunque il client) |
+| `deepsky.content.packs-dir` | `DEEPSKY_CONTENT_PACKS_DIR` | `""` (compose: `/var/lib/deepsky/packs`, volume `pack_data`) | No | Directory of signed content micro-packs served by `/api/v1/content/pack/**` |
+| `deepsky.content.min-pack-version` | `DEEPSKY_MIN_PACK_VERSION` | `1.0.0` | No | Minimum pack version exposed in `GET /api/v1/system/compatibility` (anti-downgrade, `AD-06`) |
+| `deepsky.content.trusted-public-keys.v1` / `.v2` | `DEEPSKY_CONTENT_TRUSTED_KEY_V1` / `DEEPSKY_CONTENT_TRUSTED_KEY_V2` | `""` (signature verification disabled) | Recommended | Ed25519 public keys (base64, 32-byte raw or 44-byte SPKI) by `keyId`. If at least one is set, the server verifies the signature of `pack-checksums.json` and rejects unknown `keyId`s. If the packs directory is configured without any key, the server logs a `WARN` at startup (only SHA-256/path verification remains active; the trust anchor is the client regardless) |
 | `deepsky.firebase.enabled` | `DEEPSKY_FIREBASE_ENABLED` | `false` | No (`false`) | Enables FCM push delivery and runtime client config endpoint (`TC-13`) |
 | `deepsky.firebase.project-id` | `DEEPSKY_FIREBASE_PROJECT_ID` | `""` | If `firebase.enabled=true` | Firebase project ID sent to clients at pairing |
 | `deepsky.firebase.api-key` | `DEEPSKY_FIREBASE_API_KEY` | `""` | If `firebase.enabled=true` | Firebase Web/Android API key sent to clients at pairing |
@@ -47,9 +47,9 @@ All configuration is supplied via environment variables (or Docker secrets mappe
 - Whenever `DEEPSKY_FIREBASE_ENABLED=true`, all five Firebase fields (`project-id`, `api-key`, `app-id`, `sender-id`, `service-account-file`) must be non-blank, and `service-account-file` must point to a readable file. See [Firebase Setup Guide](firebase-setup.md) for step-by-step setup without `google-services.json`.
 - Quotas (`max-blob-bytes`, `max-couple-storage-bytes`) and protocol versions must be strictly positive, and `max-couple-storage-bytes >= max-blob-bytes`.
 
-## Pubblicazione dei pacchetti di contenuti (`S2-SRV-01`, `TC-10`)
+## Publishing Content Packs (`S2-SRV-01`, `TC-10`)
 
-Il server serve il pacchetto attivo letto dal volume Docker `pack_data` (montato in `/var/lib/deepsky/packs` nel container `api`). La directory può contenere direttamente i file del pacchetto oppure una sottodirectory `current/`. Struttura attesa:
+The server serves the active pack read from the Docker `pack_data` volume (mounted at `/var/lib/deepsky/packs` in the `api` container). The directory can contain the pack files directly or a `current/` subdirectory. Expected structure:
 
 ```text
 pack-checksums.json
@@ -58,20 +58,20 @@ manifest.json
 assets/*.png
 ```
 
-Procedura di pubblicazione di una nuova versione (es. `v1.1.0`):
+Procedure to publish a new version (e.g., `v1.1.0`):
 
-1. Genera e firma il pacchetto in locale (`scripts/build_content_pack.py`, `scripts/sign_content.py`, `scripts/validate_content.py`); la chiave privata di firma non lascia mai la macchina del promotore.
-2. Pubblica i file in una nuova directory versionata e aggiorna il symlink `current` (non modificare mai i file sul posto per evitare disallineamenti con `ETag`/`Cache-Control: immutable`, `AU-15`). Il container `api` gira come utente non-root `deepsky` (immagine Alpine/BusyBox), mentre `docker compose cp` scrive come root: l'`exec` va quindi eseguito con `-u root` e la nuova directory va assegnata a `deepsky`. Il server risolve la radice con `toRealPath()`, quindi cambiare la destinazione del symlink è sicuro. `mv -T` potrebbe non essere disponibile in BusyBox: il comando ricade su `ln -sfn` (quasi atomico; se il ricaricamento cade nella finestra di pochi microsecondi, il server mantiene l'ultimo pacchetto valido e riprova al ciclo successivo).
+1. Generate and sign the pack locally (`scripts/build_content_pack.py`, `scripts/sign_content.py`, `scripts/validate_content.py`); the signing private key never leaves the promoter's machine.
+2. Publish the files into a new versioned directory and update the `current` symlink (never modify files in place to avoid mismatches with `ETag`/`Cache-Control: immutable`, `AU-15`). The `api` container runs as the non-root `deepsky` user (Alpine/BusyBox image), while `docker compose cp` writes as root: `exec` must therefore run with `-u root` and the new directory must be owned by `deepsky`. The server resolves the root with `toRealPath()`, so changing the symlink target is safe. `mv -T` may not be available in BusyBox: the command falls back to `ln -sfn` (near-atomic; if the reload falls within the few-microsecond window, the server keeps the last valid pack and retries on the next cycle).
    ```bash
    docker compose cp ./pack-v1.1.0 api:/var/lib/deepsky/packs/v1.1.0
    docker compose exec -u root api sh -c 'cd /var/lib/deepsky/packs && chown -R deepsky:deepsky v1.1.0 && ln -sfn v1.1.0 current.next && { mv -fT current.next current || ln -sfn v1.1.0 current; }'
    ```
-   **Migrazione una tantum:** se `current` è ancora una vera directory (non un symlink), `mv -T` non può sostituirla. Prima della prima pubblicazione con symlink, sposta la directory esistente in una directory versionata e crea il symlink (es. se il pacchetto attuale è `v1.0.0`):
+   **One-time migration:** if `current` is still a real directory (not a symlink), `mv -T` cannot replace it. Before the first symlink-based publish, move the existing directory into a versioned directory and create the symlink (e.g., if the current pack is `v1.0.0`):
    ```bash
    docker compose exec -u root api sh -c 'cd /var/lib/deepsky/packs && if [ -d current ] && [ ! -L current ]; then mv current v1.0.0 && ln -sfn v1.0.0 current; fi'
    ```
-   Se `current` non esiste (i file del pacchetto sono direttamente nella radice), crea prima `v1.0.0/` e sposta lì i file del pacchetto, poi crea il symlink come sopra. Dopo questa migrazione si può usare il comando di pubblicazione standard.
-3. Entro 60 secondi il server ricarica il pacchetto (`@Scheduled`, intervallo configurabile con `deepsky.content.reload-interval`, formato `PT60S`), lo verifica (firma se sono configurate le chiavi, SHA-256, dimensioni, path) e inizia a servirlo. Se la verifica fallisce resta servito l'ultimo pacchetto valido e il motivo compare nel log (`Rejected content pack ...`). Non è necessario riavviare il container; in caso di dubbio `docker compose restart api` forza un ricaricamento.
-4. Controlla: `curl -s https://<dominio>/api/v1/content/pack/checksums` e, per un file, `curl -I https://<dominio>/api/v1/content/pack/blobs/<sha256>`.
+   If `current` does not exist (pack files are directly in the root), create `v1.0.0/` first and move the pack files there, then create the symlink as above. After this migration, the standard publish command can be used.
+3. Within 60 seconds the server reloads the pack (`@Scheduled`, interval configurable with `deepsky.content.reload-interval`, `PT60S` format), verifies it (signature if keys are configured, SHA-256, sizes, paths), and begins serving it. If verification fails, the last valid pack continues to be served and the reason appears in the log (`Rejected content pack ...`). No container restart is needed; if in doubt, `docker compose restart api` forces a reload.
+4. Verify: `curl -s https://<domain>/api/v1/content/pack/checksums` and, for a file, `curl -I https://<domain>/api/v1/content/pack/blobs/<sha256>`.
 
-Aumenta `DEEPSKY_MIN_PACK_VERSION` solo per escludere versioni vecchie (anti-downgrade); i client scaricano i file da `/api/v1/content/pack/blobs/<sha256>` (immutabile) e rivalidano i percorsi `/files/**` con `ETag`.
+Increase `DEEPSKY_MIN_PACK_VERSION` only to exclude old versions (anti-downgrade); clients download files from `/api/v1/content/pack/blobs/<sha256>` (immutable) and revalidate `/files/**` paths with `ETag`.
