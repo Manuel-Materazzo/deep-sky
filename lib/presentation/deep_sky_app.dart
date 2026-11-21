@@ -42,6 +42,7 @@ class _DeepSkyAppState extends State<DeepSkyApp> with WidgetsBindingObserver {
       _controller.refreshPushStatus();
       _controller.refreshLocalSkyPeriod();
       unawaited(_controller.pollActiveInviteSilently());
+      unawaited(_controller.syncOnResumeSilently());
     }
   }
 

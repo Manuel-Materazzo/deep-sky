@@ -157,6 +157,52 @@ void main() {
       );
     });
 
+    test('AU-09: rejects plain HTTP for DNS names starting with private IP prefixes', () {
+      for (final String malicious in const <String>[
+        'http://10.attacker.example',
+        'http://192.168.evil.com',
+        'http://172.20.x.example.org',
+        'http://127.0.0.1.attacker.example',
+        'http://localhost.evil.com',
+        'http://[2001:db8::1]:8080',
+        'http://8.8.8.8:8080',
+      ]) {
+        expect(
+          () => InviteLinkCodec.normalizeServerUrl(malicious),
+          throwsFormatException,
+          reason: 'Expected plain HTTP rejection for $malicious',
+        );
+      }
+
+      // Without explicit scheme, DNS names with numeric prefixes infer https://
+      expect(
+        InviteLinkCodec.normalizeServerUrl('10.attacker.example'),
+        'https://10.attacker.example',
+      );
+      expect(
+        InviteLinkCodec.normalizeServerUrl('192.168.evil.com'),
+        'https://192.168.evil.com',
+      );
+
+      // Valid literal loopback, RFC 1918, link-local, and IPv6 ULA/loopback allow http://
+      expect(
+        InviteLinkCodec.normalizeServerUrl('http://127.0.0.1:8080'),
+        'http://127.0.0.1:8080',
+      );
+      expect(
+        InviteLinkCodec.normalizeServerUrl('http://169.254.1.10:8080'),
+        'http://169.254.1.10:8080',
+      );
+      expect(
+        InviteLinkCodec.normalizeServerUrl('[::1]:8080'),
+        'http://[::1]:8080',
+      );
+      expect(
+        InviteLinkCodec.normalizeServerUrl('http://[fd00::1]:8080'),
+        'http://[fd00::1]:8080',
+      );
+    });
+
     test('displayHost extracts host and optional port', () {
       expect(
         InviteLinkCodec.displayHost('https://deepsky.vectevo.com'),

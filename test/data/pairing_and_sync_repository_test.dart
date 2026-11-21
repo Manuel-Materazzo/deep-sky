@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:deep_sky/data/couple_api_client.dart';
+import 'package:deep_sky/data/encrypted_local_cache.dart';
 import 'package:deep_sky/data/pairing_and_sync_repository.dart';
 import 'package:deep_sky/data/secure_key_store.dart';
 import 'package:deep_sky/domain/crypto/deep_sky_crypto.dart';
@@ -269,6 +271,258 @@ void main() {
       repoA.loadCachedEvents(),
       throwsA(isA<SecretBoxAuthenticationError>()),
     );
+  });
+
+  test('AU-02: write-ahead epoch rotation survives lost HTTP response and app restart', () async {
+    final _FakeServer fakeServer = _FakeServer();
+    bool dropRevokeResponseAfterCommit = false;
+    bool keepOfflineOnReconcile = false;
+    final MockClient mockHttp = MockClient((http.Request req) async {
+      final http.Response res = await fakeServer.handle(req);
+      if (dropRevokeResponseAfterCommit &&
+          req.method == 'POST' &&
+          req.url.path.endsWith('/revoke')) {
+        // Server already committed epoch 2, but network drops before client sees 204.
+        dropRevokeResponseAfterCommit = false;
+        throw const SocketException('Connection reset after commit');
+      }
+      if (keepOfflineOnReconcile &&
+          req.method == 'GET' &&
+          req.url.path == '/api/v1/pairing/epoch-rotations/me') {
+        throw TimeoutException('Still offline during immediate reconcile');
+      }
+      return res;
+    });
+    final DeepSkyCrypto crypto = DeepSkyCrypto();
+    final InMemorySecureKeyStore storeA = InMemorySecureKeyStore();
+    final InMemorySecureKeyStore storeB = InMemorySecureKeyStore();
+
+    PairingAndSyncRepository makeRepo(InMemorySecureKeyStore store) =>
+        PairingAndSyncRepository(
+          keyStore: store,
+          crypto: crypto,
+          clientFactory: (String url) => CoupleApiClient(
+            baseUrl: url,
+            httpClient: mockHttp,
+            crypto: crypto,
+          ),
+        );
+
+    final PairingAndSyncRepository repoA = makeRepo(storeA);
+    final PairingAndSyncRepository repoB = makeRepo(storeB);
+
+    final init = await repoA.createInitialInvite(
+      serverUrl: 'https://test.local',
+      deviceLabel: 'Phone A',
+    );
+    final PendingJoinSession joinB = await repoB.acceptInvite(
+      serverUrl: 'https://test.local',
+      inviteToken: init.invite.inviteToken,
+      sasSecret: init.invite.sasSecret!,
+      deviceLabel: 'Phone B',
+    );
+    final status = await repoA.checkInviteAndSas(
+      init.invite.inviteToken,
+      sasSecret: init.invite.sasSecret,
+    );
+    await repoA.confirmSasAndDeliverRootKey(
+      targetDeviceId: status.status.acceptedDeviceId!,
+      targetKemPublicKey: status.status.acceptedKemPublicKey!,
+    );
+    final LocalDeviceIdentity idB = await repoB.completeKeyDelivery(
+      session: joinB,
+    );
+
+    // Case 1: Revoke commits on server, response drops, immediate reconcile fails (simulating crash/offline).
+    dropRevokeResponseAfterCommit = true;
+    keepOfflineOnReconcile = true;
+    await expectLater(
+      repoA.revokeDevice(idB.deviceId),
+      throwsA(isA<SocketException>()),
+    );
+    // Pending rotation must remain persisted in storeA, while identity is still epoch 1.
+    expect((await repoA.loadIdentity())?.currentKeyEpoch, 1);
+    expect(await storeA.read('deep_sky.pending_rotation.v1'), isNotNull);
+
+    // Simulate app restart with a fresh repository instance once network returns.
+    keepOfflineOnReconcile = false;
+    final PairingAndSyncRepository restartedRepoA = makeRepo(storeA);
+    final LocalDeviceIdentity? reconciled = await restartedRepoA
+        .reconcilePendingRotation();
+    expect(reconciled, isNotNull);
+    expect(reconciled!.currentKeyEpoch, 2);
+    expect(reconciled.recoverySeed, isNot(equals(init.identity.recoverySeed)));
+    expect(await storeA.read('deep_sky.pending_rotation.v1'), isNull);
+
+    // Reconciled initiator can immediately upload at epoch 2 and recover using the new seed!
+    await restartedRepoA.sendEncryptedEvent(
+      eventType: 'thinking_of_you',
+      body: <String, Object?>{'note': 'Recovered after drop'},
+    );
+    final PairingAndSyncRepository recoveredRepo = makeRepo(
+      InMemorySecureKeyStore(),
+    );
+    await recoveredRepo.recoverWithRecoveryKey(
+      serverUrl: 'https://test.local',
+      recoveryInput: RecoveryKeyCodec.toSentence(reconciled.recoverySeed!),
+      deviceLabel: 'New Phone',
+    );
+    final List<DecryptedEventRecord> events = await recoveredRepo
+        .fetchAndDecryptEvents();
+    expect(events, hasLength(1));
+    expect(events.first.payload.body['note'], 'Recovered after drop');
+  });
+
+  test('AU-04: single corrupted envelope is quarantined without breaking timeline sync', () async {
+    final _FakeServer fakeServer = _FakeServer();
+    final MockClient mockHttp = MockClient(
+      (http.Request req) => fakeServer.handle(req),
+    );
+    final DeepSkyCrypto crypto = DeepSkyCrypto();
+    final PairingAndSyncRepository repoA = PairingAndSyncRepository(
+      keyStore: InMemorySecureKeyStore(),
+      crypto: crypto,
+      clientFactory: (String url) =>
+          CoupleApiClient(baseUrl: url, httpClient: mockHttp, crypto: crypto),
+    );
+
+    final init = await repoA.createInitialInvite(
+      serverUrl: 'https://test.local',
+      deviceLabel: 'Phone A',
+    );
+    await repoA.sendEncryptedEvent(
+      eventType: 'thinking_of_you',
+      body: <String, Object?>{'note': 'First valid'},
+    );
+    // Inject a corrupted envelope directly into the server history
+    fakeServer.envelopes.add(<String, Object?>{
+      'envelopeId': 'corrupted-env-1',
+      'coupleId': init.identity.coupleId,
+      'senderDeviceId': init.identity.deviceId,
+      'seq': 99,
+      'channel': 'EVENT',
+      'keyEpoch': 1,
+      'nonceB64': base64UrlEncode(List<int>.filled(24, 1)),
+      'ciphertextB64': base64UrlEncode(List<int>.filled(48, 2)),
+      'createdAtServer': DateTime.now().toUtc().toIso8601String(),
+    });
+    await repoA.sendEncryptedEvent(
+      eventType: 'thinking_of_you',
+      body: <String, Object?>{'note': 'Second valid'},
+    );
+
+    final SyncEventsSnapshot snap = await repoA.syncEventsWithOfflineFallback();
+    expect(snap.isOffline, isFalse);
+    expect(snap.events, hasLength(2));
+    expect(snap.events.map((e) => e.payload.body['note']), <Object?>[
+      'First valid',
+      'Second valid',
+    ]);
+    expect(snap.quarantinedEnvelopes, hasLength(1));
+    expect(snap.quarantinedEnvelopes.first.envelopeId, 'corrupted-env-1');
+  });
+
+  test(
+    'AU-06: stalled HTTP request times out and triggers offline fallback',
+    () async {
+      final _FakeServer fakeServer = _FakeServer();
+      bool stallSync = false;
+      final MockClient mockHttp = MockClient((http.Request req) async {
+        if (stallSync && req.url.path == '/api/v1/sync/envelopes') {
+          await Future<void>.delayed(const Duration(seconds: 5));
+        }
+        return fakeServer.handle(req);
+      });
+      final DeepSkyCrypto crypto = DeepSkyCrypto();
+      final PairingAndSyncRepository repoA = PairingAndSyncRepository(
+        keyStore: InMemorySecureKeyStore(),
+        crypto: crypto,
+        clientFactory: (String url) => CoupleApiClient(
+          baseUrl: url,
+          httpClient: mockHttp,
+          crypto: crypto,
+          requestTimeout: const Duration(milliseconds: 50),
+        ),
+      );
+
+      await repoA.createInitialInvite(
+        serverUrl: 'https://test.local',
+        deviceLabel: 'Phone A',
+      );
+      await repoA.sendEncryptedEvent(
+        eventType: 'thinking_of_you',
+        body: <String, Object?>{'note': 'Cached before stall'},
+      );
+      await repoA.syncEventsWithOfflineFallback();
+
+      stallSync = true;
+      final SyncEventsSnapshot offlineSnap = await repoA
+          .syncEventsWithOfflineFallback();
+      expect(offlineSnap.isOffline, isTrue);
+      expect(offlineSnap.events, hasLength(1));
+      expect(
+        offlineSnap.events.first.payload.body['note'],
+        'Cached before stall',
+      );
+    },
+  );
+
+  test('AU-05: incremental sync uses persisted lastSeq and encrypted file-backed cache', () async {
+    final _FakeServer fakeServer = _FakeServer();
+    final List<String> syncQueries = <String>[];
+    final MockClient mockHttp = MockClient((http.Request req) {
+      if (req.method == 'GET' && req.url.path == '/api/v1/sync/envelopes') {
+        syncQueries.add(req.url.query);
+      }
+      return fakeServer.handle(req);
+    });
+    final Directory cacheDir = Directory.systemTemp.createTempSync(
+      'deepsky_cache_',
+    );
+    addTearDown(() => cacheDir.deleteSync(recursive: true));
+
+    final DeepSkyCrypto crypto = DeepSkyCrypto();
+    final InMemorySecureKeyStore keyStore = InMemorySecureKeyStore();
+    final PairingAndSyncRepository repoA = PairingAndSyncRepository(
+      keyStore: keyStore,
+      crypto: crypto,
+      clientFactory: (String url) =>
+          CoupleApiClient(baseUrl: url, httpClient: mockHttp, crypto: crypto),
+      localCache: EncryptedLocalCache(
+        keyStore: keyStore,
+        resolveCacheRootDir: () async => cacheDir.path,
+      ),
+    );
+
+    await repoA.createInitialInvite(
+      serverUrl: 'https://test.local',
+      deviceLabel: 'Phone A',
+    );
+    await repoA.sendEncryptedEvent(
+      eventType: 'thinking_of_you',
+      body: <String, Object?>{'note': 'First message'},
+    );
+
+    final SyncEventsSnapshot snap1 = await repoA
+        .syncEventsWithOfflineFallback();
+    expect(snap1.events, hasLength(1));
+    expect(syncQueries.last, contains('afterSeq=0'));
+    // Encrypted file exists on disk and SharedPreferences key stays empty
+    final File encFile = File(
+      '${cacheDir.path}${Platform.pathSeparator}offline_events.v1.enc',
+    );
+    expect(encFile.existsSync(), isTrue);
+    expect(await keyStore.read('deep_sky.offline_cache.v1'), isNull);
+    expect(encFile.readAsStringSync().contains('First message'), isFalse);
+
+    await repoA.sendEncryptedEvent(
+      eventType: 'thinking_of_you',
+      body: <String, Object?>{'note': 'Second message'},
+    );
+    final SyncEventsSnapshot snap2 = await repoA
+        .syncEventsWithOfflineFallback();
+    expect(snap2.events, hasLength(2));
+    expect(syncQueries.last, contains('afterSeq=1'));
   });
 
   test('unlinkCurrentDevice revokes only calling device and wipes local state even on 401/offline', () async {

@@ -9,6 +9,10 @@ class NativeBridge {
   const NativeBridge([this._channel = const MethodChannel(channelName)]);
 
   static const String channelName = 'com.vectevo.deep_sky/platform';
+  static final Map<MethodChannel, void Function(String uri)>
+  _deepLinkListeners = <MethodChannel, void Function(String uri)>{};
+  static final Map<MethodChannel, void Function(String l10nKey)>
+  _pushWakeupListeners = <MethodChannel, void Function(String l10nKey)>{};
 
   final MethodChannel _channel;
 
@@ -197,14 +201,42 @@ class NativeBridge {
   /// Registers a listener for deep-link invite URIs arriving while the app is open (`S1-APP-01`).
   void setDeepLinkListener(void Function(String uri)? listener) {
     if (listener == null) {
+      _deepLinkListeners.remove(_channel);
+    } else {
+      _deepLinkListeners[_channel] = listener;
+    }
+    _syncChannelHandler();
+  }
+
+  /// Registers a listener for foreground FCM wakeups forwarded from native Android (`AU-18`).
+  void setPushWakeupListener(void Function(String l10nKey)? listener) {
+    if (listener == null) {
+      _pushWakeupListeners.remove(_channel);
+    } else {
+      _pushWakeupListeners[_channel] = listener;
+    }
+    _syncChannelHandler();
+  }
+
+  void _syncChannelHandler() {
+    final bool hasDeepLink = _deepLinkListeners.containsKey(_channel);
+    final bool hasWakeup = _pushWakeupListeners.containsKey(_channel);
+    if (!hasDeepLink && !hasWakeup) {
       _channel.setMethodCallHandler(null);
       return;
     }
     _channel.setMethodCallHandler((MethodCall call) async {
       if (call.method == 'onDeepLink') {
         final String? uri = call.arguments as String?;
-        if (uri != null && uri.trim().isNotEmpty) {
-          listener(uri.trim());
+        final void Function(String)? cb = _deepLinkListeners[_channel];
+        if (cb != null && uri != null && uri.trim().isNotEmpty) {
+          cb(uri.trim());
+        }
+      } else if (call.method == 'onPushWakeup') {
+        final String? key = call.arguments as String?;
+        final void Function(String)? cb = _pushWakeupListeners[_channel];
+        if (cb != null && key != null && key.trim().isNotEmpty) {
+          cb(key.trim());
         }
       }
     });
@@ -283,6 +315,23 @@ class NativeBridge {
     try {
       final String? path = await _channel.invokeMethod<String>(
         'getContentPackRootDir',
+      );
+      if (path == null || path.trim().isEmpty) {
+        return null;
+      }
+      return path.trim();
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  /// Returns the app-private directory used for the encrypted offline event cache (`AU-05`).
+  Future<String?> getOfflineCacheRootDir() async {
+    try {
+      final String? path = await _channel.invokeMethod<String>(
+        'getOfflineCacheRootDir',
       );
       if (path == null || path.trim().isEmpty) {
         return null;

@@ -8,6 +8,7 @@ import 'package:deep_sky/data/encrypted_local_cache.dart';
 import 'package:deep_sky/data/secure_key_store.dart';
 import 'package:deep_sky/domain/content/content_pack_models.dart';
 import 'package:deep_sky/domain/crypto/e2ee_models.dart';
+import 'package:deep_sky/platform/native_bridge.dart';
 import 'package:deep_sky/presentation/deep_sky_controller.dart';
 import 'package:deep_sky/scene/couple_room_snapshot.dart';
 import 'package:deep_sky/scene/local_scene_view_state.dart';
@@ -584,4 +585,174 @@ void main() {
     expect(controller.sceneState.floorLampLit, isFalse);
     controller.dispose();
   });
+
+  test('AU-07 / AU-15 / AU-19: concurrent syncFromServer is serialized, oversized streams abort, and stale previous dirs are pruned', () async {
+    final SimpleKeyPair kp = await ed25519.newKeyPair();
+    final SimplePublicKey pub = await kp.extractPublicKey();
+    final Directory tempRoot = Directory.systemTemp.createTempSync(
+      'deepsky_au07_',
+    );
+    addTearDown(() => tempRoot.deleteSync(recursive: true));
+
+    final Map<String, List<int>> files11 = buildValidPackFiles(
+      packVersion: '1.1.0',
+      floorBytes: <int>[1, 2, 3, 4],
+    );
+    final signed11 = await signPackPayload(
+      keyPair: kp,
+      keyId: 'v1',
+      packId: 'deep-sky-home-v1',
+      packVersion: '1.1.0',
+      files: files11,
+    );
+    final Map<String, List<int>> files12 = buildValidPackFiles(
+      packVersion: '1.2.0',
+      floorBytes: <int>[5, 6, 7, 8],
+    );
+    final signed12 = await signPackPayload(
+      keyPair: kp,
+      keyId: 'v1',
+      packId: 'deep-sky-home-v1',
+      packVersion: '1.2.0',
+      files: files12,
+    );
+
+    Map<String, List<int>> activeFiles = files11;
+    var activeSigned = signed11;
+    bool sendOversizedBlob = false;
+    final MockClient mockHttp = MockClient((http.Request req) async {
+      final String p = req.url.path;
+      if (p.endsWith('/checksums')) {
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        return http.Response.bytes(
+          activeSigned.checksumsBytes,
+          200,
+          headers: <String, String>{
+            'etag': '"e-${activeFiles['manifest.json']!.length}"',
+          },
+        );
+      }
+      if (p.endsWith('/checksums.sig')) {
+        return http.Response.bytes(activeSigned.sigBytes, 200);
+      }
+      if (p.contains('/blobs/')) {
+        final String sha = p.split('/').last;
+        for (final List<int> bytes in activeFiles.values) {
+          if (await sha256Hex(bytes) == sha) {
+            if (sendOversizedBlob) {
+              return http.Response.bytes(<int>[
+                ...bytes,
+                ...List<int>.filled(64, 9),
+              ], 200);
+            }
+            return http.Response.bytes(bytes, 200);
+          }
+        }
+      }
+      return http.Response('not found', 404);
+    });
+
+    final ContentPackService svc = ContentPackService(
+      keyStore: InMemorySecureKeyStore(),
+      trustedPublicKeys: <String, SimplePublicKey>{'v1': pub},
+      httpClient: mockHttp,
+      resolveStorageRootDir: () async => tempRoot.path,
+    );
+
+    // AU-15: oversized blob response aborts with fileHashMismatch
+    sendOversizedBlob = true;
+    await expectLater(
+      () => svc.syncFromServer(
+        serverBaseUrl: 'https://test.local',
+        bundledPackVersion: SemanticVersion.parse('1.0.0'),
+        currentActivePackVersion: SemanticVersion.parse('1.0.0'),
+        manualForce: true,
+      ),
+      throwsA(
+        isA<ContentPackException>().having(
+          (ContentPackException e) => e.code,
+          'code',
+          ContentPackErrorCode.fileHashMismatch,
+        ),
+      ),
+    );
+    sendOversizedBlob = false;
+
+    // AU-07: parallel background + manual syncFromServer serialize without corrupting state
+    final List<ContentPackUpdateResult> results = await Future.wait(
+      <Future<ContentPackUpdateResult>>[
+        svc.syncFromServer(
+          serverBaseUrl: 'https://test.local',
+          bundledPackVersion: SemanticVersion.parse('1.0.0'),
+          currentActivePackVersion: SemanticVersion.parse('1.0.0'),
+          manualForce: false,
+        ),
+        svc.syncFromServer(
+          serverBaseUrl: 'https://test.local',
+          bundledPackVersion: SemanticVersion.parse('1.0.0'),
+          currentActivePackVersion: SemanticVersion.parse('1.0.0'),
+          manualForce: true,
+        ),
+      ],
+    );
+    expect(results[0].status, ContentPackUpdateStatus.stagedForNextBoot);
+    expect(results[1].status, ContentPackUpdateStatus.activatedHotReload);
+
+    // AU-19: create a stale older version in previous/ and upgrade to 1.2.0 -> stale dir is pruned
+    final Directory stalePrev = Directory(
+      '${tempRoot.path}${Platform.pathSeparator}previous${Platform.pathSeparator}1.0.5',
+    )..createSync(recursive: true);
+    File('${stalePrev.path}${Platform.pathSeparator}old.bin')
+        .writeAsBytesSync(<int>[9, 9, 9]);
+    activeFiles = files12;
+    activeSigned = signed12;
+    final ContentPackUpdateResult v12Res = await svc.syncFromServer(
+      serverBaseUrl: 'https://test.local',
+      bundledPackVersion: SemanticVersion.parse('1.0.0'),
+      currentActivePackVersion: SemanticVersion.parse('1.1.0'),
+      manualForce: true,
+    );
+    expect(v12Res.status, ContentPackUpdateStatus.activatedHotReload);
+    expect(stalePrev.existsSync(), isFalse);
+    expect(
+      Directory(
+        '${tempRoot.path}${Platform.pathSeparator}previous${Platform.pathSeparator}1.1.0',
+      ).existsSync(),
+      isTrue,
+    );
+  });
+
+  test('AU-24: setSecureScreen is reference-counted across nested sensitive screens', () async {
+    final List<bool> nativeCalls = <bool>[];
+    final _RecordingNativeBridge bridge = _RecordingNativeBridge(nativeCalls);
+    final DeepSkyController controller = DeepSkyController(
+      keyStore: InMemorySecureKeyStore(),
+      nativeBridge: bridge,
+      enableSkyRefreshTimer: false,
+    );
+
+    await controller.setSecureScreen(true); // page 1 opens -> native true
+    await controller.setSecureScreen(
+      true,
+    ); // nested page 2 opens -> no duplicate call
+    await controller.setSecureScreen(
+      false,
+    ); // page 2 closes -> still protected!
+    expect(nativeCalls, <bool>[true]);
+
+    await controller.setSecureScreen(false); // page 1 closes -> native false
+    expect(nativeCalls, <bool>[true, false]);
+    controller.dispose();
+  });
+}
+
+class _RecordingNativeBridge extends NativeBridge {
+  _RecordingNativeBridge(this.secureCalls);
+
+  final List<bool> secureCalls;
+
+  @override
+  Future<void> setSecureScreen(bool enabled) async {
+    secureCalls.add(enabled);
+  }
 }

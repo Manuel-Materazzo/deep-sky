@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -13,8 +14,24 @@ class ApiRequestException implements Exception {
   final String message;
   final String? errorCode;
 
-  bool get isDeviceUnknownOrRevoked {
+  bool get isClockSkew {
     if (statusCode != 401) {
+      return false;
+    }
+    if (errorCode == 'CLOCK_SKEW') {
+      return true;
+    }
+    return message.toLowerCase().contains('timestamp');
+  }
+
+  bool get isDeviceUnknownOrRevoked {
+    if (statusCode != 401 || isClockSkew) {
+      return false;
+    }
+    if (errorCode == 'DEVICE_AUTH_FAILED') {
+      return true;
+    }
+    if (errorCode == 'AUTH_HEADERS_INVALID' || errorCode == 'NONCE_REPLAYED') {
       return false;
     }
     final String lower = message.toLowerCase();
@@ -207,22 +224,31 @@ class CoupleApiClient {
     DeepSkyCrypto? crypto,
     this._clientVersionCode = 1,
     this._protocolVersion = 1,
+    this.requestTimeout = defaultRequestTimeout,
+    this.uploadTimeout = defaultUploadTimeout,
   }) : _baseUrl = baseUrl.endsWith('/')
            ? baseUrl.substring(0, baseUrl.length - 1)
            : baseUrl,
        _http = httpClient ?? http.Client(),
        _crypto = crypto ?? DeepSkyCrypto();
 
+  static const Duration defaultRequestTimeout = Duration(seconds: 15);
+  static const Duration defaultUploadTimeout = Duration(seconds: 45);
+
   final String _baseUrl;
   final http.Client _http;
   final DeepSkyCrypto _crypto;
   final int _clientVersionCode;
   final int _protocolVersion;
+  final Duration requestTimeout;
+  final Duration uploadTimeout;
 
   /// Performs an unauthenticated GET request carrying client version headers.
   Future<Object?> unsignedGetJson(String pathWithQuery) async {
     final Uri uri = Uri.parse('$_baseUrl$pathWithQuery');
-    final http.Response res = await _http.get(uri, headers: _versionHeaders());
+    final http.Response res = await _http
+        .get(uri, headers: _versionHeaders())
+        .timeout(requestTimeout);
     return _decodeResponse(res);
   }
 
@@ -487,6 +513,7 @@ class CoupleApiClient {
       pathWithQuery: '/api/v1/sync/envelopes',
       identity: identity,
       body: envelope.toUploadJson(),
+      timeout: uploadTimeout,
     );
     return EncryptedEnvelope.fromJson(raw! as Map<String, Object?>);
   }
@@ -604,14 +631,16 @@ class CoupleApiClient {
     Map<String, Object?> body,
   ) async {
     final Uri uri = Uri.parse('$_baseUrl$path');
-    final http.Response res = await _http.post(
-      uri,
-      headers: <String, String>{
-        ..._versionHeaders(),
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
-    );
+    final http.Response res = await _http
+        .post(
+          uri,
+          headers: <String, String>{
+            ..._versionHeaders(),
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(body),
+        )
+        .timeout(requestTimeout);
     return _decodeResponse(res)! as Map<String, Object?>;
   }
 
@@ -620,6 +649,7 @@ class CoupleApiClient {
     required String pathWithQuery,
     required LocalDeviceIdentity identity,
     Map<String, Object?>? body,
+    Duration? timeout,
   }) async {
     final List<int> bodyBytes = body == null
         ? const <int>[]
@@ -648,13 +678,15 @@ class CoupleApiClient {
     };
 
     final Uri uri = Uri.parse('$_baseUrl$pathWithQuery');
-    final http.Response res = switch (method.toUpperCase()) {
-      'GET' => await _http.get(uri, headers: headers),
-      'POST' => await _http.post(uri, headers: headers, body: bodyBytes),
-      'PATCH' => await _http.patch(uri, headers: headers, body: bodyBytes),
-      'DELETE' => await _http.delete(uri, headers: headers),
+    final Duration effectiveTimeout = timeout ?? requestTimeout;
+    final Future<http.Response> responseFuture = switch (method.toUpperCase()) {
+      'GET' => _http.get(uri, headers: headers),
+      'POST' => _http.post(uri, headers: headers, body: bodyBytes),
+      'PATCH' => _http.patch(uri, headers: headers, body: bodyBytes),
+      'DELETE' => _http.delete(uri, headers: headers),
       _ => throw UnsupportedError('Unsupported method $method'),
     };
+    final http.Response res = await responseFuture.timeout(effectiveTimeout);
     return _decodeResponse(res);
   }
 

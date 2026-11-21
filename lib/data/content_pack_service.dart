@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -26,6 +27,8 @@ class ContentPackService {
     this._isConnectionUnmetered,
     this.appProtocolVersion = 1,
     this.clientVersionCode = 1,
+    this.requestTimeout = defaultRequestTimeout,
+    this.chunkIdleTimeout = defaultChunkIdleTimeout,
   }) : _trustedPublicKeys = Map<String, SimplePublicKey>.unmodifiable(
          trustedPublicKeys,
        ),
@@ -33,6 +36,8 @@ class ContentPackService {
 
   static const String _metaStorageKey = 'deepsky.content_pack.meta.v1';
   static const int maxFailedBootAttemptsBeforeRollback = 2;
+  static const Duration defaultRequestTimeout = Duration(seconds: 15);
+  static const Duration defaultChunkIdleTimeout = Duration(seconds: 20);
   static final Ed25519 _ed25519 = Ed25519();
   static final RegExp _keyIdPattern = RegExp(r'^[a-z0-9][a-z0-9_-]{0,31}$');
   static final RegExp _sha256Pattern = RegExp(r'^[0-9a-f]{64}$');
@@ -45,6 +50,32 @@ class ContentPackService {
   final Future<bool> Function()? _isConnectionUnmetered;
   final int appProtocolVersion;
   final int clientVersionCode;
+  final Duration requestTimeout;
+  final Duration chunkIdleTimeout;
+  Future<void>? _opTail;
+
+  /// Serializes state-mutating content-pack operations in-process (`AU-07`).
+  Future<T> _synchronized<T>(Future<T> Function() action) {
+    final Future<void>? previous = _opTail;
+    final Completer<T> completer = Completer<T>();
+    Future<void> run() async {
+      try {
+        completer.complete(await action());
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    }
+
+    late final Future<void> current;
+    current = (previous == null ? run() : previous.then((_) => run()))
+        .whenComplete(() {
+          if (identical(_opTail, current)) {
+            _opTail = null;
+          }
+        });
+    _opTail = current;
+    return completer.future;
+  }
 
   /// Parses trusted key maps (`keyId -> base64 SPKI or raw 32B Ed25519 public key`).
   static Map<String, SimplePublicKey> parseTrustedKeyMap(
@@ -240,6 +271,18 @@ class ContentPackService {
     required SceneManifest bundledManifest,
     required String bundledAssetRoot,
     SemanticVersion? serverMinPackVersion,
+  }) => _synchronized(
+    () => _resolveStartupPackLocked(
+      bundledManifest: bundledManifest,
+      bundledAssetRoot: bundledAssetRoot,
+      serverMinPackVersion: serverMinPackVersion,
+    ),
+  );
+
+  Future<ResolvedContentPack> _resolveStartupPackLocked({
+    required SceneManifest bundledManifest,
+    required String bundledAssetRoot,
+    SemanticVersion? serverMinPackVersion,
   }) async {
     final String? rootPath = await _getStorageRootPath();
     if (rootPath == null) {
@@ -300,6 +343,7 @@ class ContentPackService {
             packBootAttempts: 0,
           );
           await _saveMeta(meta);
+          await _pruneUnusedPackDirs(rootPath, meta);
           await _collectBlobGarbage(rootPath);
         } else {
           meta = meta.copyWith(clearStagedVersion: true);
@@ -399,13 +443,13 @@ class ContentPackService {
   }
 
   /// Resets `packBootAttempts` to `0` once the Home first frame renders cleanly (`S2-APP-02`).
-  Future<void> markHomeBootSucceeded() async {
+  Future<void> markHomeBootSucceeded() => _synchronized(() async {
     final _PackMeta meta = await _loadMeta();
     if (meta.packBootAttempts == 0) {
       return;
     }
     await _saveMeta(meta.copyWith(packBootAttempts: 0));
-  }
+  });
 
   /// Downloads verified file-by-file content pack updates from [serverBaseUrl].
   ///
@@ -414,6 +458,22 @@ class ContentPackService {
   /// - When [manualForce] is `true` (Settings "Aggiorna grafiche" button), downloads even on
   ///   metered networks and promotes the verified pack to `active/` immediately for hot reload.
   Future<ContentPackUpdateResult> syncFromServer({
+    required String serverBaseUrl,
+    required SemanticVersion bundledPackVersion,
+    required SemanticVersion currentActivePackVersion,
+    SemanticVersion? serverMinPackVersion,
+    bool manualForce = false,
+  }) => _synchronized(
+    () => _syncFromServerLocked(
+      serverBaseUrl: serverBaseUrl,
+      bundledPackVersion: bundledPackVersion,
+      currentActivePackVersion: currentActivePackVersion,
+      serverMinPackVersion: serverMinPackVersion,
+      manualForce: manualForce,
+    ),
+  );
+
+  Future<ContentPackUpdateResult> _syncFromServerLocked({
     required String serverBaseUrl,
     required SemanticVersion bundledPackVersion,
     required SemanticVersion currentActivePackVersion,
@@ -451,10 +511,12 @@ class ContentPackService {
 
     final http.Response checksumsResp;
     try {
-      checksumsResp = await _http.get(
-        Uri.parse('$base/api/v1/content/pack/checksums'),
-        headers: checksumHeaders,
-      );
+      checksumsResp = await _http
+          .get(
+            Uri.parse('$base/api/v1/content/pack/checksums'),
+            headers: checksumHeaders,
+          )
+          .timeout(requestTimeout);
     } catch (error) {
       throw ContentPackException(ContentPackErrorCode.networkError, '$error');
     }
@@ -478,10 +540,12 @@ class ContentPackService {
 
     final http.Response sigResp;
     try {
-      sigResp = await _http.get(
-        Uri.parse('$base/api/v1/content/pack/checksums.sig'),
-        headers: baseHeaders,
-      );
+      sigResp = await _http
+          .get(
+            Uri.parse('$base/api/v1/content/pack/checksums.sig'),
+            headers: baseHeaders,
+          )
+          .timeout(requestTimeout);
     } catch (error) {
       throw ContentPackException(ContentPackErrorCode.networkError, '$error');
     }
@@ -574,27 +638,50 @@ class ContentPackService {
         }
         if (fileBytes == null) {
           // Content-addressed URL: immutable and safe for intermediate caches (`S2-SRV-01`).
-          final http.Response fileResp;
+          // Stream with per-chunk idle timeout (AU-06) and strict size cap (AU-15).
+          final http.StreamedResponse streamed;
           try {
-            fileResp = await _http.get(
+            final http.Request req = http.Request(
+              'GET',
               Uri.parse('$base/api/v1/content/pack/blobs/${entry.sha256}'),
-              headers: baseHeaders,
-            );
+            )..headers.addAll(baseHeaders);
+            streamed = await _http.send(req).timeout(requestTimeout);
           } catch (error) {
             throw ContentPackException(
               ContentPackErrorCode.networkError,
               '$error',
             );
           }
-          if (fileResp.statusCode != 200) {
+          if (streamed.statusCode != 200) {
             throw ContentPackException(
               ContentPackErrorCode.networkError,
-              'HTTP ${fileResp.statusCode} fetching ${entry.relativePath}',
+              'HTTP ${streamed.statusCode} fetching ${entry.relativePath}',
             );
           }
-          final Uint8List downloadedBytes = Uint8List.fromList(
-            fileResp.bodyBytes,
-          );
+          final BytesBuilder builder = BytesBuilder(copy: false);
+          int received = 0;
+          try {
+            await for (final List<int> chunk in streamed.stream.timeout(
+              chunkIdleTimeout,
+            )) {
+              received += chunk.length;
+              if (received > entry.sizeBytes) {
+                throw ContentPackException(
+                  ContentPackErrorCode.fileHashMismatch,
+                  'Size limit exceeded for ${entry.relativePath}: expected ${entry.sizeBytes} bytes.',
+                );
+              }
+              builder.add(chunk);
+            }
+          } on ContentPackException {
+            rethrow;
+          } catch (error) {
+            throw ContentPackException(
+              ContentPackErrorCode.networkError,
+              '$error',
+            );
+          }
+          final Uint8List downloadedBytes = builder.takeBytes();
           if (downloadedBytes.length != entry.sizeBytes) {
             throw ContentPackException(
               ContentPackErrorCode.fileHashMismatch,
@@ -631,21 +718,26 @@ class ContentPackService {
         );
       }
 
-      final String? newEtag = checksumsResp.headers['etag'] ?? meta.etag;
+      // Re-read metadata inside the lock before committing (AU-07).
+      final _PackMeta latestMeta = await _loadMeta();
+      final String? newEtag = checksumsResp.headers['etag'] ?? latestMeta.etag;
       final SemanticVersion nextMaxSeen = computeMinAcceptableVersion(
         bundledPackVersion: bundledPackVersion,
-        localMaxSeenPackVersion: SemanticVersion.tryParse(meta.maxSeenVersion),
+        localMaxSeenPackVersion: SemanticVersion.tryParse(
+          latestMeta.maxSeenVersion,
+        ),
         serverMinPackVersion: checksums.packVersion,
       );
 
       if (!manualForce) {
-        await _saveMeta(
-          meta.copyWith(
-            stagedVersion: checksums.packVersion.toString(),
-            maxSeenVersion: nextMaxSeen.toString(),
-            etag: newEtag,
-          ),
+        final _PackMeta nextMeta = latestMeta.copyWith(
+          stagedVersion: checksums.packVersion.toString(),
+          maxSeenVersion: nextMaxSeen.toString(),
+          etag: newEtag,
         );
+        await _saveMeta(nextMeta);
+        await _pruneUnusedPackDirs(rootPath, nextMeta);
+        await _collectBlobGarbage(rootPath);
         return ContentPackUpdateResult(
           status: ContentPackUpdateStatus.stagedForNextBoot,
           packVersion: checksums.packVersion.toString(),
@@ -656,28 +748,29 @@ class ContentPackService {
 
       // Manual force mode: promote immediately to active/ for instant hot reload.
       final String targetVerStr = checksums.packVersion.toString();
-      String? nextPrevious = meta.previousVersion;
-      if (meta.activeVersion != null && meta.activeVersion != targetVerStr) {
+      String? nextPrevious = latestMeta.previousVersion;
+      if (latestMeta.activeVersion != null &&
+          latestMeta.activeVersion != targetVerStr) {
         await _moveDirReplacing(
-          _packDir(rootPath, 'active', meta.activeVersion!),
-          _packDir(rootPath, 'previous', meta.activeVersion!),
+          _packDir(rootPath, 'active', latestMeta.activeVersion!),
+          _packDir(rootPath, 'previous', latestMeta.activeVersion!),
         );
-        nextPrevious = meta.activeVersion;
+        nextPrevious = latestMeta.activeVersion;
       }
       final Directory activeTarget = _packDir(rootPath, 'active', targetVerStr);
       await _moveDirReplacing(stagingTarget, activeTarget);
 
-      await _saveMeta(
-        meta.copyWith(
-          activeVersion: targetVerStr,
-          previousVersion: nextPrevious,
-          clearStagedVersion: true,
-          clearBlockedVersion: true,
-          maxSeenVersion: nextMaxSeen.toString(),
-          etag: newEtag,
-          packBootAttempts: 0,
-        ),
+      final _PackMeta nextMeta = latestMeta.copyWith(
+        activeVersion: targetVerStr,
+        previousVersion: nextPrevious,
+        clearStagedVersion: true,
+        clearBlockedVersion: true,
+        maxSeenVersion: nextMaxSeen.toString(),
+        etag: newEtag,
+        packBootAttempts: 0,
       );
+      await _saveMeta(nextMeta);
+      await _pruneUnusedPackDirs(rootPath, nextMeta);
       await _collectBlobGarbage(rootPath);
 
       return ContentPackUpdateResult(
@@ -698,6 +791,36 @@ class ContentPackService {
         } catch (_) {}
       }
       rethrow;
+    }
+  }
+
+  /// Prunes stale version directories in `active/`, `previous/`, and `staged/`
+  /// so older packs do not accumulate and prevent blob GC (`AU-19`).
+  Future<void> _pruneUnusedPackDirs(String rootPath, _PackMeta meta) async {
+    final Map<String, String?> keepByBucket = <String, String?>{
+      'active': meta.activeVersion,
+      'previous': meta.previousVersion,
+      'staged': meta.stagedVersion,
+    };
+    for (final MapEntry<String, String?> entry in keepByBucket.entries) {
+      final Directory bucketDir = Directory(
+        '$rootPath${Platform.pathSeparator}${entry.key}',
+      );
+      if (!bucketDir.existsSync()) {
+        continue;
+      }
+      for (final FileSystemEntity child in bucketDir.listSync(
+        followLinks: false,
+      )) {
+        final String name = child.uri.pathSegments
+            .where((String s) => s.isNotEmpty)
+            .last;
+        if (name != entry.value) {
+          try {
+            child.deleteSync(recursive: true);
+          } catch (_) {}
+        }
+      }
     }
   }
 

@@ -571,4 +571,60 @@ class DeepSkyStrings {
   String get usSectionTitle => isIt ? 'La vostra coppia' : 'Your couple';
 
   String get usSyncNowButton => isIt ? 'Sincronizza ora' : 'Sync now';
+
+  String unreadableEnvelopesNotice(int count) {
+    if (count == 1) {
+      return isIt
+          ? 'Un elemento non può essere letto su questo dispositivo.'
+          : 'One item could not be read on this device.';
+    }
+    return isIt
+        ? '$count elementi non possono essere letti su questo dispositivo.'
+        : '$count items could not be read on this device.';
+  }
+
+  // Friendly localized errors (`AU-16`, `AU-17`)
+  String get clockSkewError => isIt
+      ? 'L\'orologio del telefono sembra fuori sincrono. Controlla data e ora automatiche e riprova.'
+      : 'Your phone\'s clock seems out of sync. Check automatic date & time settings and try again.';
+
+  String get networkErrorGeneric => isIt
+      ? 'Impossibile raggiungere il server. Controlla la connessione e riprova.'
+      : 'Could not reach the server. Check your connection and try again.';
+
+  String get rateLimitedError => isIt
+      ? 'Troppi tentativi ravvicinati. Attendi un momento prima di riprovare.'
+      : 'Too many attempts in a short time. Please wait a moment and try again.';
+
+  String get payloadTooLargeError => isIt
+      ? 'Contenuto troppo grande per essere inviato.'
+      : 'The content is too large to send.';
+
+  String get conflictErrorGeneric => isIt
+      ? 'Operazione non completata: lo stato potrebbe essere cambiato. Riprova.'
+      : 'Action could not be completed: state may have changed. Please try again.';
+
+  String get serverErrorGeneric => isIt
+      ? 'Il server ha riscontrato un problema temporaneo. Riprova tra poco.'
+      : 'The server encountered a temporary problem. Please try again shortly.';
+
+  String get unexpectedErrorGeneric => isIt
+      ? 'Si è verificato un errore imprevisto. Riprova tra un momento.'
+      : 'Something unexpected went wrong. Please try again in a moment.';
+
+  String get joinAuthCheckError => isIt
+      ? 'Impossibile verificare l\'accesso in questo momento. Riprova oppure richiedi un nuovo invito al partner.'
+      : 'Could not verify access right now. Try again or ask your partner for a new invite.';
+
+  String get inviteNotAcceptedYetError => isIt
+      ? 'L\'altro telefono non ha ancora aperto l\'invito.'
+      : 'The other phone has not opened the invite yet.';
+
+  String get partnerNotConfirmedSasYetError => isIt
+      ? 'L\'altro telefono non ha ancora confermato il codice SAS. Conferma prima sull\'altro telefono, poi riprova.'
+      : 'The other phone has not confirmed the SAS code yet. Confirm on the other device first, then try again.';
+
+  String get keysDeliveredNotice => isIt
+      ? 'Chiavi inviate in modo cifrato. Ora completa la ricezione sull\'altro telefono.'
+      : 'Keys delivered in encrypted form. Now finish receiving on the other phone.';
 }
