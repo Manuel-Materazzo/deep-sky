@@ -42,3 +42,6 @@ deepsky:
     app-id: ${DEEPSKY_FIREBASE_APP_ID:}
     sender-id: ${DEEPSKY_FIREBASE_SENDER_ID:}
     service-account-file: ${DEEPSKY_FIREBASE_SERVICE_ACCOUNT_FILE:}
+  content:
+    packs-dir: ${DEEPSKY_CONTENT_PACKS_DIR:}
+    min-pack-version: ${DEEPSKY_MIN_PACK_VERSION:1.0.0}
