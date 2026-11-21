@@ -41,7 +41,7 @@ Persistito esclusivamente nello storage sicuro locale del dispositivo (`SecureKe
 | :-- | :-- | :-- |
 | `lastSeenEventSeq` | `int` (default `0`) | Ultimo `seq` di evento visto/ricambiato localmente sul telefono. Usato insieme al timestamp per decidere se la card *Ti penso* mostra il banner `"<Partner> ti ha pensato"` + `♥ Ricambia` e se `floor_lamp` è in stato `lit`. |
 | `lastSeenThoughtEnvelopeId` | `String?` | Fallback per eventi locali o senza `seq` assegnato (es. compatibilità test / `n-1`). |
-| `lastOpenedAtLocal` | `DateTime?` (UTC ISO-8601) | Istante locale della precedente apertura della Home. Se trascorrono `>= 72 ore` (`3 giorni`) dall'ultima apertura, la Home mostra un messaggio calmo di bentornato (*"Bentornato, la casa ti aspettava"* / *"Welcome back, home was waiting for you"*), senza mai mostrare conteggi di giorni o salvare contatori di inattività (`P-02`, `P-03`). |
+| `lastOpenedAtLocal` | `DateTime?` (UTC ISO-8601) | Istante locale della precedente apertura della Home. Se trascorrono `>= 72 ore` (`3 giorni`) dall'ultima apertura, la Home mostra un messaggio calmo di bentornato (*"Che bello rivederti, la casa ti aspettava"* / *"Welcome back, home was waiting for you"*), senza mai mostrare conteggi di giorni o salvare contatori di inattività (`P-02`, `P-03`). |
 | `skyPreference` | `enum { auto, day, night }` | Preferenza locale dell'atmosfera/cielo della casa (`Auto` segue l'orologio locale; `Giorno` e `Notte` forzano la relativa fascia e il tema coerente). |
 
 ### Regola della finestra di 6 ore per il banner *Ti penso* e la lampada (`F-03`, `S2-APP-03`)

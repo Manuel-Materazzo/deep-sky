@@ -240,5 +240,5 @@ Because the room wall is rendered directly by Flutter as the app background (no 
   - Header: left `Casa` title + single right `Impostazioni` icon button (zero online presence dots `P-07`).
   - Bottom Navigation: 2 tabs in `S3-2` (`Casa`, `Noi`).
   - Top Adaptive Thought Card: displays `"<Partner> ti ha pensato"` + optional reply note field + `♥ Ricambia` when an unseen partner thought `< 6h` exists locally; transitions to a temporary `"Pensiero inviato"` / `"Thought sent"` confirmation banner replacing the composer for a few seconds (with optional sent-note preview and manual dismiss) after sending or reciprocating; otherwise displays the quick-send `"Ti penso"` input & button.
-  - Welcome Back (`S2-D07`): after `>= 3 days` local absence, shows a dismissible warm note (*"Bentornato, la casa ti aspettava."* / *"Welcome back, home was waiting for you."*) with zero inactivity counters (`P-02`).
+  - Welcome Back (`S2-D07`): after `>= 3 days` local absence, shows a dismissible warm note (*"Che bello rivederti, la casa ti aspettava."* / *"Welcome back, home was waiting for you."*) with zero inactivity counters (`P-02`).
   - Graphics Updates (`S2-D09`): Settings displays active pack version and an explicit `"Aggiorna grafiche"` button for immediate download + hot reload.

@@ -77,7 +77,15 @@ Tutti gli endpoint sono serviti sotto `/api/v1/content/pack` in sola lettura (`G
 | `GET /api/v1/system/compatibility` | `{ minClientVersionCode, minProtocolVersion, minPackVersion }` | Nessuna cache forte |
 | `GET /api/v1/content/pack/checksums` | Byte grezzi di `pack-checksums.json` (`application/json`) | `ETag: "<sha256>"`, `Cache-Control: no-cache`, supporto `If-None-Match` -> `304` |
 | `GET /api/v1/content/pack/checksums.sig` | Byte grezzi di `pack-checksums.json.sig` (`text/plain; charset=utf-8`) | `ETag: "<sha256>"`, `Cache-Control: no-cache`, supporto `If-None-Match` -> `304` |
-| `GET /api/v1/content/pack/files/{*relativePath}` | Byte grezzi del file asset (`image/png`, `image/jpeg`, `application/json`) | `ETag: "<file-sha256>"`, `Cache-Control: public, max-age=31536000, immutable`, `Content-Length` rigoroso, supporto `If-None-Match` -> `304` |
+| `GET /api/v1/content/pack/blobs/{sha256}` | Byte grezzi del file del pacchetto attivo il cui SHA-256 coincide (`image/png`, `image/jpeg`, `application/json`). `sha256` deve rispettare `^[0-9a-f]{64}$` (altrimenti `400`); hash non presente nel pacchetto attivo -> `404` | `ETag: "<sha256>"`, `Cache-Control: public, max-age=31536000, immutable`, `Content-Length` rigoroso, supporto `If-None-Match` -> `304`. **Endpoint usato dal client** |
+| `GET /api/v1/content/pack/files/{*relativePath}` | Byte grezzi del file indicato per percorso (stessi tipi di contenuto). Mantenuto per compatibilità | `ETag: "<file-sha256>"`, `Cache-Control: no-cache` (rivalidazione obbligatoria), `Content-Length` rigoroso, supporto `If-None-Match` -> `304` |
+
+Regole di caching (`S2-SRV-01`):
+- Solo gli URL **content-addressed** (`/blobs/{sha256}`) possono essere `immutable`: l'URL cambia quando cambiano i byte, quindi nessuna cache intermedia può servire contenuto obsoleto.
+- Gli URL **per percorso** (`/files/**`) riusano lo stesso path tra versioni del pacchetto (`v1.0.0` -> `v1.1.0`): per questo rispondono con `no-cache` + `ETag` e il client non li usa per il download. Marcarli `immutable` causerebbe, dietro una cache intermedia, mismatch SHA-256 permanenti sul client.
+- `checksums` e `checksums.sig` restano `no-cache` + `ETag`.
+
+Pubblicazione e ricarica sul server: il pacchetto attivo viene letto dal volume `pack_data` (`DEEPSKY_CONTENT_PACKS_DIR`) all'avvio e ricaricato automaticamente ogni 60 s se `pack-checksums.json` o `.sig` cambiano; se la verifica fallisce resta servito l'ultimo pacchetto valido. Vedi `docs/server-configuration.md`.
 
 Sicurezza server:
 - Qualsiasi path non presente nella whitelist `files` del `pack-checksums.json` attivo o contenente `..` / `\` / symlink esterni restituisce `400` o `404`.
@@ -104,7 +112,7 @@ Un pacchetto con `packVersion < minAcceptablePackVersion` viene sempre rifiutato
 ## 5. Modalità di aggiornamento, staging e rollback "ultimo pacchetto funzionante"
 
 ### 5.1 Struttura su disco locale (app-private storage)
-- `content_packs/blobs/<sha256>`: cache content-addressed dei singoli file già verificati (per evitare di riscaricare file invariati tra `v1.0.0`, `v1.1.0` e `v1.2.0`).
+- `content_packs/blobs/<sha256>`: cache content-addressed dei singoli file già verificati (per evitare di riscaricare file invariati tra `v1.0.0`, `v1.1.0` e `v1.2.0`). Dopo ogni promozione `staged -> active` (all'avvio o con l'aggiornamento manuale) i blob non referenziati dai pacchetti `active`, `previous` e `staged` vengono eliminati.
 - `content_packs/staged/<packVersion>/`: pacchetto completamente verificato (firma + SHA-256 + `SceneManifestParser`), pronto per promozione.
 - `content_packs/active/<packVersion>/`: pacchetto attivo.
 - `content_packs/previous/<packVersion>/`: ultimo pacchetto funzionante precedente.
@@ -122,7 +130,7 @@ Un pacchetto con `packVersion < minAcceptablePackVersion` viene sempre rifiutato
 - All'avvio dell'app, prima di caricare un pacchetto esterno `active`:
   - se esiste uno `staged` valido, viene promosso ad `active` (spostando il vecchio `active` in `previous`) e `packBootAttempts` viene azzerato a `0`;
   - poi `packBootAttempts` viene incrementato (`+= 1`) e salvato prima del rendering della Home.
-- Quando la Home completa con successo il primo frame (`WidgetsBinding.instance.addPostFrameCallback`), il controller chiama `markHomeBootSucceeded()` che azzera `packBootAttempts = 0`.
+- Quando la Home completa con successo il primo frame (`WidgetsBinding.instance.addPostFrameCallback`), il controller chiama `markHomeBootSucceeded()` che azzera `packBootAttempts = 0`. Lo stesso azzeramento avviene al primo frame di una schermata pre-Home di un dispositivo già abbinato (impostazione dello spazio o chiave di recupero) che non disegna il pacchetto, così un avvio che non mostra la Home non conta come fallimento.
 - Se al boot successivo `packBootAttempts >= 2` (la Home è andata in crash o non ha mai completato il primo frame per 2 avvii consecutivi), il client esegue rollback automatico:
   - ripristina `previous` se presente e valido, altrimenti torna al pacchetto incorporato nell'APK (`bundled`);
   - registra il pacchetto difettoso (`blockedVersion`) per non ripromuoverlo automaticamente finché non arriva una versione più recente.

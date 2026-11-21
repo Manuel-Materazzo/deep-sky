@@ -154,7 +154,7 @@ Tutti gli asset visivi (pet, avatar, oggetti, sfondi) saranno **generati con str
 | :-- | :-- |
 | “Ti ho lasciato un disegno.” | “Non rispondi da due giorni!” |
 | “Hai un pensiero in arrivo.” (notifica generica) | Contenuti intimi sulla schermata bloccata |
-| “Bentornato, la casa ti aspettava.” | “Hai perso la tua serie di giorni.” |
+| “Che bello rivederti, la casa ti aspettava.” | “Hai perso la tua serie di giorni.” |
 | “Se ti va, racconta com’è andata.” | “Spiega perché ti senti così.” |
 
 ## 11. Movimento, suono, aptica
