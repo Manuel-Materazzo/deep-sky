@@ -227,9 +227,9 @@
           subtitleInstall: 'Deep Sky is an end-to-end encrypted private room. Download the official Android APK or open an invite link from your partner.',
           openApp: 'Open in Deep Sky',
           downloadApk: 'Download official APK (GitHub Releases)',
-          manualHint: 'If the button does not launch the app, copy the full link and paste it in the Join tab:',
+          manualHint: 'If the button does not launch the app, copy the invite code below, paste it in the Join tab, then clear your clipboard:',
           copy: 'Copy invite link',
-          copied: 'Link copied',
+          copied: 'Copied — clear your clipboard after pasting',
           stepsTitle: 'Join in 3 quiet steps',
           step1: 'Download and install the latest APK from GitHub Releases.',
           step2: 'Open Deep Sky and choose "Join" (or tap "Open in Deep Sky" above).',
@@ -268,7 +268,8 @@
         tokenSection.classList.toggle('hidden', !hasInvite);
         if (hasInvite) {
           document.getElementById('manual-hint').textContent = t.manualHint;
-          document.getElementById('invite-code-box').textContent = window.location.href;
+          // AU-26: Mask the raw secret in the visible preview box and copy only the app deep link.
+          document.getElementById('invite-code-box').textContent = 'deepsky://pair#••••••••';
           document.getElementById('copy-btn').textContent = t.copy;
         }
 
@@ -290,7 +291,7 @@
       document.getElementById('copy-btn').addEventListener('click', function () {
         var btn = document.getElementById('copy-btn');
         if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(window.location.href).then(function () {
+          navigator.clipboard.writeText(deepLink).then(function () {
             btn.textContent = COPY[lang].copied;
           });
         }
