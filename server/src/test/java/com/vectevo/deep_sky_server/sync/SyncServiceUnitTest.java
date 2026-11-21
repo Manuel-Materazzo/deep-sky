@@ -122,6 +122,22 @@ class SyncServiceUnitTest {
 				.isInstanceOf(StaleKeyEpochException.class)
 				.satisfies(ex -> assertThat(((StaleKeyEpochException) ex).getCurrentKeyEpoch()).isEqualTo(3));
 
+		// AU-21: Future keyEpoch exceeding couple currentKeyEpoch is rejected
+		assertThatThrownBy(() -> guardedSync.storeEnvelope(principal, UUID.randomUUID(), "EVENT", 4, nonceB64, cipherB64))
+				.isInstanceOf(IllegalArgumentException.class);
+
+		// AU-21: Atomic stored_bytes quota reservation failure throws StorageQuotaExceededException
+		UUID envOverQuota = UUID.randomUUID();
+		when(envelopeRepository.findById(envOverQuota)).thenReturn(Optional.empty());
+		when(envelopeRepository.insertIfAbsent(
+				eq(envOverQuota), eq(coupleId), eq(deviceId), eq("EVENT"), eq(3), any(), any(), any()))
+				.thenReturn(1);
+		when(lookup.tryReserveStorageBytes(coupleId, 64L, 4096L)).thenReturn(false);
+		assertThatThrownBy(() -> guardedSync.storeEnvelope(principal, envOverQuota, "EVENT", 3, nonceB64, cipherB64))
+				.isInstanceOf(StorageQuotaExceededException.class)
+				.satisfies(ex -> assertThat(((StorageQuotaExceededException) ex).getErrorCode())
+						.isEqualTo("COUPLE_STORAGE_QUOTA_EXCEEDED"));
+
 		var page = guardedSync.listEnvelopes(principal, 0L, 10);
 		assertThat(page.coupleKeyEpoch()).isEqualTo(3);
 	}

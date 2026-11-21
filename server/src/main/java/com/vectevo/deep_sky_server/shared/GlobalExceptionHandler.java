@@ -97,6 +97,12 @@ public class GlobalExceptionHandler {
 				.body(new ApiError("STALE_KEY_EPOCH", ex.getMessage(), Instant.now()));
 	}
 
+	@ExceptionHandler(RotationRequiredException.class)
+	public ResponseEntity<ApiError> handleRotationRequired(RotationRequiredException ex) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+				.body(new ApiError("ROTATION_REQUIRED", ex.getMessage(), Instant.now()));
+	}
+
 	@ExceptionHandler(RateLimitExceededException.class)
 	public ResponseEntity<ApiError> handleRateLimited(RateLimitExceededException ex) {
 		return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)

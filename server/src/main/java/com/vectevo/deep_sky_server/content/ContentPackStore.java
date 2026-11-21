@@ -45,7 +45,12 @@ public class ContentPackStore {
 	private final ObjectMapper objectMapper;
 	private final AtomicReference<LoadedPack> activePack = new AtomicReference<>();
 
-	public record PackFileEntry(String relativePath, Path resolvedPath, String sha256, long sizeBytes) {}
+	public record PackFileEntry(
+			String relativePath, Path resolvedPath, String sha256, long sizeBytes, long lastModifiedMillis) {
+		public PackFileEntry(String relativePath, Path resolvedPath, String sha256, long sizeBytes) {
+			this(relativePath, resolvedPath, sha256, sizeBytes, -1L);
+		}
+	}
 
 	public record LoadedPack(
 			String packId,
@@ -218,11 +223,12 @@ public class ContentPackStore {
 				throw new SecurityException("Size mismatch for " + relPath + ": expected "
 						+ expectedSize + ", actual " + actualSize);
 			}
+			long lastModMillis = Files.getLastModifiedTime(resolved).toMillis();
 			String actualSha = sha256Hex(Files.readAllBytes(resolved));
 			if (!actualSha.equals(expectedSha)) {
 				throw new SecurityException("SHA-256 mismatch for " + relPath);
 			}
-			verifiedFiles.put(relPath, new PackFileEntry(relPath, resolved, actualSha, actualSize));
+			verifiedFiles.put(relPath, new PackFileEntry(relPath, resolved, actualSha, actualSize, lastModMillis));
 		}
 
 		return new LoadedPack(

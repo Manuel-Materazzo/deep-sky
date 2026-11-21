@@ -6,10 +6,13 @@ import com.vectevo.deep_sky_server.push.PushConfig;
 import com.vectevo.deep_sky_server.push.PushProvider;
 import com.vectevo.deep_sky_server.push.ServiceAccountTokenProvider;
 import java.io.IOException;
+import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.ObjectMapper;
 
@@ -43,7 +46,15 @@ public class PushConfiguration {
 		if (!pushConfig.hasServerCredentials()) {
 			return new NoopPushProvider();
 		}
-		RestClient restClient = RestClient.create();
+		// AU-12: Always bound connect and read timeouts on Google OAuth2 and FCM HTTP v1 calls.
+		HttpClient jdkHttpClient = HttpClient.newBuilder()
+				.connectTimeout(Duration.ofSeconds(5))
+				.build();
+		JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(jdkHttpClient);
+		requestFactory.setReadTimeout(Duration.ofSeconds(8));
+		RestClient restClient = RestClient.builder()
+				.requestFactory(requestFactory)
+				.build();
 		ServiceAccountTokenProvider tokenProvider = new ServiceAccountTokenProvider(
 				Path.of(pushConfig.serviceAccountFile()),
 				restClient,

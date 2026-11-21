@@ -1,6 +1,7 @@
 package com.vectevo.deep_sky_server.push;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.time.Instant;
 
 /** Public DTOs for runtime push configuration, registration, and wakeup dispatch (`SP-01`, `PR-M2-03`). */
@@ -16,8 +17,8 @@ public final class PushDtos {
 			String senderId) {}
 
 	public record RegisterTokenRequest(
-			@NotBlank String fcmToken,
-			String platform) {}
+			@NotBlank @Size(max = 4096) String fcmToken,
+			@Size(max = 16) String platform) {}
 
 	public record TokenStatus(
 			String deviceId,

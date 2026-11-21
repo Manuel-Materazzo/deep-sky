@@ -19,6 +19,7 @@ COPY --from=builder --chown=deepsky:deepsky /workspace/target/app.jar /app/app.j
 USER deepsky:deepsky
 EXPOSE 8080
 
+ENV SPRING_PROFILES_ACTIVE=prod
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError"
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=5 \

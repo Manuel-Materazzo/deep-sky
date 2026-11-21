@@ -2,10 +2,19 @@ package com.vectevo.deep_sky_server.content;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -24,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/content/pack")
 public class ContentPackController {
 
+	private static final Logger log = LoggerFactory.getLogger(ContentPackController.class);
 	private static final String FILES_PREFIX = "/api/v1/content/pack/files/";
 	private static final String IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
 	private static final Pattern SHA256_HEX = Pattern.compile("^[0-9a-f]{64}$");
@@ -81,7 +91,7 @@ public class ContentPackController {
 	}
 
 	@GetMapping("/files/**")
-	public ResponseEntity<byte[]> getPackFile(
+	public ResponseEntity<Resource> getPackFile(
 			HttpServletRequest request,
 			@RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch)
 			throws IOException {
@@ -112,7 +122,7 @@ public class ContentPackController {
 	 * Content-addressed endpoint: the URL is the SHA-256 of the bytes, so the response is truly immutable.
 	 */
 	@GetMapping("/blobs/{sha256}")
-	public ResponseEntity<byte[]> getPackBlob(
+	public ResponseEntity<Resource> getPackBlob(
 			@PathVariable("sha256") String sha256,
 			@RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch)
 			throws IOException {
@@ -133,7 +143,7 @@ public class ContentPackController {
 		return serveEntry(entry, ifNoneMatch, IMMUTABLE_CACHE_CONTROL);
 	}
 
-	private static ResponseEntity<byte[]> serveEntry(
+	private static ResponseEntity<Resource> serveEntry(
 			ContentPackStore.PackFileEntry entry, String ifNoneMatch, String cacheControl) throws IOException {
 		String etag = quotedEtag(entry.sha256());
 		if (matchesEtag(ifNoneMatch, etag)) {
@@ -142,13 +152,52 @@ public class ContentPackController {
 					.header(HttpHeaders.CACHE_CONTROL, cacheControl)
 					.build();
 		}
-		byte[] bytes = Files.readAllBytes(entry.resolvedPath());
+		// AU-15: Stream directly from disk via FileSystemResource (no whole-file byte[] on heap)
+		// and reject with 500 if the underlying file was modified in place since verification.
+		Path path = entry.resolvedPath();
+		if (!Files.isRegularFile(path)) {
+			log.error("Verified content pack file disappeared on disk: {}", entry.relativePath());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
+		long currentSize = Files.size(path);
+		if (currentSize != entry.sizeBytes()) {
+			log.error("Content pack file {} size changed on disk (expected {}, found {}); refusing to serve with stale ETag",
+					entry.relativePath(), entry.sizeBytes(), currentSize);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+		}
+		if (entry.lastModifiedMillis() >= 0L) {
+			long currentMtime = Files.getLastModifiedTime(path).toMillis();
+			if (currentMtime != entry.lastModifiedMillis()) {
+				String actualSha = computeFileSha256Hex(path);
+				if (!entry.sha256().equals(actualSha)) {
+					log.error("Content pack file {} modified in place on disk (SHA-256 mismatch); refusing to serve with stale ETag",
+							entry.relativePath());
+					return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+				}
+			}
+		}
 		return ResponseEntity.ok()
 				.contentType(resolveMediaType(entry.relativePath()))
-				.contentLength(bytes.length)
+				.contentLength(currentSize)
 				.eTag(etag)
 				.header(HttpHeaders.CACHE_CONTROL, cacheControl)
-				.body(bytes);
+				.body(new FileSystemResource(path));
+	}
+
+	private static String computeFileSha256Hex(Path path) throws IOException {
+		try {
+			MessageDigest md = MessageDigest.getInstance("SHA-256");
+			byte[] buf = new byte[8192];
+			try (InputStream in = Files.newInputStream(path)) {
+				int n;
+				while ((n = in.read(buf)) != -1) {
+					md.update(buf, 0, n);
+				}
+			}
+			return HexFormat.of().formatHex(md.digest());
+		} catch (NoSuchAlgorithmException ex) {
+			throw new IllegalStateException("SHA-256 unavailable", ex);
+		}
 	}
 
 	private static String quotedEtag(String sha256) {

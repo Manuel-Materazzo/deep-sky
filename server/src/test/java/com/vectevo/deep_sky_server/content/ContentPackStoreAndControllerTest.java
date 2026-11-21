@@ -113,6 +113,11 @@ class ContentPackStoreAndControllerTest {
 				.andExpect(status().isNotFound());
 		mvc.perform(get("/api/v1/content/pack/files/..%2Fsecret.txt"))
 				.andExpect(status().is4xxClientError());
+
+		// 7) AU-15: In-place file modification after verification refuses to serve stale ETag (500)
+		Files.write(packDir.resolve("assets/floor.png"), new byte[] {9, 9, 9});
+		mvc.perform(get("/api/v1/content/pack/blobs/" + floorSha))
+				.andExpect(status().isInternalServerError());
 	}
 
 	@Test

@@ -5,6 +5,7 @@ import com.vectevo.deep_sky_server.shared.DevicePrincipal;
 import com.vectevo.deep_sky_server.shared.Ed25519SignatureVerifier;
 import com.vectevo.deep_sky_server.shared.PartnerWakeupRequestedEvent;
 import com.vectevo.deep_sky_server.shared.RateLimitExceededException;
+import com.vectevo.deep_sky_server.shared.RotationRequiredException;
 import com.vectevo.deep_sky_server.shared.SlidingWindowLimiter;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
@@ -372,13 +373,13 @@ public class PairingService {
 		if (ciphertext.length <= 16) {
 			throw new IllegalArgumentException("Wrapped key ciphertext too short");
 		}
-		int keyEpoch = requestedKeyEpoch != null
-				? requestedKeyEpoch
-				: coupleRepository.findById(principal.coupleId())
-						.map(CoupleEntity::getCurrentKeyEpoch)
-						.orElse(1);
-		if (keyEpoch < 1) {
-			throw new IllegalArgumentException("keyEpoch must be >= 1");
+		int currentCoupleEpoch = coupleRepository.findById(principal.coupleId())
+				.map(CoupleEntity::getCurrentKeyEpoch)
+				.orElse(1);
+		int keyEpoch = requestedKeyEpoch != null ? requestedKeyEpoch : currentCoupleEpoch;
+		if (keyEpoch < 1 || keyEpoch != currentCoupleEpoch) {
+			throw new IllegalArgumentException(
+					"keyEpoch must match couple currentKeyEpoch (" + currentCoupleEpoch + ")");
 		}
 
 		Instant now = Instant.now();
@@ -402,10 +403,10 @@ public class PairingService {
 
 	@Transactional
 	public KeyDeliveryView fetchPendingKeyDelivery(DevicePrincipal principal) {
+		// AU-27: Only return PAIRING_SEED deliveries here; never fall back to EPOCH_ROTATION bundles.
 		KeyDeliveryEntity entity = keyDeliveryRepository
 				.findFirstByToDeviceIdAndDeliveryKindOrderByKeyEpochDescCreatedAtDesc(
 						principal.deviceId(), "PAIRING_SEED")
-				.or(() -> keyDeliveryRepository.findFirstByToDeviceIdOrderByCreatedAtDesc(principal.deviceId()))
 				.orElseThrow(() -> new NoSuchElementException("No key delivery ready for this device"));
 		if (entity.getDeliveredAt() == null) {
 			entity.setDeliveredAt(Instant.now());
@@ -487,6 +488,12 @@ public class PairingService {
 				.orElseThrow(() -> new NoSuchElementException("Device not found"));
 		if (!target.getCoupleId().equals(principal.coupleId())) {
 			throw new NoSuchElementException("Device not found");
+		}
+		boolean revokingOtherApprovedDevice =
+				!target.getId().equals(principal.deviceId()) && target.getApprovedAt() != null;
+		if (revokingOtherApprovedDevice && rotation == null) {
+			throw new RotationRequiredException(
+					"Epoch rotation is required when revoking another approved device");
 		}
 		Instant now = Instant.now();
 		if (target.getRevokedAt() == null) {
@@ -607,7 +614,8 @@ public class PairingService {
 	public RecoveryChallengeResult createRecoveryChallenge(String recoveryAuthPublicKeyB64) {
 		byte[] recoveryAuthPub = Ed25519SignatureVerifier.decodeBase64Url(
 				recoveryAuthPublicKeyB64, 32, "recoveryAuthPublicKeyB64");
-		enforceCoupleRecoveryLimit("challenge:" + Ed25519SignatureVerifier.encodeBase64Url(recoveryAuthPub));
+		// AU-23: Do not consume a per-couple bucket here; knowing only the recovery public key
+		// must not allow locking out a real recovery. IP-based limits protect challenge creation.
 		CoupleEntity couple = coupleRepository.findByRecoveryAuthPublicKey(recoveryAuthPub)
 				.orElseThrow(() -> new NoSuchElementException("Couple not found for recovery key"));
 		if (couple.getUnpairedAt() != null) {
@@ -653,7 +661,6 @@ public class PairingService {
 		if (couple.getUnpairedAt() != null) {
 			throw new IllegalStateException("Couple has been unpaired");
 		}
-		enforceCoupleRecoveryLimit("complete:" + couple.getId());
 
 		byte[] authPub = Ed25519SignatureVerifier.decodeBase64Url(
 				newDeviceAuthPublicKeyB64, 32, "newDeviceAuthPublicKeyB64");
@@ -672,6 +679,9 @@ public class PairingService {
 				Ed25519SignatureVerifier.encodeBase64Url(kemPub));
 
 		if (!Ed25519SignatureVerifier.verify(couple.getRecoveryAuthPublicKey(), canonicalClaim, signature)) {
+			// AU-23: Consume the per-couple recovery bucket only on invalid signature attempts
+			// so a legitimate holder of the private recovery key cannot be locked out by probing.
+			enforceCoupleRecoveryLimit("complete-fail:" + couple.getId());
 			throw new SecurityException("Invalid recovery signature");
 		}
 

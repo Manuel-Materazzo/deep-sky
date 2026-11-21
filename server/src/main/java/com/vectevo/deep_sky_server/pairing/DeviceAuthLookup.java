@@ -51,4 +51,12 @@ public class DeviceAuthLookup {
 				.map(CoupleEntity::getCurrentKeyEpoch)
 				.orElse(1);
 	}
+
+	/**
+	 * Atomically reserves {@code deltaBytes} against the couple's storage quota ({@code AU-21}).
+	 */
+	@Transactional
+	public boolean tryReserveStorageBytes(UUID coupleId, long deltaBytes, long maxCoupleStorageBytes) {
+		return coupleRepository.tryReserveStorageBytes(coupleId, deltaBytes, maxCoupleStorageBytes) == 1;
+	}
 }

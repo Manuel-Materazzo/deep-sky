@@ -18,7 +18,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -47,19 +46,7 @@ public class DeviceAuthFilter extends OncePerRequestFilter {
 		if (!path.startsWith("/api/v1/")) {
 			return true;
 		}
-		if (HttpMethod.GET.matches(method)
-				&& ("/api/v1/system/compatibility".equals(path) || "/api/v1/push/config".equals(path))) {
-			return true;
-		}
-		if (HttpMethod.POST.matches(method)) {
-			if ("/api/v1/pairing/invites".equals(path) || "/api/v1/pairing/invites/accept".equals(path)) {
-				return true;
-			}
-			if ("/api/v1/recovery/challenges".equals(path) || "/api/v1/recovery/complete".equals(path)) {
-				return true;
-			}
-		}
-		return false;
+		return PublicRoutes.isPublicApiRequest(method, path);
 	}
 
 	@Override
@@ -74,7 +61,7 @@ public class DeviceAuthFilter extends OncePerRequestFilter {
 		String signatureHeader = request.getHeader("X-Signature");
 
 		if (isBlank(deviceIdHeader) || isBlank(timestampHeader) || isBlank(nonceHeader) || isBlank(signatureHeader)) {
-			rejectUnauthorized(response, "Missing device authentication headers");
+			rejectUnauthorized(response, "AUTH_HEADERS_INVALID", "Missing device authentication headers");
 			return;
 		}
 
@@ -84,19 +71,19 @@ public class DeviceAuthFilter extends OncePerRequestFilter {
 			deviceId = UUID.fromString(deviceIdHeader.trim());
 			timestamp = Long.parseLong(timestampHeader.trim());
 		} catch (IllegalArgumentException ex) {
-			rejectUnauthorized(response, "Malformed X-Device-Id or X-Timestamp");
+			rejectUnauthorized(response, "AUTH_HEADERS_INVALID", "Malformed X-Device-Id or X-Timestamp");
 			return;
 		}
 
 		long now = Instant.now().getEpochSecond();
 		if (Math.abs(now - timestamp) > MAX_CLOCK_SKEW_SECONDS) {
-			rejectUnauthorized(response, "Request timestamp outside allowed window");
+			rejectUnauthorized(response, "CLOCK_SKEW", "Request timestamp outside allowed window");
 			return;
 		}
 
 		String nonce = nonceHeader.trim();
 		if (nonce.length() < 16 || nonce.length() > 128) {
-			rejectUnauthorized(response, "Invalid X-Nonce length");
+			rejectUnauthorized(response, "AUTH_HEADERS_INVALID", "Invalid X-Nonce length");
 			return;
 		}
 
@@ -104,13 +91,13 @@ public class DeviceAuthFilter extends OncePerRequestFilter {
 		try {
 			signatureBytes = Ed25519SignatureVerifier.decodeBase64Url(signatureHeader, 64, "X-Signature");
 		} catch (IllegalArgumentException ex) {
-			rejectUnauthorized(response, UNIFORM_AUTH_FAILURE);
+			rejectUnauthorized(response, "DEVICE_AUTH_FAILED", UNIFORM_AUTH_FAILURE);
 			return;
 		}
 
 		DeviceAuthLookup.ActiveDeviceKey deviceKey = deviceAuthLookup.findActiveDevice(deviceId).orElse(null);
 		if (deviceKey == null) {
-			rejectUnauthorized(response, UNIFORM_AUTH_FAILURE);
+			rejectUnauthorized(response, "DEVICE_AUTH_FAILED", UNIFORM_AUTH_FAILURE);
 			return;
 		}
 
@@ -132,13 +119,13 @@ public class DeviceAuthFilter extends OncePerRequestFilter {
 				bodyHashHex);
 
 		if (!Ed25519SignatureVerifier.verify(deviceKey.authPublicKey(), canonical, signatureBytes)) {
-			rejectUnauthorized(response, UNIFORM_AUTH_FAILURE);
+			rejectUnauthorized(response, "DEVICE_AUTH_FAILED", UNIFORM_AUTH_FAILURE);
 			return;
 		}
 
 		Instant expiresAt = Instant.ofEpochSecond(now + MAX_CLOCK_SKEW_SECONDS + 30);
 		if (!deviceAuthLookup.consumeNonceIfUnused(deviceId, nonce, expiresAt)) {
-			rejectUnauthorized(response, "Replayed request nonce");
+			rejectUnauthorized(response, "NONCE_REPLAYED", "Replayed request nonce");
 			return;
 		}
 
@@ -162,12 +149,12 @@ public class DeviceAuthFilter extends OncePerRequestFilter {
 		return s == null || s.isBlank();
 	}
 
-	private static void rejectUnauthorized(HttpServletResponse response, String message) throws IOException {
+	private static void rejectUnauthorized(HttpServletResponse response, String code, String message) throws IOException {
 		SecurityContextHolder.clearContext();
 		response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 		response.setContentType(MediaType.APPLICATION_JSON_VALUE);
 		String escaped = message.replace("\"", "\\\"");
-		response.getWriter().write("{\"code\":\"UNAUTHORIZED\",\"message\":\"" + escaped + "\"}");
+		response.getWriter().write("{\"code\":\"" + code + "\",\"message\":\"" + escaped + "\"}");
 	}
 
 	private static final class CachedBodyHttpServletRequest extends HttpServletRequestWrapper {

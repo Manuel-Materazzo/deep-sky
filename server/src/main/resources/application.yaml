@@ -2,7 +2,10 @@ spring:
   application:
     name: deep-sky-server
   profiles:
-    default: dev
+    default: prod
+  docker:
+    compose:
+      enabled: false
   jpa:
     open-in-view: false
     hibernate:
@@ -10,6 +13,12 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
 
 management:
   endpoints:

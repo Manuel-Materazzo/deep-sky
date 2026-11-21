@@ -24,6 +24,7 @@ public class PairingCleanupService {
 	private static final Duration INVITE_RETENTION_GRACE = Duration.ofMinutes(15);
 	private static final Duration UNAPPROVED_DEVICE_TTL = Duration.ofMinutes(30);
 	private static final Duration ORPHAN_COUPLE_TTL = Duration.ofHours(24);
+	private static final Duration UNPAIRED_COUPLE_RETENTION = Duration.ofDays(30);
 
 	private final RequestNonceRepository requestNonceRepository;
 	private final RecoveryChallengeRepository recoveryChallengeRepository;
@@ -56,19 +57,23 @@ public class PairingCleanupService {
 		int deletedInvites = purgeExpiredInvites(now.minus(INVITE_RETENTION_GRACE));
 		int revokedUnapproved = purgeStaleUnapprovedDevices(now.minus(UNAPPROVED_DEVICE_TTL));
 		int deletedOrphanCouples = purgeOrphanNeverPairedCouples(now.minus(ORPHAN_COUPLE_TTL));
+		int deletedUnpairedCouples = purgeUnpairedCouples(now.minus(UNPAIRED_COUPLE_RETENTION));
 		if (deletedNonces > 0
 				|| deletedChallenges > 0
 				|| deletedInvites > 0
 				|| revokedUnapproved > 0
-				|| deletedOrphanCouples > 0) {
+				|| deletedOrphanCouples > 0
+				|| deletedUnpairedCouples > 0) {
 			log.debug(
 					"Cleanup purged {} nonces, {} recovery challenges, {} expired invites, "
-							+ "revoked {} unapproved devices, and removed {} never-paired orphan couples",
+							+ "revoked {} unapproved devices, removed {} never-paired orphan couples, "
+							+ "and purged {} expired unpaired couples",
 					deletedNonces,
 					deletedChallenges,
 					deletedInvites,
 					revokedUnapproved,
-					deletedOrphanCouples);
+					deletedOrphanCouples,
+					deletedUnpairedCouples);
 		}
 	}
 
@@ -114,5 +119,27 @@ public class PairingCleanupService {
 		}
 		coupleRepository.deleteAllByIdInBatch(orphanIds);
 		return orphanIds.size();
+	}
+
+	/**
+	 * Permanently purges unpaired couples and all associated ciphertext, devices,
+	 * invites, key deliveries, challenges, and push registrations past retention ({@code AU-20}).
+	 */
+	@Transactional
+	public int purgeUnpairedCouples(Instant cutoff) {
+		List<UUID> expiredIds = coupleRepository.findUnpairedCoupleIdsBefore(cutoff);
+		if (expiredIds.isEmpty()) {
+			return 0;
+		}
+		for (UUID coupleId : expiredIds) {
+			pushService.unregisterCouple(coupleId);
+			coupleRepository.deleteEnvelopesByCoupleId(coupleId);
+			coupleRepository.deleteKeyDeliveriesByCoupleId(coupleId);
+			coupleRepository.deleteRecoveryChallengesByCoupleId(coupleId);
+			coupleRepository.deleteInvitesByCoupleId(coupleId);
+			deviceRepository.deleteByCoupleId(coupleId);
+		}
+		coupleRepository.deleteAllByIdInBatch(expiredIds);
+		return expiredIds.size();
 	}
 }

@@ -263,6 +263,28 @@ class SecurityApprovalWebMvcTest {
 				.andReturn();
 		assertThat(unknownRes.getResponse().getContentAsString())
 				.isEqualTo(badSigRes.getResponse().getContentAsString());
+		assertThat(unknownRes.getResponse().getContentAsString())
+				.contains("\"code\":\"DEVICE_AUTH_FAILED\"");
+
+		// AU-16: Clock skew returns a distinct CLOCK_SKEW code instead of ambiguous revocation
+		long skewedTs = Instant.now().getEpochSecond() - 600;
+		mockMvc.perform(get("/api/v1/pairing/devices")
+						.header("X-Device-Id", approvedDeviceId.toString())
+						.header("X-Timestamp", Long.toString(skewedTs))
+						.header("X-Nonce", UUID.randomUUID().toString())
+						.header("X-Signature", Base64.getUrlEncoder().encodeToString(new byte[64])))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.code").value("CLOCK_SKEW"));
+
+		// AU-22: Oversized platform field fails validation cleanly with 400 (not 500 DB constraint error)
+		String oversizedPlatformBody = "{\"fcmToken\":\"tok12345\",\"platform\":\"android-way-too-long-platform-name\"}";
+		mockMvc.perform(signed(
+						post("/api/v1/push/register")
+								.contentType(MediaType.APPLICATION_JSON)
+								.content(oversizedPlatformBody),
+						approvedDeviceId, approvedKp, oversizedPlatformBody))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 
 		// Unhandled runtime exception returns generic 500 without leaking raw message (CA-13)
 		when(pairingService.listDevices(any())).thenThrow(new RuntimeException("sensitive internal DB detail"));
