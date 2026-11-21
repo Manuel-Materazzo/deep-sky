@@ -1,0 +1,5 @@
+# Deep Sky Git LFS configuration (`S2-CNT-01`, `D-11`)
+# High-resolution master artwork lives on Git LFS; CI checkouts set `lfs: false`
+# so routine builds never consume LFS bandwidth. Runtime derivatives under
+# `content/packs/**` stay in standard Git.
+content/masters/** filter=lfs diff=lfs merge=lfs -text

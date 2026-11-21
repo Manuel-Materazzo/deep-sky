@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "packId": "deep-sky-home-v1",
+  "packVersion": "1.0.0",
+  "minAppProtocol": 1,
+  "name": {
+    "it": "La nostra casa · v1",
+    "en": "Our Home · v1"
+  },
+  "scene": {
+    "aspectRatio": "4:3",
+    "bleed": {
+      "top": 0.0,
+      "bottom": 0.0,
+      "left": 0.0,
+      "right": 0.0
+    },
+    "background": {
+      "dayAsset": null,
+      "nightAsset": null
+    }
+  },
+  "slots": [
+    {
+      "id": "floor",
+      "description": "Warm wooden parquet floor with baseboard extending continuously to the bottom of the Home viewport",
+      "zIndex": 5,
+      "replaceable": false,
+      "anchor": { "x": 0.50, "y": 0.56 },
+      "bounds": { "x": 0.0, "y": 0.56, "width": 1.0, "height": 0.44 },
+      "touchArea": { "x": 0.0, "y": 0.56, "width": 1.0, "height": 0.44 },
+      "accessibilityLabel": {
+        "it": "Pavimento in legno della casa",
+        "en": "Wooden floor of our home"
+      },
+      "defaultState": "default",
+      "states": {
+        "default": {
+          "layers": [
+            { "id": "parquet", "asset": "assets/floor.png", "zOffset": 0, "opacity": 1.0 }
+          ]
+        }
+      },
+      "animations": []
+    },
+    {
+      "id": "window",
+      "description": "Arched window showing local sky time of day (day, twilight, night) without GPS or weather",
+      "zIndex": 10,
+      "replaceable": false,
+      "anchor": { "x": 0.30, "y": 0.29 },
+      "bounds": { "x": 0.14, "y": 0.06, "width": 0.33, "height": 0.46 },
+      "touchArea": { "x": 0.12, "y": 0.04, "width": 0.37, "height": 0.50 },
+      "accessibilityLabel": {
+        "it": "Finestra ad arco con il cielo dell'ora attuale",
+        "en": "Arched window showing the current sky"
+      },
+      "defaultState": "night",
+      "states": {
+        "day": {
+          "layers": [
+            { "id": "sky_day", "asset": "assets/window_sky_day.png", "zOffset": 0, "opacity": 1.0 },
+            { "id": "frame", "asset": "assets/window_frame.png", "zOffset": 1, "opacity": 1.0 }
+          ]
+        },
+        "twilight": {
+          "layers": [
+            { "id": "sky_twilight", "asset": "assets/window_sky_twilight.png", "zOffset": 0, "opacity": 1.0 },
+            { "id": "frame", "asset": "assets/window_frame.png", "zOffset": 1, "opacity": 1.0 }
+          ]
+        },
+        "night": {
+          "layers": [
+            { "id": "sky_night", "asset": "assets/window_sky_night.png", "zOffset": 0, "opacity": 1.0 },
+            { "id": "frame", "asset": "assets/window_frame.png", "zOffset": 1, "opacity": 1.0 }
+          ]
+        }
+      },
+      "animations": []
+    }
+  ]
+}
