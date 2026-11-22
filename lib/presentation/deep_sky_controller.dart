@@ -167,7 +167,7 @@ class DeepSkyController extends ChangeNotifier {
   String? lastSentThoughtNote;
   int thoughtSentBannerSequence = 0;
 
-  String get activePackVersion => sceneManifest?.packVersion ?? '1.0.0';
+  String get activePackVersion => sceneManifest?.packVersion ?? '1.1.0';
 
   AppBootPhase phase = AppBootPhase.loading;
   bool busy = false;
