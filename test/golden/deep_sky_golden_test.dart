@@ -132,60 +132,6 @@ MockClient _goldenHomeServer() {
   });
 }
 
-/// v1.0.0 manifest plus a SYNTHETIC `floor_lamp` slot (test-only, reusing existing v1 PNGs as
-/// stand-in art: `window_frame` = calm, `window_sky_night` = lit) so the lit state is renderable
-/// before the real v1.1.0 lamp assets exist.
-String _manifestWithSyntheticLamp(String v1ManifestRaw) {
-  final Map<String, Object?> manifest =
-      jsonDecode(v1ManifestRaw) as Map<String, Object?>;
-  (manifest['slots']! as List<Object?>).add(<String, Object?>{
-    'id': 'floor_lamp',
-    'description': 'Synthetic lamp for golden tests',
-    'zIndex': 35,
-    'replaceable': true,
-    'anchor': <String, double>{'x': 0.83, 'y': 0.54},
-    'bounds': <String, double>{
-      'x': 0.75,
-      'y': 0.30,
-      'width': 0.16,
-      'height': 0.48,
-    },
-    'touchArea': <String, double>{
-      'x': 0.73,
-      'y': 0.28,
-      'width': 0.20,
-      'height': 0.52,
-    },
-    'accessibilityLabel': <String, String>{
-      'it': 'Lampada da terra',
-      'en': 'Floor lamp',
-    },
-    'defaultState': 'calm',
-    'states': <String, Object?>{
-      'calm': <String, Object?>{
-        'layers': <Object?>[
-          <String, Object?>{
-            'id': 'lamp',
-            'asset': 'assets/window_frame.png',
-            'zOffset': 0,
-          },
-        ],
-      },
-      'lit': <String, Object?>{
-        'layers': <Object?>[
-          <String, Object?>{
-            'id': 'lamp',
-            'asset': 'assets/window_sky_night.png',
-            'zOffset': 0,
-          },
-        ],
-      },
-    },
-    'animations': <Object?>[],
-  });
-  return jsonEncode(manifest);
-}
-
 void main() {
   setUpAll(_loadGoldenFonts);
 
@@ -345,15 +291,14 @@ void main() {
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
 
-      final String lampManifest = _manifestWithSyntheticLamp(
-        File('content/packs/v1/manifest.json').readAsStringSync(),
-      );
+      final String v1ManifestRaw = File('content/packs/v1/manifest.json')
+          .readAsStringSync();
       final DateTime nowUtc = DateTime.utc(2026, 11, 21, 18, 10);
 
       final DeepSkyController controller = DeepSkyController(
         keyStore: await _pairedGoldenStore(),
         httpClient: _goldenHomeServer(),
-        loadAssetString: (_) async => lampManifest,
+        loadAssetString: (_) async => v1ManifestRaw,
         loadCapabilities: () async => _goldenCaps,
         defaultServerUrl: 'https://couple.example.test',
         enableSkyRefreshTimer: false,

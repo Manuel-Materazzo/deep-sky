@@ -17,7 +17,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// S3-2 QA test suite covering real v1.0.0 Home, wall-backdrop time bands,
+/// S3-2 QA test suite covering real v1.1.0 Home, wall-backdrop time bands,
 /// dual-state `< 6h` "Ti penso" card, welcome-back notice, TalkBack semantics,
 /// 200% text scaling, hot graphics reload, and S3-1 -> S3-2 `PD-19` compatibility
 /// (`S2-QA-01`, `ADR-0007`, `V-07`, `PD-19`).
@@ -229,7 +229,7 @@ void main() {
         ),
       ]) {
     testWidgets(
-      'S3-2 Home renders v1.0.0 scene, 2 tabs, single Settings button without overflow (${scenario.label})',
+      'S3-2 Home renders v1.1.0 scene, 2 tabs, single Settings button without overflow (${scenario.label})',
       (WidgetTester tester) async {
         tester.view.physicalSize = scenario.size;
         tester.view.devicePixelRatio = 1.0;
@@ -286,8 +286,11 @@ void main() {
         final AppBar appBar = tester.widget<AppBar>(find.byType(AppBar));
         expect(appBar.actions?.length, 1);
 
-        // Window slot exists and floor is non-interactive
+        // Window, rug, couch, and floor_lamp slots exist; floor is non-interactive
         expect(find.byKey(const Key('scene-slot-window')), findsOneWidget);
+        expect(find.byKey(const Key('scene-slot-rug')), findsOneWidget);
+        expect(find.byKey(const Key('scene-slot-couch')), findsOneWidget);
+        expect(find.byKey(const Key('scene-slot-floor_lamp')), findsOneWidget);
         expect(find.byKey(const Key('scene-slot-floor')), findsNothing);
 
         // Welcome-back banner dismisses cleanly
@@ -318,9 +321,9 @@ void main() {
         } catch (_) {}
       });
 
-      // Active external pack v1.1.0 (copy of the bundled v1 assets) with one failed boot recorded.
+      // Active external pack v1.2.0 (copy of the bundled v1 assets) with one failed boot recorded.
       final Directory activeDir = Directory(
-        '${tempPackRoot.path}/active/1.1.0/assets',
+        '${tempPackRoot.path}/active/1.2.0/assets',
       )..createSync(recursive: true);
       for (final FileSystemEntity f in Directory(
         'content/packs/v1/assets',
@@ -329,10 +332,10 @@ void main() {
           f.copySync('${activeDir.path}/${f.uri.pathSegments.last}');
         }
       }
-      File('${tempPackRoot.path}/active/1.1.0/manifest.json').writeAsStringSync(
+      File('${tempPackRoot.path}/active/1.2.0/manifest.json').writeAsStringSync(
         v1ManifestRaw.replaceFirst(
-          '"packVersion": "1.0.0"',
           '"packVersion": "1.1.0"',
+          '"packVersion": "1.2.0"',
         ),
       );
 
@@ -343,8 +346,8 @@ void main() {
       await store.write(
         metaKey,
         jsonEncode(<String, Object?>{
-          'activeVersion': '1.1.0',
-          'maxSeenVersion': '1.1.0',
+          'activeVersion': '1.2.0',
+          'maxSeenVersion': '1.2.0',
           'packBootAttempts': 1,
         }),
       );
@@ -379,7 +382,7 @@ void main() {
       await tester.pump();
 
       expect(find.byKey(const Key('space-setup-page')), findsOneWidget);
-      expect(controller.activePackVersion, '1.1.0');
+      expect(controller.activePackVersion, '1.2.0');
       final Map<String, Object?> meta =
           jsonDecode((await store.read(metaKey))!) as Map<String, Object?>;
       expect(meta['packBootAttempts'], 0);
@@ -437,6 +440,7 @@ void main() {
       expect(find.textContaining('Buona serata amore'), findsOneWidget);
       expect(find.byKey(const Key('reply-thought-button')), findsOneWidget);
       expect(controller.sceneState.floorLampLit, isTrue);
+      expect(find.byKey(const Key('floor-lamp-ambient-glow')), findsOneWidget);
 
       final FilledButton offlineReply = tester.widget<FilledButton>(
         find.byKey(const Key('reply-thought-button')),
@@ -449,6 +453,7 @@ void main() {
       expect(find.byKey(const Key('reply-thought-button')), findsNothing);
       expect(find.byKey(const Key('send-thought-button')), findsOneWidget);
       expect(controller.sceneState.floorLampLit, isFalse);
+      expect(find.byKey(const Key('floor-lamp-ambient-glow')), findsNothing);
     },
   );
 
@@ -616,11 +621,25 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('thought-sent-banner')), findsNothing);
       expect(find.byKey(const Key('ds2-thought-action-card')), findsOneWidget);
+
+      // 5) Tapping floor_lamp while calm focuses the quick-send composer
+      final Finder lampSlot = find.byKey(const Key('scene-slot-floor_lamp'));
+      expect(lampSlot, findsOneWidget);
+      await tester.ensureVisible(lampSlot);
+      await tester.tap(lampSlot);
+      await tester.pumpAndSettle();
+      final EditableText noteEditable = tester.widget<EditableText>(
+        find.descendant(
+          of: find.byKey(const Key('thought-note-field')),
+          matching: find.byType(EditableText),
+        ),
+      );
+      expect(noteEditable.focusNode.hasFocus, isTrue);
     },
   );
 
   testWidgets(
-    'Settings "Aggiorna grafiche" hot-reloads signed v1.1.0 pack live without restarting app',
+    'Settings "Aggiorna grafiche" hot-reloads signed v1.2.0 pack live without restarting app',
     (WidgetTester tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1.0;
@@ -642,19 +661,15 @@ void main() {
 
       final Uint8List floorBytes = File('content/packs/v1/assets/floor.png')
           .readAsBytesSync();
-      final Uint8List windowFrameBytes = File(
-        'content/packs/v1/assets/window_frame.png',
-      ).readAsBytesSync();
-      final Uint8List skyNightBytes = File(
-        'content/packs/v1/assets/window_sky_night.png',
-      ).readAsBytesSync();
+      final Uint8List rugBytes = File('content/packs/v1/assets/rug.png')
+          .readAsBytesSync();
 
-      final String v11Manifest = jsonEncode(<String, Object?>{
+      final String v12Manifest = jsonEncode(<String, Object?>{
         'schemaVersion': 1,
         'packId': 'deep-sky-home-v1',
-        'packVersion': '1.1.0',
+        'packVersion': '1.2.0',
         'minAppProtocol': 1,
-        'name': <String, String>{'it': 'Casa v1.1', 'en': 'Home v1.1'},
+        'name': <String, String>{'it': 'Casa v1.2', 'en': 'Home v1.2'},
         'scene': <String, Object?>{
           'aspectRatio': '4:3',
           'bleed': <String, double>{
@@ -703,43 +718,34 @@ void main() {
             'animations': <Object?>[],
           },
           <String, Object?>{
-            'id': 'floor_lamp',
-            'description': 'Lamp',
-            'zIndex': 35,
+            'id': 'pet_sleeping',
+            'description': 'Sleeping puppy',
+            'zIndex': 45,
             'replaceable': true,
-            'anchor': <String, double>{'x': 0.83, 'y': 0.54},
+            'anchor': <String, double>{'x': 0.62, 'y': 0.78},
             'bounds': <String, double>{
-              'x': 0.75,
-              'y': 0.30,
-              'width': 0.16,
-              'height': 0.48,
+              'x': 0.52,
+              'y': 0.68,
+              'width': 0.20,
+              'height': 0.16,
             },
             'touchArea': <String, double>{
-              'x': 0.73,
-              'y': 0.28,
-              'width': 0.20,
-              'height': 0.52,
+              'x': 0.50,
+              'y': 0.66,
+              'width': 0.24,
+              'height': 0.20,
             },
             'accessibilityLabel': <String, String>{
-              'it': 'Lampada da terra',
-              'en': 'Floor lamp',
+              'it': 'Cagnolino che dorme sul tappeto',
+              'en': 'Sleeping puppy on the rug',
             },
-            'defaultState': 'calm',
+            'defaultState': 'sleeping',
             'states': <String, Object?>{
-              'calm': <String, Object?>{
+              'sleeping': <String, Object?>{
                 'layers': <Object?>[
                   <String, Object?>{
-                    'id': 'lamp',
-                    'asset': 'assets/window_frame.png',
-                    'zOffset': 0,
-                  },
-                ],
-              },
-              'lit': <String, Object?>{
-                'layers': <Object?>[
-                  <String, Object?>{
-                    'id': 'lamp',
-                    'asset': 'assets/window_sky_night.png',
+                    'id': 'pet',
+                    'asset': 'assets/rug.png',
                     'zOffset': 0,
                   },
                 ],
@@ -751,10 +757,9 @@ void main() {
       });
 
       final Map<String, List<int>> files = <String, List<int>>{
-        'manifest.json': utf8.encode(v11Manifest),
+        'manifest.json': utf8.encode(v12Manifest),
         'assets/floor.png': floorBytes,
-        'assets/window_frame.png': windowFrameBytes,
-        'assets/window_sky_night.png': skyNightBytes,
+        'assets/rug.png': rugBytes,
       };
       final Map<String, Object?> fileMeta = <String, Object?>{};
       for (final MapEntry<String, List<int>> e in files.entries) {
@@ -772,7 +777,7 @@ void main() {
             'schemaVersion': 1,
             'keyId': 'v1',
             'packId': 'deep-sky-home-v1',
-            'packVersion': '1.1.0',
+            'packVersion': '1.2.0',
             'minAppProtocol': 1,
             'files': fileMeta,
           }),
@@ -848,13 +853,13 @@ void main() {
       await tester.pumpWidget(DeepSkyApp(controller: controller));
       await tester.pumpAndSettle();
 
-      expect(controller.activePackVersion, '1.0.0');
+      expect(controller.activePackVersion, '1.1.0');
 
       // Open Settings via single top-right button
       await tester.tap(find.byKey(const Key('open-settings-button')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('settings-page')), findsOneWidget);
-      expect(find.textContaining('v1.0.0'), findsOneWidget);
+      expect(find.textContaining('v1.1.0'), findsOneWidget);
 
       // Tap explicit "Aggiorna grafiche" button
       final Finder updateBtn = find.byKey(
@@ -883,14 +888,14 @@ void main() {
       }
       await tester.pumpAndSettle();
 
-      expect(controller.activePackVersion, '1.1.0');
+      expect(controller.activePackVersion, '1.2.0');
       expect(controller.activePackIsFileSystem, isTrue);
-      expect(find.textContaining('v1.1.0'), findsWidgets);
+      expect(find.textContaining('v1.2.0'), findsWidgets);
 
-      // Pop back to Home and verify the new v1.1.0 floor_lamp slot is live!
+      // Pop back to Home and verify the new v1.2.0 pet_sleeping slot is live!
       await tester.tap(find.byKey(const Key('settings-back-button')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('scene-slot-floor_lamp')), findsOneWidget);
+      expect(find.byKey(const Key('scene-slot-pet_sleeping')), findsOneWidget);
     },
   );
 }
