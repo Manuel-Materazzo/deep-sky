@@ -56,7 +56,11 @@ class _HomeShellPageState extends State<HomeShellPage> {
       if (!mounted) {
         return;
       }
-      widget.controller.markHomeBootSucceeded();
+      // IR-03: a file-system pack only counts as booted once its active layers decoded
+      // (see `_onActiveLayersResolved`); bundled assets cannot be a bad downloaded pack.
+      if (!widget.controller.activePackIsFileSystem) {
+        widget.controller.markHomeBootSucceeded();
+      }
       _centerPanoramicSceneIfNeeded();
     });
   }
@@ -70,6 +74,15 @@ class _HomeShellPageState extends State<HomeShellPage> {
       _handledThoughtSentSequence = 0;
       _syncThoughtSentTimer();
     }
+  }
+
+  /// `IR-03`: reset `packBootAttempts` only when every active layer of a file-system pack
+  /// resolved; a decode failure leaves the counter so the rollback guard can trigger.
+  void _onActiveLayersResolved(bool allOk) {
+    if (!mounted || !allOk) {
+      return;
+    }
+    widget.controller.markHomeBootSucceeded();
   }
 
   void _syncThoughtSentTimer() {
@@ -429,6 +442,9 @@ class _HomeShellPageState extends State<HomeShellPage> {
                               slotStates: c.sceneState.slotStates,
                               overrides: c.assetOverrides,
                               languageCode: c.languageCode,
+                              onActiveLayersResolved: c.activePackIsFileSystem
+                                  ? _onActiveLayersResolved
+                                  : null,
                               expandFloorDownward: true,
                               extraFloorHeight: extraFloorH,
                               floorBaseColor: tokens.floorParquetBase,
@@ -453,6 +469,9 @@ class _HomeShellPageState extends State<HomeShellPage> {
                             slotStates: c.sceneState.slotStates,
                             overrides: c.assetOverrides,
                             languageCode: c.languageCode,
+                            onActiveLayersResolved: c.activePackIsFileSystem
+                                ? _onActiveLayersResolved
+                                : null,
                             onSlotTapped: (SceneSlot slot) =>
                                 _handleSceneSlotTap(slot, c, canWrite),
                           ),

@@ -30,6 +30,7 @@ class HybridSceneCanvas extends StatefulWidget {
     this.expandFloorDownward = false,
     this.extraFloorHeight = 0.0,
     this.floorBaseColor,
+    this.onActiveLayersResolved,
   });
 
   final SceneManifest manifest;
@@ -47,6 +48,13 @@ class HybridSceneCanvas extends StatefulWidget {
   final bool expandFloorDownward;
   final double extraFloorHeight;
   final Color? floorBaseColor;
+
+  /// Called once, after the first frame, when every active image provider that this canvas
+  /// actually renders (background plus current slot-state layers, including the `ResizeImage`
+  /// wrappers, so the shared bounded-decode cache entries are reused, `ADR-0007`) has either
+  /// decoded (`allOk == true`) or failed (`allOk == false`). With no layers it reports `true`.
+  /// Used by Home to reset the pack boot counter only once the pack really rendered (`IR-03`).
+  final void Function(bool allOk)? onActiveLayersResolved;
 
   static ImageProvider _buildProvider({
     required String packAssetRoot,
@@ -72,6 +80,85 @@ class HybridSceneCanvas extends StatefulWidget {
 class _HybridSceneCanvasState extends State<HybridSceneCanvas> {
   final Map<String, ImageProvider> _activeSkyProviders =
       <String, ImageProvider>{};
+
+  /// Providers handed to `Image` widgets in the latest build (`IR-03`).
+  final List<ImageProvider> _renderedProviders = <ImageProvider>[];
+  final List<(ImageStream, ImageStreamListener)> _resolveListeners =
+      <(ImageStream, ImageStreamListener)>[];
+  bool _layersReported = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.onActiveLayersResolved != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _watchActiveLayers());
+    }
+  }
+
+  @override
+  void dispose() {
+    _detachResolveListeners();
+    super.dispose();
+  }
+
+  void _detachResolveListeners() {
+    for (final (ImageStream stream, ImageStreamListener listener)
+        in _resolveListeners) {
+      stream.removeListener(listener);
+    }
+    _resolveListeners.clear();
+  }
+
+  /// Resolves the very providers that were rendered (no extra full-size precache, `ADR-0007`)
+  /// and reports once whether all of them decoded (`IR-03`).
+  void _watchActiveLayers() {
+    if (!mounted || _layersReported) {
+      return;
+    }
+    final void Function(bool allOk)? callback = widget.onActiveLayersResolved;
+    if (callback == null) {
+      return;
+    }
+    final List<ImageProvider> providers = List<ImageProvider>.of(
+      _renderedProviders,
+    );
+    void report(bool allOk) {
+      if (_layersReported) {
+        return;
+      }
+      _layersReported = true;
+      _detachResolveListeners();
+      callback(allOk);
+    }
+
+    if (providers.isEmpty) {
+      report(true);
+      return;
+    }
+    final ImageConfiguration config = createLocalImageConfiguration(context);
+    int pending = providers.length;
+    bool failed = false;
+    void settle() {
+      pending--;
+      if (pending == 0) {
+        report(!failed);
+      }
+    }
+
+    for (final ImageProvider provider in providers) {
+      final ImageStream stream = provider.resolve(config);
+      late final ImageStreamListener listener;
+      listener = ImageStreamListener(
+        (ImageInfo _, bool _) => settle(),
+        onError: (Object _, StackTrace? _) {
+          failed = true;
+          settle();
+        },
+      );
+      _resolveListeners.add((stream, listener));
+      stream.addListener(listener);
+    }
+  }
 
   @override
   void didUpdateWidget(covariant HybridSceneCanvas oldWidget) {
@@ -150,7 +237,7 @@ class _HybridSceneCanvasState extends State<HybridSceneCanvas> {
 
     final SceneBackground? bg = widget.manifest.background;
     final bool hasOpaqueBackground = bg != null;
-    final ImageProvider? bgProvider = bg == null
+    final ImageProvider? rawBgProvider = bg == null
         ? null
         : HybridSceneCanvas._buildProvider(
             packAssetRoot: widget.packAssetRoot,
@@ -167,6 +254,17 @@ class _HybridSceneCanvasState extends State<HybridSceneCanvas> {
         final double sceneW = constraints.maxWidth;
         final double sceneH = sceneW / widget.manifest.numericAspectRatio;
         final double totalH = sceneH + extraFloor;
+        _renderedProviders.clear();
+        final ImageProvider? bgProvider = rawBgProvider == null
+            ? null
+            : ResizeImage.resizeIfNeeded(
+                (sceneW * dpr).round().clamp(64, 1600),
+                null,
+                rawBgProvider,
+              );
+        if (bgProvider != null) {
+          _renderedProviders.add(bgProvider);
+        }
 
         return SizedBox(
           width: sceneW,
@@ -181,11 +279,7 @@ class _HybridSceneCanvasState extends State<HybridSceneCanvas> {
                   width: sceneW,
                   height: sceneH,
                   child: Image(
-                    image: ResizeImage.resizeIfNeeded(
-                      (sceneW * dpr).round().clamp(64, 1600),
-                      null,
-                      bgProvider,
-                    ),
+                    image: bgProvider,
                     fit: BoxFit.cover,
                     gaplessPlayback: true,
                     excludeFromSemantics: true,
@@ -318,6 +412,7 @@ class _HybridSceneCanvasState extends State<HybridSceneCanvas> {
         cacheWidth: decodeW,
         cacheHeight: decodeH,
       );
+      _renderedProviders.add(provider);
       final List<SceneAnimation> anims = slot.animations
           .where((SceneAnimation a) => a.layerId == layer.id)
           .toList(growable: false);

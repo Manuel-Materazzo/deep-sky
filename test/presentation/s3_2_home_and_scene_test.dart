@@ -389,6 +389,110 @@ void main() {
     },
   );
 
+  // IR-03: the rollback guard must reset only after the active pack layers actually decoded.
+  for (final ({String label, bool corrupt}) scenario
+      in <({String label, bool corrupt})>[
+        (
+          label: 'valid file-system pack resets packBootAttempts once layers decoded',
+          corrupt: false,
+        ),
+        (
+          label: 'undecodable PNG layer in a file-system pack does NOT reset packBootAttempts',
+          corrupt: true,
+        ),
+      ]) {
+    testWidgets('IR-03: ${scenario.label}', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final Directory tempPackRoot = Directory.systemTemp.createTempSync(
+        'deepsky_ir03_',
+      );
+      addTearDown(() {
+        PaintingBinding.instance.imageCache.clear();
+        try {
+          tempPackRoot.deleteSync(recursive: true);
+        } catch (_) {}
+      });
+
+      final Directory activeAssets = Directory(
+        '${tempPackRoot.path}/active/1.2.0/assets',
+      )..createSync(recursive: true);
+      for (final FileSystemEntity f in Directory(
+        'content/packs/v1/assets',
+      ).listSync()) {
+        if (f is File) {
+          f.copySync('${activeAssets.path}/${f.uri.pathSegments.last}');
+        }
+      }
+      if (scenario.corrupt) {
+        // Same path/size class as a real asset, but not a decodable image.
+        File('${activeAssets.path}/floor.png')
+            .writeAsBytesSync(List<int>.filled(64, 7));
+      }
+      File('${tempPackRoot.path}/active/1.2.0/manifest.json').writeAsStringSync(
+        v1ManifestRaw.replaceFirst(
+          '"packVersion": "1.1.0"',
+          '"packVersion": "1.2.0"',
+        ),
+      );
+
+      final InMemorySecureKeyStore store = await buildPairedStore();
+      const String metaKey = 'deepsky.content_pack.meta.v1';
+      await store.write(
+        metaKey,
+        jsonEncode(<String, Object?>{
+          'activeVersion': '1.2.0',
+          'maxSeenVersion': '1.2.0',
+          'packBootAttempts': 1,
+        }),
+      );
+
+      final MockClient httpClient = buildMockServer();
+      final ContentPackService packService = ContentPackService(
+        keyStore: store,
+        trustedPublicKeys: const <String, SimplePublicKey>{},
+        httpClient: httpClient,
+        resolveStorageRootDir: () async => tempPackRoot.path,
+        isConnectionUnmetered: () async => false,
+      );
+      final DeepSkyController controller = DeepSkyController(
+        keyStore: store,
+        httpClient: httpClient,
+        contentPackService: packService,
+        loadAssetString: (_) async => v1ManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+        enableSkyRefreshTimer: false,
+      );
+      controller.reduceMotion = true;
+
+      await tester.pumpWidget(
+        DeepSkyApp(controller: controller, autoInitialize: false),
+      );
+      await tester.runAsync(controller.initialize);
+      for (int i = 0; i < 20; i++) {
+        await tester.pump();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+      }
+      await tester.pump();
+
+      expect(controller.activePackIsFileSystem, isTrue);
+      expect(find.byKey(const Key('ds2-scene-canvas')), findsOneWidget);
+      if (scenario.corrupt) {
+        // Decode failures are reported through FlutterError (expected here).
+        while (tester.takeException() != null) {}
+      }
+      final Map<String, Object?> meta =
+          jsonDecode((await store.read(metaKey))!) as Map<String, Object?>;
+      // Startup incremented 1 -> 2; a decode failure must leave it pending (not reset to 0).
+      expect(meta['packBootAttempts'], scenario.corrupt ? 2 : 0);
+    });
+  }
+
   testWidgets(
     'Dual-state "Ti penso" card shows "<Partner> ti ha pensato" + Ricambia for unseen <6h thought and switches to quick-send after reply',
     (WidgetTester tester) async {
@@ -960,9 +1064,7 @@ void main() {
           channel: EnvelopeChannel.event,
           keyEpoch: 1,
           seq: 1,
-          createdAtServer: nowLocal
-              .subtract(const Duration(days: 3))
-              .toUtc(),
+          createdAtServer: nowLocal.subtract(const Duration(days: 3)).toUtc(),
           payload: DecryptedEnvelopePayload(
             schemaVersion: 1,
             eventType: 'thinking_of_you',
@@ -1033,7 +1135,10 @@ void main() {
       expect(populatedCtrl.events.length, 3);
 
       // Also visible in received-thought state
-      expect(find.byKey(const Key('open-thought-history-button')), findsOneWidget);
+      expect(
+        find.byKey(const Key('open-thought-history-button')),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('open-thought-history-button')));
       await tester.pumpAndSettle();
 

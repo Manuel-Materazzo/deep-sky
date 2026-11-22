@@ -37,6 +37,8 @@ public class ContentPackStore {
 	private static final Pattern KEY_ID_PATTERN = Pattern.compile("^[a-z0-9][a-z0-9_-]{0,31}$");
 	private static final Pattern SEMVER_PATTERN = Pattern.compile("^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$");
 	private static final Pattern SHA256_HEX_PATTERN = Pattern.compile("^[0-9a-f]{64}$");
+	/** Signing context of `pack-checksums.json` (`IR-06`, `PD-19`). */
+	static final String CHECKSUMS_TYPE = "deep-sky/pack-checksums";
 	private static final byte[] ED25519_SPKI_PREFIX = new byte[] {
 			0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00
 	};
@@ -179,6 +181,13 @@ public class ContentPackStore {
 			throw new IllegalArgumentException("pack-checksums.json root must be an object");
 		}
 
+		// IR-06 (PD-19 transitional): `type` is optional for already-published packs, but when
+		// present it must be the pack-checksums signing context. Mandatory in a later release.
+		JsonNode typeNode = root.get("type");
+		if (typeNode != null && (!typeNode.isString() || !CHECKSUMS_TYPE.equals(typeNode.asString()))) {
+			throw new SecurityException("pack-checksums.json type must be " + CHECKSUMS_TYPE);
+		}
+
 		String keyId = requireText(root, "keyId");
 		if (!KEY_ID_PATTERN.matcher(keyId).matches() || !keyId.equals(parsedSig.keyId())) {
 			throw new SecurityException("pack-checksums.json keyId does not match .sig envelope");
@@ -187,6 +196,11 @@ public class ContentPackStore {
 		String packVersion = requireText(root, "packVersion");
 		if (!SEMVER_PATTERN.matcher(packVersion).matches()) {
 			throw new IllegalArgumentException("Invalid packVersion semver: " + packVersion);
+		}
+		// IR-04: never serve a pack below our own advertised minPackVersion; the previous valid pack stays.
+		if (compareSemver(packVersion, config.minPackVersion()) < 0) {
+			throw new IllegalArgumentException("packVersion " + packVersion
+					+ " is below configured minPackVersion " + config.minPackVersion());
 		}
 		int minAppProtocol = root.path("minAppProtocol").asInt(-1);
 		if (minAppProtocol < 1) {
@@ -242,12 +256,38 @@ public class ContentPackStore {
 				Map.copyOf(verifiedFiles));
 	}
 
+	/** Numeric MAJOR.MINOR.PATCH comparison; an unparseable {@code b} (config) compares as "no floor". */
+	static int compareSemver(String a, String b) {
+		java.util.regex.Matcher ma = SEMVER_PATTERN.matcher(a);
+		java.util.regex.Matcher mb = SEMVER_PATTERN.matcher(b);
+		if (!ma.matches()) {
+			throw new IllegalArgumentException("Invalid semver: " + a);
+		}
+		if (!mb.matches()) {
+			return 1;
+		}
+		for (int i = 1; i <= 3; i++) {
+			int c = new java.math.BigInteger(ma.group(i)).compareTo(new java.math.BigInteger(mb.group(i)));
+			if (c != 0) {
+				return c;
+			}
+		}
+		return 0;
+	}
+
 	static boolean isSafeRelativePath(String raw) {
 		if (raw == null || raw.isEmpty() || !raw.equals(raw.trim())) {
 			return false;
 		}
-		if (raw.startsWith("/") || raw.contains("\\") || raw.contains(":") || raw.indexOf('\0') >= 0) {
+		if (raw.startsWith("/") || raw.contains("\\") || raw.contains(":")) {
 			return false;
+		}
+		// IR-N2: reject all control characters (U+0000-U+001F, U+007F).
+		for (int i = 0; i < raw.length(); i++) {
+			char ch = raw.charAt(i);
+			if (ch <= 0x1F || ch == 0x7F) {
+				return false;
+			}
 		}
 		String[] segments = raw.split("/", -1);
 		for (String seg : segments) {
@@ -283,13 +323,12 @@ public class ContentPackStore {
 		int colon = text.indexOf(':');
 		String keyId;
 		String sigB64;
-		if (colon > 0) {
-			keyId = text.substring(0, colon).trim();
-			sigB64 = text.substring(colon + 1).trim();
-		} else {
-			keyId = "v1";
-			sigB64 = text;
+		// IR-N1: the `keyId:base64` envelope is mandatory (no unprefixed fallback).
+		if (colon <= 0) {
+			throw new IllegalArgumentException("Missing keyId prefix in .sig file (expected keyId:base64)");
 		}
+		keyId = text.substring(0, colon).trim();
+		sigB64 = text.substring(colon + 1).trim();
 		if (!KEY_ID_PATTERN.matcher(keyId).matches()) {
 			throw new IllegalArgumentException("Invalid keyId in .sig file");
 		}

@@ -198,6 +198,78 @@ class ContentPackStoreAndControllerTest {
 		assertThat(store.getActivePack()).isEmpty();
 	}
 
+	/** IR-04 part 2: a pack below the server's own minPackVersion is rejected; previous pack keeps serving. */
+	@Test
+	void rejectsPackBelowConfiguredMinPackVersionAndKeepsPrevious() throws Exception {
+		KeyPair kp = generateEd25519();
+		String pubB64 = Base64.getEncoder().encodeToString(kp.getPublic().getEncoded());
+		Path packDir = tempDir.resolve("min_ver");
+		Map<String, byte[]> files = Map.of("manifest.json", "{}".getBytes(StandardCharsets.UTF_8));
+		writeSignedPack(packDir, kp, "v1", "1.10.0", files);
+		ContentPackStore store = new ContentPackStore(
+				new ContentPackConfig(packDir.toString(), "1.2.0", Map.of("v1", pubB64)), objectMapper);
+		// numeric (not lexicographic) comparison: 1.10.0 >= 1.2.0
+		assertThat(store.getActivePack().orElseThrow().packVersion()).isEqualTo("1.10.0");
+
+		writeSignedPack(packDir, kp, "v1", "1.1.9", files);
+		assertThat(store.reload()).isFalse();
+		assertThat(store.getActivePack().orElseThrow().packVersion()).isEqualTo("1.10.0");
+
+		ContentPackStore fresh = new ContentPackStore(
+				new ContentPackConfig(packDir.toString(), "1.2.0", Map.of("v1", pubB64)), objectMapper);
+		assertThat(fresh.getActivePack()).isEmpty();
+	}
+
+	/** IR-06: `type` optional for now, but if present it must be the pack-checksums context. */
+	@Test
+	void checksumsTypeIsOptionalButMustMatchWhenPresent() throws Exception {
+		KeyPair kp = generateEd25519();
+		String pubB64 = Base64.getEncoder().encodeToString(kp.getPublic().getEncoded());
+		Map<String, byte[]> files = Map.of("manifest.json", "{}".getBytes(StandardCharsets.UTF_8));
+
+		Path ok = writeSignedPack(tempDir.resolve("type_ok"), kp, "v1", "1.0.0", files,
+				"\"type\":\"deep-sky/pack-checksums\",");
+		assertThat(new ContentPackStore(
+				new ContentPackConfig(ok.toString(), "1.0.0", Map.of("v1", pubB64)), objectMapper)
+				.getActivePack()).isPresent();
+
+		Path legacy = writeSignedPack(tempDir.resolve("type_absent"), kp, "v1", "1.0.0", files);
+		assertThat(new ContentPackStore(
+				new ContentPackConfig(legacy.toString(), "1.0.0", Map.of("v1", pubB64)), objectMapper)
+				.getActivePack()).isPresent();
+
+		Path wrong = writeSignedPack(tempDir.resolve("type_wrong"), kp, "v1", "1.0.0", files,
+				"\"type\":\"deep-sky/apk-manifest\",");
+		assertThat(new ContentPackStore(
+				new ContentPackConfig(wrong.toString(), "1.0.0", Map.of("v1", pubB64)), objectMapper)
+				.getActivePack()).isEmpty();
+	}
+
+	/** IR-N1: the keyId prefix is mandatory in the .sig envelope. */
+	@Test
+	void rejectsSignatureWithoutKeyIdPrefix() throws Exception {
+		KeyPair kp = generateEd25519();
+		String pubB64 = Base64.getEncoder().encodeToString(kp.getPublic().getEncoded());
+		Path dir = writeSignedPack(tempDir.resolve("no_prefix"), kp, "v1", "1.0.0",
+				Map.of("manifest.json", "{}".getBytes(StandardCharsets.UTF_8)));
+		Path sigFile = dir.resolve("pack-checksums.json.sig");
+		String line = Files.readString(sigFile, StandardCharsets.UTF_8).trim();
+		Files.writeString(sigFile, line.substring("v1:".length()) + "\n", StandardCharsets.UTF_8);
+		assertThat(new ContentPackStore(
+				new ContentPackConfig(dir.toString(), "1.0.0", Map.of("v1", pubB64)), objectMapper)
+				.getActivePack()).isEmpty();
+	}
+
+	/** IR-N2: all control characters are rejected in relative paths. */
+	@Test
+	void isSafeRelativePathRejectsAllControlCharacters() {
+		assertThat(ContentPackStore.isSafeRelativePath("assets/floor.png")).isTrue();
+		for (char c : new char[] {'\u0000', '\u0001', '\t', '\n', '\r', '\u001F', '\u007F'}) {
+			assertThat(ContentPackStore.isSafeRelativePath("assets/fl" + c + "oor.png"))
+					.as("control char 0x%02x", (int) c).isFalse();
+		}
+	}
+
 	private static String sha256Hex(byte[] bytes) throws Exception {
 		return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
 	}
@@ -212,6 +284,16 @@ class ContentPackStoreAndControllerTest {
 			String keyId,
 			String packVersion,
 			Map<String, byte[]> files) throws Exception {
+		return writeSignedPack(dir, kp, keyId, packVersion, files, "");
+	}
+
+	private Path writeSignedPack(
+			Path dir,
+			KeyPair kp,
+			String keyId,
+			String packVersion,
+			Map<String, byte[]> files,
+			String extraTopLevelFields) throws Exception {
 		Files.createDirectories(dir);
 		StringBuilder filesJson = new StringBuilder("{");
 		boolean first = true;
@@ -227,7 +309,7 @@ class ContentPackStoreAndControllerTest {
 		}
 		filesJson.append("}");
 
-		String checksums = "{\"schemaVersion\":1,\"keyId\":\"" + keyId
+		String checksums = "{" + extraTopLevelFields + "\"schemaVersion\":1,\"keyId\":\"" + keyId
 				+ "\",\"packId\":\"deep-sky-home-v1\",\"packVersion\":\"" + packVersion
 				+ "\",\"minAppProtocol\":1,\"files\":" + filesJson + "}\n";
 		byte[] checksumsBytes = checksums.getBytes(StandardCharsets.UTF_8);

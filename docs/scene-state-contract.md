@@ -6,9 +6,11 @@ This document formalizes the boundary between what belongs to the couple's share
 
 ---
 
-## 1. `CoupleRoomSnapshot` (shared, E2EE encrypted, `schemaVersion = 1`)
+## 1. `CoupleRoomSnapshot` (shared couple state, `schemaVersion = 1`)
 
-Contains exclusively shared objective artifacts and states of the couple, deterministically derivable from the log of encrypted envelopes (`EncryptedEnvelope`):
+Contains exclusively shared objective artifacts and states of the couple, deterministically derivable from the log of encrypted envelopes (`EncryptedEnvelope`).
+
+**Current implementation (`S3-2`):** the snapshot is **derived locally** on each device by `SceneStateMapper` from the decrypted envelopes and is **never uploaded** to the server or stored there. Any future decision to synchronize it (for example derived pet state under `S-01`) must go through an E2EE envelope with its own version (`PD-19`) and must keep the forbidden-field list below (`IR-08`, `docs/s3-2-independent-review-2026-11-22.md`).
 
 ```json
 {

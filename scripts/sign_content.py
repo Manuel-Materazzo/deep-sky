@@ -20,6 +20,7 @@ from pathlib import Path
 
 from validate_content import is_safe_relative_asset_path, validate_manifest
 
+CHECKSUMS_TYPE = "deep-sky/pack-checksums"
 KEY_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 
 
@@ -79,6 +80,8 @@ def main() -> int:
     sig_path = out_dir / "pack-checksums.json.sig"
 
     payload = {
+        # IR-06 (PD-19): signing context / domain separator against cross-protocol replay.
+        "type": CHECKSUMS_TYPE,
         "schemaVersion": 1,
         "keyId": key_id,
         "packId": manifest_data["packId"],

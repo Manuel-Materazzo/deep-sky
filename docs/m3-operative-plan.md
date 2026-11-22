@@ -322,7 +322,7 @@ and preserves historical envelopes in `recovery_keyring`.
 ### 5.4 Exit from S3-1 (G-3a)
 
 - [ ] All tasks closed with evidence and approved
-- [ ] All items in chapter 3 checked off
+- [x] All items in chapter 3 checked off *(verified 2026-11-22: all ten G-3a items in chapter 3 are ticked)*
 - [x] List of what the partner found difficult, prioritized
 - [x] Sponsor decision: start using real data
 
@@ -490,7 +490,8 @@ For each item: screens or artifacts, **all states** (day/twilight/night, calm ho
 
 - [x] Verified in code and with automated tests (`test/security/content_pack_security_test.dart`, `ContentPackStoreAndControllerTest`) that the Ed25519 signature (with `keyId` selection) on `pack-checksums.json` is checked on raw bytes before any JSON parsing
 - [x] Automated rejection tests for: unknown `keyId`, invalid signature, tampered `pack-checksums.json`, single PNG with mismatched SHA-256, path traversal (`../`), downgrade below `max(bundled, localMaxSeen, serverMin)`, and unsupported `minAppProtocol`, plus test of automatic rollback on `>= 2` failed launches *(`test/security/content_pack_security_test.dart`)*
-- [ ] Verified that neither `lastSeenEventSeq` nor `lastOpenedAtLocal` ever leave the device toward the server (`P-07`, `S-05`, `test/security/content_pack_security_test.dart`) *(automated check run by the author; independent review by a non-author reviewer remains, as required by this task)*
+- [x] Verified that neither `lastSeenEventSeq` nor `lastOpenedAtLocal` ever leave the device toward the server (`P-07`, `S-05`, `test/security/content_pack_security_test.dart`) *(independent non-author review passed on 2026-11-22: `docs/s3-2-independent-review-2026-11-22.md`; the server operator can still infer app-open times from sync timing, documented as `IR-07` in `docs/wiki/server-operations.md`)*
+- [x] Review findings handled (`docs/s3-2-independent-review-2026-11-22.md`): `IR-01`, `IR-03`, `IR-04` (server min version), `IR-05`, `IR-06`, and nits `IR-N1`..`IR-N3` fixed with regression tests (full client and server suites green on 2026-11-22); `IR-04` (optional server signature check) excluded in `docs/audit-exclusions.md`; `IR-09` (total thought counter) accepted by the sponsor; `IR-02` deferred to `S3-3` design
 
 **S2-QA-01 · Tests on two real phones, accessibility, and `ADR-0007` thresholds** — Role: QA · Ref.: `ADR-0007`, `AD-09`, `V-07`, `PD-19`
 
@@ -518,8 +519,8 @@ In summary; details are written at each sprint with the same structure as chapte
 
 | Sprint                               | Design (one slice ahead)                                                    | Contract and server                              | App                                                                       | Questions to ask in the field                                                |
 |:-------------------------------------|:----------------------------------------------------------------------------|:-------------------------------------------------|:--------------------------------------------------------------------------|:-----------------------------------------------------------------------------|
-| **S3-3 Thinking of you and notifications** | Gesture, notification copy, channel, and settings *(delivered in S2-D10)* | Encrypted event, generic push with explicit non-secret *hint* on `POST /api/v1/sync/envelopes` (`CA-15`), quiet rules | Send, receive, tap on notification | Does the gesture feel natural? Does it create a sense of obligation? |
-| **S3-4 Mood**                        | Selection, optional note, history + mood slot micro-pack                    | Event, push hint per event type (`CA-15`), and derived state | Choice, display, and appearance of the slot in the room | Do you use it? Is it always optional, really?                                |
+| **S3-3 Thinking of you and notifications** | Gesture, notification copy, channel, and settings *(delivered in S2-D10)*; **per-partner authorship** (`IR-02`): a stable per-partner identity carried in the encrypted event, plus a "which one of you is this phone?" step when restoring from the recovery key, so a replaced phone does not show its owner's earlier thoughts as the partner's | Encrypted event, generic push with explicit non-secret *hint* on `POST /api/v1/sync/envelopes` (`CA-15`), quiet rules | Send, receive, tap on notification | Does the gesture feel natural? Does it create a sense of obligation? |
+| **S3-4 Mood**                        | Selection, optional note, history + mood slot micro-pack *(a new `packId` requires the client `packId` pinning of `IR-01`)* | Event, push hint per event type (`CA-15`), and derived state | Choice, display, and appearance of the slot in the room | Do you use it? Is it always optional, really?                                |
 | **S3-5 Countdown**                   | List, detail, todo, images, comments + calendar micro-pack                  | Encrypted events and blobs                       | Countdown, local notifications, and appearance of the calendar in the room | Does it help closeness? What is missing?                                     |
 | **S3-6 Turn-based drawing**          | Canvas, tools, turns, messages + frame/easel micro-pack                     | Blobs and turn state                             | Canvas, send, over-drawing, and appearance of the drawing in the room     | Does even someone who can't draw use it?                                     |
 | **S3-7 Time capsule**                | Creation, seal, waiting, ceremony + sealed box micro-pack                   | Events, date in the encrypted envelope           | Seal applied by the app, local notification, and appearance in the room   | Is opening it a special moment?                                              |

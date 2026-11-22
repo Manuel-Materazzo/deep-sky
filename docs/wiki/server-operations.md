@@ -44,6 +44,16 @@ Complete guide and FCM troubleshooting: [firebase-setup.md](../firebase-setup.md
 
 ---
 
+## What the Server Operator Can See (`P-06`, `P-07`, `IR-07`)
+
+Contents (thoughts, notes, names inside events) are end-to-end encrypted and unreadable on the server (`S-01`). Read state ("seen", the 6-hour *Thinking of you* banner, the lamp) and the last time Home was opened stay **only on the phone** and are never sent (`S-05`).
+
+However, every phone contacts the server when the app is opened or resumed (to fetch new events) and when it checks for graphics updates. Whoever operates the server can therefore **roughly infer when each phone opens the app** from request times in logs or database activity, even though Caddy logs drop URLs and headers and mask IP addresses (`/24`, `/48`).
+
+In Deep Sky the operator is usually one of the two partners. Be transparent with your partner about this, and keep log retention short (for example, rotate `docker compose logs` and do not ship access logs to third parties).
+
+---
+
 ## Backup and Restore
 
 To keep metadata and encrypted payloads consistent, they must be backed up **within the same time window**:

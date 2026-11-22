@@ -43,7 +43,10 @@ def is_safe_relative_asset_path(raw: str) -> bool:
     """Rejects absolute paths, backslashes, drive letters, control chars, or '..' segments."""
     if not raw or raw != raw.strip():
         return False
-    if "\\" in raw or ":" in raw or "\x00" in raw:
+    if "\\" in raw or ":" in raw:
+        return False
+    # IR-N2: reject every control character (U+0000-U+001F, U+007F).
+    if any(ord(ch) <= 0x1F or ord(ch) == 0x7F for ch in raw):
         return False
     if raw.startswith("/"):
         return False

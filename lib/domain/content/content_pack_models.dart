@@ -150,6 +150,7 @@ enum ContentPackErrorCode {
   checksumsInvalid,
   pathTraversal,
   downgradeRejected,
+  packIdMismatch,
   protocolUnsupported,
   fileHashMismatch,
   manifestInvalid,
@@ -182,6 +183,11 @@ class ContentPackException implements Exception {
         return isIt
             ? 'Versione grafiche più vecchia di quella minima consentita: ignorata.'
             : 'Graphics pack version is older than the minimum allowed: ignored.';
+      case ContentPackErrorCode.packIdMismatch:
+        // IR-01: a validly signed pack for a different packId is never the Home scene.
+        return isIt
+            ? 'Queste grafiche non appartengono a questa scena: ignorate.'
+            : 'This graphics pack is not for this scene: ignored.';
       case ContentPackErrorCode.protocolUnsupported:
         return isIt
             ? 'Queste nuove grafiche richiedono una versione più recente dell\'app.'

@@ -704,6 +704,7 @@ class DeepSkyController extends ChangeNotifier {
             serverBaseUrl: current.serverUrl,
             bundledPackVersion: SemanticVersion.parse(bundled.packVersion),
             currentActivePackVersion: SemanticVersion.parse(active.packVersion),
+            expectedPackId: bundled.packId, // IR-01
             serverMinPackVersion: SemanticVersion.tryParse(
               compatibilityPolicy?.minPackVersion,
             ),
@@ -746,6 +747,7 @@ class DeepSkyController extends ChangeNotifier {
             serverBaseUrl: current.serverUrl,
             bundledPackVersion: SemanticVersion.parse(bundled.packVersion),
             currentActivePackVersion: SemanticVersion.parse(active.packVersion),
+            expectedPackId: bundled.packId, // IR-01
             serverMinPackVersion: SemanticVersion.tryParse(
               compatibilityPolicy?.minPackVersion,
             ),
