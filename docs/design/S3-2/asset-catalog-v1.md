@@ -1,6 +1,6 @@
 # Asset Catalog v1 & Style Bible (`DS-5`, `S2-D08`, `A-01..A-09`)
 
-**Version:** 1.1 (micro-packs `v1.0.0` and `v1.1.0` delivered; `v1.2.0` ready for production) · **Date:** November 22, 2026
+**Version:** 1.2 (micro-packs `v1.0.0`, `v1.1.0`, and `v1.2.0` delivered) · **Date:** November 22, 2026
 **Asset license:** `CC-BY-4.0` ([content/LICENSE-ASSETS](../../../content/LICENSE-ASSETS)), excluding the `Deep Sky` name, logo, and icon (`D-11`).
 **Storage:** high-resolution masters in `content/masters/v1/` on **Git LFS**; runtime derivatives in `content/packs/v1/assets/` on standard Git (`S2-CNT-01`).
 
@@ -25,12 +25,12 @@
 | `rug` | `v1.1.0` | `20` | `0.47, 0.83` | `0.15, 0.66, 0.64, 0.34` | Yes | `default` |
 | `couch` | `v1.1.0` | `30` | `0.47, 0.64` | `0.19, 0.43, 0.56, 0.42` | Yes | `default` |
 | `floor_lamp` | `v1.1.0` | `35` | `0.82, 0.53` | `0.73, 0.28, 0.19, 0.50` | Yes | `calm`, `lit` |
-| `couple_on_couch` | `v1.2.0` | `40` | `0.50, 0.54` | `0.30, 0.36, 0.40, 0.34` *(planned)* | Yes | `resting` |
-| `pet_sleeping` | `v1.2.0` | `45` | `0.62, 0.78` | `0.52, 0.68, 0.20, 0.16` *(planned)* | Yes | `sleeping` |
+| `couple_on_couch` | `v1.2.0` | `40` | `0.48, 0.58` | `0.28, 0.41, 0.40, 0.34` | Yes | `resting` |
+| `pet_sleeping` | `v1.2.0` | `45` | `0.62, 0.78` | `0.52, 0.68, 0.20, 0.16` | Yes | `sleeping` |
 
 ---
 
-## 3. Delivered Asset Catalog (`v1.0.0` + `v1.1.0`, `A-07`, `DD-10`)
+## 3. Delivered Asset Catalog (`v1.0.0` + `v1.1.0` + `v1.2.0`, `A-07`, `DD-10`)
 
 Reproducible build from masters to derivatives:
 ```bash
@@ -49,8 +49,10 @@ python scripts/validate_content.py
 | `couch.png` | `couch` | `1920 × 1080` RGBA (`920,322 B`) | `960 × 540` **quantized PNG8-RGBA** | `96,987 B` (≤ 250 KiB) | Transparent exterior + soft ground shadow (`37.4%`), zero halos | Integrated (`v1.1.0`) |
 | `floor_lamp_calm.png` | `floor_lamp` (`calm`) | `720 × 1440` RGBA (`225,358 B`) | `360 × 720` RGBA32 lossless | `57,648 B` (≤ 250 KiB) | Transparent exterior (`83.9%`), zero halos | Integrated (`v1.1.0`) |
 | `floor_lamp_lit.png` | `floor_lamp` (`lit`) | `720 × 1440` RGBA (`544,657 B`) | `360 × 720` RGBA32 lossless | `147,191 B` (≤ 250 KiB) | Transparent exterior + directional light cone (`54.0%`), zero halos | Integrated (`v1.1.0`) |
+| `couple_on_couch.png` | `couple_on_couch` (`resting`) | `1280 × 960` RGBA (`767,871 B`) | `640 × 480` RGBA32 lossless | `243,753 B` (≤ 250 KiB) | Transparent exterior (`63.0%`), zero halos | Integrated (`v1.2.0`) |
+| `pet_sleeping.png` | `pet_sleeping` (`sleeping`) | `768 × 576` RGBA (`257,079 B`) | `384 × 288` RGBA32 lossless | `88,118 B` (≤ 250 KiB) | Transparent exterior (`62.3%`), zero halos | Integrated (`v1.2.0`) |
 
-**Total `v1.0.0 + v1.1.0` derivatives:** `1,444,997 B` (`1.38 MiB` out of `1.8 MiB` total budget for `v1.0 + v1.1 + v1.2`, leaving `~432 KiB` for `v1.2.0`). All `v1.0.0` derivative SHA-256 hashes remain bit-for-bit identical for file-by-file cache reuse (`S2-CTR-01`). In the plan, `KB`/`MB` are interpreted as `KiB`/`MiB` (1024 bytes), consistently across `scripts/build_content_pack.py`, `scripts/ImagePackTool.java`, and `scripts/validate_content.py`.
+**Total `v1.0.0 + v1.1.0 + v1.2.0` derivatives:** `1,776,868 B` (`1.69 MiB` out of `1.8 MiB` total budget). All `v1.0.0` and `v1.1.0` derivative SHA-256 hashes remain bit-for-bit identical for file-by-file cache reuse (`S2-CTR-01`). In the plan, `KB`/`MB` are interpreted as `KiB`/`MiB` (1024 bytes), consistently across `scripts/build_content_pack.py`, `scripts/ImagePackTool.java`, and `scripts/validate_content.py`.
 
 ### 3.1 Quantized derivatives (PNG8) — recorded exception to the lossless rule
 
@@ -80,9 +82,11 @@ For each asset, `A-07` requires ID, slot, master dimensions, SHA-256, prompt, AI
 | `couch` | `couch` | `1920 × 1080` | `986f3286ce670af7391ccd6b48d7a7a4f80f2f8cf7a02bb836d4208edeec6141` | `4f52cec5d03b1061f6145e68961b8656a3d0d67b5e11432d1168a9964177e34c` | to be provided (designer/sponsor) | to be provided (designer/sponsor) | to be provided (designer/sponsor) |
 | `floor_lamp_calm` | `floor_lamp` (`calm`) | `720 × 1440` | `f865c54aa4549dca7918a1107fc0cada5aeff6c252480a2318db9dc5e2e7b5e3` | `ad5e210fc8905da6f42b8556cd3237e1a303af3899d3b7c9cbc01ab7a2d87b70` | to be provided (designer/sponsor) | to be provided (designer/sponsor) | to be provided (designer/sponsor) |
 | `floor_lamp_lit` | `floor_lamp` (`lit`) | `720 × 1440` | `b6a441f6cd7daa2ec3b92f6c01beab6c148c74e33d9971fa31dac264f117c194` | `dcc6de25c869bbeac0f85edd4d1a6c643a681b3ac561ddbf26e5af9d987954ea` | to be provided (designer/sponsor) | to be provided (designer/sponsor) | to be provided (designer/sponsor) |
+| `couple_on_couch` | `couple_on_couch` (`resting`) | `1280 × 960` | `d4b416c663fceded3f526ce055c68b5f85cd5781093af3c86e7827bb1691324b` | `d7e262c107d5e89c0e21745e2f1b2fdc02fc6664bf141ca91d2369ea8e80a7da` | to be provided (designer/sponsor) | to be provided (designer/sponsor) | to be provided (designer/sponsor) |
+| `pet_sleeping` | `pet_sleeping` (`sleeping`) | `768 × 576` | `353cb3e5ccc60656ef0cd892c55706db902cd186e73dc4c7216584d14d94a736` | `458b60f678f3efba0fb4be09c61909cef43a2961d1cdf8e686bd8213aa02d29b` | to be provided (designer/sponsor) | to be provided (designer/sponsor) | to be provided (designer/sponsor) |
 
 Derivative SHA-256 hashes must be regenerated (`sha256sum content/packs/v1/assets/*.png`) on every new pipeline build.
 
-## 4. Planned Assets for Subsequent Micro-Packs
+## 4. Delivered Assets Summary
 
-- **`v1.2.0` (Presence in the room):** `couple_on_couch.png` (`640×480`), `pet_sleeping.png` (`384×288`).
+All `S3-2` micro-packs (`v1.0.0`, `v1.1.0`, `v1.2.0`) are now delivered and integrated in `content/packs/v1/manifest.json`. Note: `pet_sleeping.png` depicts a spotted bunny resting on the rug.
