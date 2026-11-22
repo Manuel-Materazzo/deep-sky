@@ -11,6 +11,7 @@ import com.vectevo.deep_sky_server.push.PushService;
 import com.vectevo.deep_sky_server.shared.DevicePrincipal;
 import com.vectevo.deep_sky_server.shared.PartnerWakeupRequestedEvent;
 import com.vectevo.deep_sky_server.shared.RateLimitExceededException;
+import com.vectevo.deep_sky_server.shared.RotationRequiredException;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -273,15 +274,13 @@ class PairingServiceUnitTest {
 		when(coupleRepository.findByRecoveryAuthPublicKey(keyA)).thenReturn(Optional.of(coupleA));
 		when(coupleRepository.findByRecoveryAuthPublicKey(keyB)).thenReturn(Optional.of(coupleB));
 
-		limited.createRecoveryChallenge(b64KeyA);
-		limited.createRecoveryChallenge(b64KeyA);
-		assertThatThrownBy(() -> limited.createRecoveryChallenge(b64KeyA))
-				.isInstanceOf(RateLimitExceededException.class);
-
-		// Different couple remains unaffected
+		// AU-23: Creating challenges using the public recovery key does not lock out the couple
+		assertThat(limited.createRecoveryChallenge(b64KeyA).coupleId()).isEqualTo(coupleAId);
+		assertThat(limited.createRecoveryChallenge(b64KeyA).coupleId()).isEqualTo(coupleAId);
+		assertThat(limited.createRecoveryChallenge(b64KeyA).coupleId()).isEqualTo(coupleAId);
 		assertThat(limited.createRecoveryChallenge(b64KeyB).coupleId()).isEqualTo(coupleBId);
 
-		// Recovery completion failures are also capped per couple
+		// Invalid signature attempts on completeRecovery are capped per couple (AU-23)
 		UUID challengeAId = UUID.randomUUID();
 		RecoveryChallengeEntity challengeA = new RecoveryChallengeEntity();
 		challengeA.setId(challengeAId);
@@ -299,6 +298,37 @@ class PairingServiceUnitTest {
 				.isInstanceOf(SecurityException.class);
 		assertThatThrownBy(() -> limited.completeRecovery(challengeAId, "Phone", b64KeyA, b64KeyA, badSig))
 				.isInstanceOf(RateLimitExceededException.class);
+	}
+
+	@Test
+	void storeKeyDeliveryRejectsMismatchedEpochAndFetchNeverFallsBackToEpochRotation() {
+		UUID coupleId = UUID.randomUUID();
+		UUID deviceAId = UUID.randomUUID();
+		UUID deviceBId = UUID.randomUUID();
+
+		CoupleEntity couple = new CoupleEntity();
+		couple.setId(coupleId);
+		couple.setCurrentKeyEpoch(2);
+		DeviceEntity devB = new DeviceEntity();
+		devB.setId(deviceBId);
+		devB.setCoupleId(coupleId);
+
+		when(deviceRepository.findById(deviceBId)).thenReturn(Optional.of(devB));
+		when(coupleRepository.findById(coupleId)).thenReturn(Optional.of(couple));
+
+		String nonce = Base64.getUrlEncoder().encodeToString(new byte[24]);
+		String cipher = Base64.getUrlEncoder().encodeToString(new byte[40]);
+		// AU-27: mismatched keyEpoch is rejected
+		assertThatThrownBy(() -> pairingService.storeKeyDelivery(
+				new DevicePrincipal(coupleId, deviceAId, true), deviceBId, nonce, cipher, 1))
+				.isInstanceOf(IllegalArgumentException.class);
+
+		// AU-27: fetchPendingKeyDelivery only queries PAIRING_SEED and never falls back to EPOCH_ROTATION
+		when(keyDeliveryRepository.findFirstByToDeviceIdAndDeliveryKindOrderByKeyEpochDescCreatedAtDesc(
+				deviceBId, "PAIRING_SEED")).thenReturn(Optional.empty());
+		assertThatThrownBy(() -> pairingService.fetchPendingKeyDelivery(
+				new DevicePrincipal(coupleId, deviceBId, false)))
+				.isInstanceOf(java.util.NoSuchElementException.class);
 	}
 
 	@Test
@@ -325,9 +355,39 @@ class PairingServiceUnitTest {
 		assertThat(kdCaptor.getValue().getKeyEpoch()).isEqualTo(1);
 		assertThat(kdCaptor.getValue().getDeliveryKind()).isEqualTo("PAIRING_SEED");
 
-		// Legacy empty-body revoke succeeds without touching keyEpoch
+		// Legacy empty-body self-revoke succeeds without touching keyEpoch
 		pairingService.revokeDevice(new DevicePrincipal(coupleId, deviceBId, true), deviceBId);
 		assertThat(devB.getRevokedAt()).isNotNull();
 		assertThat(couple.getCurrentKeyEpoch()).isEqualTo(1);
+	}
+
+	@Test
+	void revokingAnotherApprovedDeviceWithoutRotationIsRejectedWithRotationRequired() {
+		UUID coupleId = UUID.randomUUID();
+		UUID deviceAId = UUID.randomUUID();
+		UUID deviceBId = UUID.randomUUID();
+		UUID unapprovedCId = UUID.randomUUID();
+
+		DeviceEntity devB = new DeviceEntity();
+		devB.setId(deviceBId);
+		devB.setCoupleId(coupleId);
+		devB.setApprovedAt(Instant.now());
+
+		DeviceEntity devC = new DeviceEntity();
+		devC.setId(unapprovedCId);
+		devC.setCoupleId(coupleId);
+		devC.setApprovedAt(null);
+
+		when(deviceRepository.findById(deviceBId)).thenReturn(Optional.of(devB));
+		when(deviceRepository.findById(unapprovedCId)).thenReturn(Optional.of(devC));
+
+		DevicePrincipal principalA = new DevicePrincipal(coupleId, deviceAId, true);
+		assertThatThrownBy(() -> pairingService.revokeDevice(principalA, deviceBId, null))
+				.isInstanceOf(RotationRequiredException.class);
+		assertThat(devB.getRevokedAt()).isNull();
+
+		// Revoking an unapproved peer without rotation remains allowed
+		pairingService.revokeDevice(principalA, unapprovedCId, null);
+		assertThat(devC.getRevokedAt()).isNotNull();
 	}
 }

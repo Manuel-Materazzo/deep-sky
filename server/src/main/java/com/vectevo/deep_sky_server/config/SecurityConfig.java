@@ -28,17 +28,16 @@ public class SecurityConfig {
 		DeviceAuthFilter deviceAuthFilter = new DeviceAuthFilter(deviceAuthLookup);
 		ClientCompatibilityFilter compatibilityFilter = new ClientCompatibilityFilter(deepSkyProperties);
 		PublicEndpointRateLimitFilter rateLimitFilter = new PublicEndpointRateLimitFilter(rateLimiter);
+		RequestBodySizeLimitFilter bodySizeLimitFilter = new RequestBodySizeLimitFilter();
 		return http
 				.csrf(AbstractHttpConfigurer::disable)
 				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
 						.requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
 						.requestMatchers("/actuator/info").permitAll()
-						.requestMatchers(HttpMethod.GET, "/api/v1/system/compatibility", "/api/v1/push/config")
+						.requestMatchers(HttpMethod.GET, PublicRoutes.PUBLIC_GET_PATTERNS)
 						.permitAll()
-						.requestMatchers(HttpMethod.POST, "/api/v1/pairing/invites", "/api/v1/pairing/invites/accept")
-						.permitAll()
-						.requestMatchers(HttpMethod.POST, "/api/v1/recovery/challenges", "/api/v1/recovery/complete")
+						.requestMatchers(HttpMethod.POST, PublicRoutes.PUBLIC_POST_PATTERNS)
 						.permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/v1/pairing/key-deliveries/me")
 						.hasRole("DEVICE")
@@ -57,6 +56,7 @@ public class SecurityConfig {
 				.addFilterBefore(deviceAuthFilter, UsernamePasswordAuthenticationFilter.class)
 				.addFilterBefore(compatibilityFilter, DeviceAuthFilter.class)
 				.addFilterBefore(rateLimitFilter, ClientCompatibilityFilter.class)
+				.addFilterBefore(bodySizeLimitFilter, PublicEndpointRateLimitFilter.class)
 				.build();
 	}
 }

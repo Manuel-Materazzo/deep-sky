@@ -26,6 +26,31 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      - name: Validate workflow inputs (AU-25)
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          if ! printf '%s' "$VERSION_NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "Invalid version_name: $VERSION_NAME"
+            exit 1
+          fi
+          if ! printf '%s' "$VERSION_CODE" | grep -Eq '^[1-9][0-9]*$'; then
+            echo "Invalid version_code: $VERSION_CODE"
+            exit 1
+          fi
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+
+      - name: Verify server build and tests before pushing image (AU-25)
+        working-directory: server
+        run: ./mvnw -B verify
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 
@@ -34,8 +59,10 @@ jobs:
 
       - name: Compute lowercase GHCR image name
         id: meta
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
         run: |
-          OWNER_LC=$(printf '%s' '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          OWNER_LC=$(printf '%s' "$REPO_OWNER" | tr '[:upper:]' '[:lower:]')
           echo "image=ghcr.io/${OWNER_LC}/deep-sky-server" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
@@ -90,16 +117,37 @@ jobs:
           flutter analyze
           flutter test
 
+      - name: Validate workflow inputs (AU-25)
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          if ! printf '%s' "$VERSION_NAME" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "Invalid version_name: $VERSION_NAME"
+            exit 1
+          fi
+          if ! printf '%s' "$VERSION_CODE" | grep -Eq '^[1-9][0-9]*$'; then
+            echo "Invalid version_code: $VERSION_CODE"
+            exit 1
+          fi
+
       - name: Build unsigned release APK (CI-02, PD-10)
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code }}
         run: |
           flutter build apk --release --config-only \
-            --build-name="${{ inputs.version_name }}" \
-            --build-number="${{ inputs.version_code }}"
+            --build-name="$VERSION_NAME" \
+            --build-number="$VERSION_CODE"
           cd android
           ./gradlew assembleRelease -Punsigned=true
 
       - name: Prepare unsigned release bundle
         id: bundle
+        env:
+          VERSION_NAME: ${{ inputs.version_name }}
+          VERSION_CODE: ${{ inputs.version_code }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
           mkdir -p release-unsigned
           cp build/app/outputs/apk/release/app-release-unsigned.apk release-unsigned/
@@ -109,9 +157,9 @@ jobs:
           cat > release-unsigned/release-info.json <<EOF
           {
             "packageId": "com.vectevo.deep_sky",
-            "versionName": "${{ inputs.version_name }}",
-            "versionCode": ${{ inputs.version_code }},
-            "commit": "${{ github.sha }}",
+            "versionName": "${VERSION_NAME}",
+            "versionCode": ${VERSION_CODE},
+            "commit": "${COMMIT_SHA}",
             "unsignedApkSha256": "${UNSIGNED_SHA}"
           }
           EOF

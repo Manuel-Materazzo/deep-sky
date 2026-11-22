@@ -77,8 +77,34 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
+    - content/packs/v1/manifest.json
+    - content/packs/v1/assets/
     - content/packs/ds2_pilot/manifest.json
     - content/packs/ds2_pilot/assets/
+    - assets/fonts/plus_jakarta_sans/OFL.txt
+    - assets/fonts/nunito_sans/OFL.txt
+
+  fonts:
+    - family: Plus Jakarta Sans
+      fonts:
+        - asset: assets/fonts/plus_jakarta_sans/PlusJakartaSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/plus_jakarta_sans/PlusJakartaSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/plus_jakarta_sans/PlusJakartaSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/plus_jakarta_sans/PlusJakartaSans-Bold.ttf
+          weight: 700
+    - family: Nunito Sans
+      fonts:
+        - asset: assets/fonts/nunito_sans/NunitoSans-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/nunito_sans/NunitoSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/nunito_sans/NunitoSans-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/nunito_sans/NunitoSans-Bold.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:

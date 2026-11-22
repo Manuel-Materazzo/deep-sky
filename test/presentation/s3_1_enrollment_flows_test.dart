@@ -413,8 +413,8 @@ void main() {
       );
       expect(find.byKey(const Key('push-optin-card')), findsNothing);
 
-      // Devices tab asks calmly for confirmation before revoking another device (S1-D11)
-      await tapVisible(tester, find.text('Dispositivi'));
+      // Noi tab asks calmly for confirmation before revoking another device (S1-D11)
+      await tapVisible(tester, find.text('Noi'));
       await tapVisible(tester, find.byKey(const Key('revoke-device-dev-b')));
       expect(find.text('Revocare questo dispositivo?'), findsOneWidget);
       await tapVisible(tester, find.byKey(const Key('confirm-revoke-dev-b')));
@@ -544,12 +544,28 @@ void main() {
       await tester.pumpWidget(DeepSkyApp(controller: controller));
       await tester.pumpAndSettle();
 
-      await tapVisible(tester, find.text('Impostazioni'));
+      await tapVisible(tester, find.byKey(const Key('open-settings-button')));
+      final Finder settingsScroll = find
+          .descendant(
+            of: find.byKey(const Key('settings-page')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('enable-push-button')),
+        200,
+        scrollable: settingsScroll,
+      );
       expect(find.text('Permesso di sistema: consentito'), findsOneWidget);
       await tapVisible(tester, find.byKey(const Key('enable-push-button')));
       expect(find.byKey(const Key('push-feedback-text')), findsOneWidget);
       expect(find.textContaining('Google Play Services'), findsOneWidget);
 
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('open-notification-settings-button')),
+        200,
+        scrollable: settingsScroll,
+      );
       await tapVisible(
         tester,
         find.byKey(const Key('open-notification-settings-button')),
@@ -596,4 +612,55 @@ void main() {
       expect(controller.errorNotice, contains('incompleto'));
     },
   );
+
+  test('DeepSkyController uses native capabilities.versionCode for compatibility check and X-Client-Version-Code header', () async {
+    String? seenClientVersionHeader;
+    final MockClient mockHttp = MockClient((http.Request req) async {
+      seenClientVersionHeader = req.headers['X-Client-Version-Code'];
+      return http.Response(
+        jsonEncode(<String, Object?>{
+          'minClientVersionCode': 4,
+          'minProtocolVersion': 1,
+        }),
+        200,
+        headers: const <String, String>{'Content-Type': 'application/json'},
+      );
+    });
+
+    final DeepSkyController compatibleController = DeepSkyController(
+      keyStore: InMemorySecureKeyStore(),
+      httpClient: mockHttp,
+      loadAssetString: (_) async => pilotManifestRaw,
+      loadCapabilities: () async => const PlatformCapabilities(
+        packageName: 'com.vectevo.deep_sky',
+        androidApiLevel: 35,
+        versionName: '0.5',
+        versionCode: 5,
+        supportsRequestInstallPackages: false,
+      ),
+      defaultServerUrl: 'https://couple.example.test',
+    );
+    await compatibleController.initialize();
+    expect(compatibleController.clientVersionCode, 5);
+    expect(seenClientVersionHeader, '5');
+    expect(compatibleController.phase, AppBootPhase.unpaired);
+
+    final DeepSkyController outdatedController = DeepSkyController(
+      keyStore: InMemorySecureKeyStore(),
+      httpClient: mockHttp,
+      loadAssetString: (_) async => pilotManifestRaw,
+      loadCapabilities: () async => const PlatformCapabilities(
+        packageName: 'com.vectevo.deep_sky',
+        androidApiLevel: 35,
+        versionName: '0.3',
+        versionCode: 3,
+        supportsRequestInstallPackages: false,
+      ),
+      defaultServerUrl: 'https://couple.example.test',
+    );
+    await outdatedController.initialize();
+    expect(outdatedController.clientVersionCode, 3);
+    expect(seenClientVersionHeader, '3');
+    expect(outdatedController.phase, AppBootPhase.upgradeRequired);
+  });
 }

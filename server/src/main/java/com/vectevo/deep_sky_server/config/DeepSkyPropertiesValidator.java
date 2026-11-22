@@ -3,10 +3,10 @@ package com.vectevo.deep_sky_server.config;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
 
 /**
@@ -77,7 +77,7 @@ public class DeepSkyPropertiesValidator implements InitializingBean {
 	}
 
 	private boolean isProdProfile() {
-		return Arrays.asList(environment.getActiveProfiles()).contains("prod");
+		return environment.acceptsProfiles(Profiles.of("prod"));
 	}
 
 	private static void requireNonBlank(String value, String envVar, List<String> errors) {

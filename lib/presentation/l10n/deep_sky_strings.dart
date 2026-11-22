@@ -8,8 +8,10 @@ class DeepSkyStrings {
 
   String get appTitle => 'Deep Sky';
   String get homeTab => isIt ? 'Casa' : 'Home';
+  String get usTab => isIt ? 'Noi' : 'Us';
   String get devicesTab => isIt ? 'Dispositivi' : 'Devices';
   String get settingsTab => isIt ? 'Impostazioni' : 'Settings';
+  String get settingsButtonTooltip => isIt ? 'Impostazioni' : 'Settings';
 
   // Welcome & Invite (`S1-D02`, `S1-D03`, `S1-D05`, `S1-D06`, `S1-D10`)
   String get welcomeTitle => isIt ? 'La vostra casa' : 'Your home';
@@ -474,4 +476,155 @@ class DeepSkyStrings {
   String get inviteMissingSasSecretError => isIt
       ? 'Questo codice è incompleto: incolla l\'intero link d\'invito o il codice completo ricevuto dal partner, oppure scansiona il QR.'
       : 'This invite code is incomplete: paste the full invite link or full pairing code from your partner, or scan the QR.';
+
+  // S3-2 Home, Dual-State Thinking of You, Welcome Back & Content Packs (`S2-D05`, `S2-D07`, `S2-D09`)
+  String get partnerFallbackName => isIt ? 'Il tuo partner' : 'Your partner';
+
+  String partnerThoughtOfYouTitle(String partnerName) =>
+      isIt ? '$partnerName ti ha pensato' : '$partnerName thought of you';
+
+  String get replyThoughtButton => isIt ? 'Ricambia' : 'Send back';
+
+  String get replyThoughtNoteHint => isIt
+      ? 'Rispondi con una nota (facoltativa)'
+      : 'Add a short note back (optional)';
+
+  String get thoughtSentBannerTitle =>
+      isIt ? 'Pensiero inviato' : 'Thought sent';
+
+  String thoughtSentBannerSubtitle(String partnerName) => isIt
+      ? 'Una luce gentile è partita verso $partnerName.'
+      : 'A gentle light is on its way to $partnerName.';
+
+  String get thoughtSentBannerCloseTooltip =>
+      isIt ? 'Scrivi un altro pensiero' : 'Send another thought';
+
+  String thoughtRelativeCaption(Duration elapsed) {
+    final String rel;
+    if (elapsed.inMinutes < 1) {
+      rel = isIt ? 'Poco fa' : 'Just now';
+    } else if (elapsed.inMinutes < 60) {
+      rel = isIt ? '${elapsed.inMinutes}m fa' : '${elapsed.inMinutes}m ago';
+    } else {
+      rel = isIt ? '${elapsed.inHours}h fa' : '${elapsed.inHours}h ago';
+    }
+    return isIt
+        ? '$rel • Un pensiero per te'
+        : '$rel • A quiet thought for you';
+  }
+
+  String get quickThoughtTitle =>
+      isIt ? 'Lascia un pensiero' : 'Leave a quiet thought';
+
+  String get quickThoughtSubtitle => isIt
+      ? 'Accende una luce gentile nella vostra casa.'
+      : 'Lights a gentle glow in your shared home.';
+
+  String get welcomeBackTitle => isIt
+      ? 'Che bello rivederti, la casa ti aspettava.'
+      : 'Welcome back, home was waiting for you.';
+
+  String get welcomeBackSubtitle => isIt
+      ? 'Tutto è rimasto com\'era, senza fretta.'
+      : 'Everything stayed just as you left it, no rush.';
+
+  String get dismissWelcomeBackTooltip => isIt ? 'Chiudi' : 'Dismiss';
+
+  String get skyPreferenceLabel =>
+      isIt ? 'Cielo e luce della casa' : 'Home sky & atmosphere';
+
+  String get settingsGraphicsTitle =>
+      isIt ? 'Grafiche della casa' : 'Home graphics';
+
+  String settingsGraphicsActiveVersion(String version, bool isExternal) {
+    final String source = isExternal
+        ? (isIt ? 'aggiornate dal server' : 'updated from server')
+        : (isIt ? 'incluse nell\'app' : 'bundled in app');
+    return isIt
+        ? 'Pacchetto attivo: v$version ($source)'
+        : 'Active pack: v$version ($source)';
+  }
+
+  String get settingsGraphicsUpdateButton =>
+      isIt ? 'Aggiorna grafiche' : 'Update graphics';
+
+  String settingsGraphicsUpdatedHotReload(String version) => isIt
+      ? 'Grafiche aggiornate a v$version e ricaricate subito.'
+      : 'Graphics updated to v$version and reloaded right away.';
+
+  String settingsGraphicsStagedNextLaunch(String version) => isIt
+      ? 'Nuove grafiche v$version pronte al prossimo avvio.'
+      : 'New graphics v$version ready for next launch.';
+
+  String get settingsGraphicsUpToDate => isIt
+      ? 'Hai già le grafiche più recenti.'
+      : 'You already have the latest graphics.';
+
+  String get settingsGraphicsUnavailable => isIt
+      ? 'Nessun pacchetto grafico aggiuntivo disponibile sul server al momento.'
+      : 'No additional graphics pack is published on the server yet.';
+
+  String settingsGraphicsRolledBack(String failedVersion) => isIt
+      ? 'Ripristinate automaticamente le grafiche funzionanti precedenti (v$failedVersion ignorata).'
+      : 'Automatically restored the last known-good graphics (skipped v$failedVersion).';
+
+  String get usSectionTitle => isIt ? 'La vostra coppia' : 'Your couple';
+
+  String get usSyncNowButton => isIt ? 'Sincronizza ora' : 'Sync now';
+
+  String unreadableEnvelopesNotice(int count) {
+    if (count == 1) {
+      return isIt
+          ? 'Un elemento non può essere letto su questo dispositivo.'
+          : 'One item could not be read on this device.';
+    }
+    return isIt
+        ? '$count elementi non possono essere letti su questo dispositivo.'
+        : '$count items could not be read on this device.';
+  }
+
+  // Friendly localized errors (`AU-16`, `AU-17`)
+  String get clockSkewError => isIt
+      ? 'L\'orologio del telefono sembra fuori sincrono. Controlla data e ora automatiche e riprova.'
+      : 'Your phone\'s clock seems out of sync. Check automatic date & time settings and try again.';
+
+  String get networkErrorGeneric => isIt
+      ? 'Impossibile raggiungere il server. Controlla la connessione e riprova.'
+      : 'Could not reach the server. Check your connection and try again.';
+
+  String get rateLimitedError => isIt
+      ? 'Troppi tentativi ravvicinati. Attendi un momento prima di riprovare.'
+      : 'Too many attempts in a short time. Please wait a moment and try again.';
+
+  String get payloadTooLargeError => isIt
+      ? 'Contenuto troppo grande per essere inviato.'
+      : 'The content is too large to send.';
+
+  String get conflictErrorGeneric => isIt
+      ? 'Operazione non completata: lo stato potrebbe essere cambiato. Riprova.'
+      : 'Action could not be completed: state may have changed. Please try again.';
+
+  String get serverErrorGeneric => isIt
+      ? 'Il server ha riscontrato un problema temporaneo. Riprova tra poco.'
+      : 'The server encountered a temporary problem. Please try again shortly.';
+
+  String get unexpectedErrorGeneric => isIt
+      ? 'Si è verificato un errore imprevisto. Riprova tra un momento.'
+      : 'Something unexpected went wrong. Please try again in a moment.';
+
+  String get joinAuthCheckError => isIt
+      ? 'Impossibile verificare l\'accesso in questo momento. Riprova oppure richiedi un nuovo invito al partner.'
+      : 'Could not verify access right now. Try again or ask your partner for a new invite.';
+
+  String get inviteNotAcceptedYetError => isIt
+      ? 'L\'altro telefono non ha ancora aperto l\'invito.'
+      : 'The other phone has not opened the invite yet.';
+
+  String get partnerNotConfirmedSasYetError => isIt
+      ? 'L\'altro telefono non ha ancora confermato il codice SAS. Conferma prima sull\'altro telefono, poi riprova.'
+      : 'The other phone has not confirmed the SAS code yet. Confirm on the other device first, then try again.';
+
+  String get keysDeliveredNotice => isIt
+      ? 'Chiavi inviate in modo cifrato. Ora completa la ricezione sull\'altro telefono.'
+      : 'Keys delivered in encrypted form. Now finish receiving on the other phone.';
 }

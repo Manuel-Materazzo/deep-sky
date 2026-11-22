@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:deep_sky/data/encrypted_local_cache.dart';
@@ -64,48 +65,51 @@ void main() {
     expect(restored.resolveAsset('pet', petBody), 'assets/pet_cat.png');
   });
 
-  test(
-    'SceneStateMapper activates window lit state when recent thought arrives',
-    () {
-      const SceneStateMapper mapper = SceneStateMapper();
-      final DateTime now = DateTime.utc(2026, 11, 15, 12, 0);
+  test('SceneStateMapper activates floor_lamp lit state when recent unseen partner thought arrives and separates local sky', () {
+    const SceneStateMapper mapper = SceneStateMapper();
+    final DateTime now = DateTime.utc(2026, 11, 15, 12, 0);
 
-      final SceneStateSnapshot emptyState = mapper.derive(
-        events: const <CachedEventEntry>[],
-        localDeviceId: 'dev-a',
-        nowUtc: now,
-      );
-      expect(emptyState.windowLit, isFalse);
-      expect(emptyState.slotStates['window'], 'calm');
+    final SceneStateSnapshot emptyState = mapper.derive(
+      events: const <CachedEventEntry>[],
+      localDeviceId: 'dev-a',
+      nowUtc: now,
+      nowLocal: DateTime(2026, 11, 15, 12, 0),
+    );
+    expect(emptyState.windowLit, isFalse);
+    expect(emptyState.floorLampLit, isFalse);
+    expect(emptyState.slotStates['floor_lamp'], 'calm');
+    expect(emptyState.slotStates['window'], 'day');
 
-      final CachedEventEntry recentPartnerThought = CachedEventEntry(
-        envelopeId: 'env-1',
-        coupleId: 'couple-1',
-        senderDeviceId: 'dev-b',
-        channel: EnvelopeChannel.event,
-        keyEpoch: 1,
-        seq: 1,
-        createdAtServer: now.subtract(const Duration(minutes: 10)),
-        payload: DecryptedEnvelopePayload(
-          schemaVersion: 1,
-          eventType: 'thinking_of_you',
-          createdAtClient: now.subtract(const Duration(minutes: 10)),
-          authorDeviceId: 'dev-b',
-          body: const <String, Object?>{'note': 'Un caffè insieme'},
-        ),
-      );
+    final CachedEventEntry recentPartnerThought = CachedEventEntry(
+      envelopeId: 'env-1',
+      coupleId: 'couple-1',
+      senderDeviceId: 'dev-b',
+      channel: EnvelopeChannel.event,
+      keyEpoch: 1,
+      seq: 1,
+      createdAtServer: now.subtract(const Duration(minutes: 10)),
+      payload: DecryptedEnvelopePayload(
+        schemaVersion: 1,
+        eventType: 'thinking_of_you',
+        createdAtClient: now.subtract(const Duration(minutes: 10)),
+        authorDeviceId: 'dev-b',
+        body: const <String, Object?>{'note': 'Un caffè insieme'},
+      ),
+    );
 
-      final SceneStateSnapshot litState = mapper.derive(
-        events: <CachedEventEntry>[recentPartnerThought],
-        localDeviceId: 'dev-a',
-        nowUtc: now,
-      );
-      expect(litState.windowLit, isTrue);
-      expect(litState.slotStates['window'], 'lit');
-      expect(litState.fromPartner, isTrue);
-      expect(litState.latestThought?.payload.body['note'], 'Un caffè insieme');
-    },
-  );
+    final SceneStateSnapshot litState = mapper.derive(
+      events: <CachedEventEntry>[recentPartnerThought],
+      localDeviceId: 'dev-a',
+      nowUtc: now,
+      nowLocal: DateTime(2026, 11, 15, 22, 0),
+    );
+    expect(litState.windowLit, isTrue);
+    expect(litState.floorLampLit, isTrue);
+    expect(litState.slotStates['floor_lamp'], 'lit');
+    expect(litState.slotStates['window'], 'night');
+    expect(litState.fromPartner, isTrue);
+    expect(litState.latestThought?.payload.body['note'], 'Un caffè insieme');
+  });
 
   for (final ({String label, Size size}) viewport
       in <({String label, Size size})>[
@@ -239,6 +243,81 @@ void main() {
       } finally {
         semanticsHandle.dispose();
       }
+    },
+  );
+
+  testWidgets(
+    'Small screens preserve intrinsic 3:4 window aspect ratio without square compression',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final SceneManifest v1Manifest = parser.parseJson(
+        File('content/packs/v1/manifest.json').readAsStringSync(),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: DeepSkyTheme.dark(),
+          home: Scaffold(
+            body: SizedBox(
+              width: 360,
+              child: HybridSceneCanvas(
+                manifest: v1Manifest,
+                packAssetRoot: 'content/packs/v1',
+                isNight: true,
+                reduceMotion: true,
+                expandFloorDownward: true,
+                extraFloorHeight: 120,
+                slotStates: const <String, String>{'window': 'night'},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 150)),
+      );
+      await tester.pumpAndSettle();
+
+      final Iterable<Image> images = tester.widgetList<Image>(
+        find.byType(Image),
+      );
+      expect(images.length, greaterThanOrEqualTo(3));
+
+      int checkedWindowImages = 0;
+      for (final Image img in images) {
+        final ImageProvider provider = img.image;
+        expect(provider, isA<ResizeImage>());
+        final ResizeImage resized = provider as ResizeImage;
+        expect(resized.policy, ResizeImagePolicy.fit);
+
+        if (resized.imageProvider is AssetImage &&
+            (resized.imageProvider as AssetImage).assetName.contains(
+              'window_',
+            )) {
+          checkedWindowImages++;
+          final ImageInfo info = await tester.runAsync(() async {
+            final ImageStream stream = resized.resolve(
+              ImageConfiguration.empty,
+            );
+            final Completer<ImageInfo> completer = Completer<ImageInfo>();
+            late ImageStreamListener listener;
+            listener = ImageStreamListener((ImageInfo i, bool _) {
+              stream.removeListener(listener);
+              completer.complete(i);
+            });
+            stream.addListener(listener);
+            return completer.future;
+          }) as ImageInfo;
+          final double decodedRatio = info.image.width / info.image.height;
+          expect(decodedRatio, closeTo(0.75, 0.02));
+          info.dispose();
+        }
+      }
+      expect(checkedWindowImages, 2);
     },
   );
 }

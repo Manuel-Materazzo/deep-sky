@@ -2,7 +2,10 @@ spring:
   application:
     name: deep-sky-server
   profiles:
-    default: dev
+    default: prod
+  docker:
+    compose:
+      enabled: false
   jpa:
     open-in-view: false
     hibernate:
@@ -10,6 +13,12 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
 
 management:
   endpoints:
@@ -42,3 +51,11 @@ deepsky:
     app-id: ${DEEPSKY_FIREBASE_APP_ID:}
     sender-id: ${DEEPSKY_FIREBASE_SENDER_ID:}
     service-account-file: ${DEEPSKY_FIREBASE_SERVICE_ACCOUNT_FILE:}
+  content:
+    packs-dir: ${DEEPSKY_CONTENT_PACKS_DIR:}
+    min-pack-version: ${DEEPSKY_MIN_PACK_VERSION:1.0.0}
+    # Chiavi pubbliche Ed25519 (base64, raw 32B o SPKI 44B) per la verifica difensiva dei pack.
+    # Le voci vuote vengono ignorate; se tutte vuote la verifica della firma lato server e' disattivata.
+    trusted-public-keys:
+      v1: ${DEEPSKY_CONTENT_TRUSTED_KEY_V1:}
+      v2: ${DEEPSKY_CONTENT_TRUSTED_KEY_V2:}

@@ -35,11 +35,41 @@ class DecryptedEventRecord {
   final DecryptedEnvelopePayload payload;
 }
 
+class QuarantinedEnvelope {
+  const QuarantinedEnvelope({
+    required this.envelopeId,
+    required this.seq,
+    required this.keyEpoch,
+    required this.reason,
+  });
+
+  final String envelopeId;
+  final int? seq;
+  final int keyEpoch;
+  final String reason;
+}
+
 class SyncEventsSnapshot {
-  const SyncEventsSnapshot({required this.events, required this.isOffline});
+  const SyncEventsSnapshot({
+    required this.events,
+    required this.isOffline,
+    this.quarantinedEnvelopes = const <QuarantinedEnvelope>[],
+  });
 
   final List<CachedEventEntry> events;
   final bool isOffline;
+  final List<QuarantinedEnvelope> quarantinedEnvelopes;
+}
+
+/// Thrown when a previous key rotation may have been committed by the server but
+/// its outcome is still unknown, so no new rotation can be started safely (`AU-02`).
+class PendingRotationUnresolvedException implements Exception {
+  const PendingRotationUnresolvedException();
+
+  @override
+  String toString() =>
+      'A previous Recovery Key change is still being confirmed. '
+      'Check your connection and try again in a moment.';
 }
 
 /// High-level client repository coordinating SP-02 pairing, key delivery,
@@ -57,11 +87,43 @@ class PairingAndSyncRepository {
 
   static const String _identityStorageKey = 'deep_sky.device_identity.v1';
   static const String _pendingInviteStorageKey = 'deep_sky.pending_invite.v1';
+  static const String _pendingRotationStorageKey =
+      'deep_sky.pending_rotation.v1';
 
   final SecureKeyStore _keyStore;
   final DeepSkyCrypto _crypto;
   final CoupleApiClient Function(String baseUrl) _clientFactory;
   final EncryptedLocalCache _localCache;
+  List<QuarantinedEnvelope> _lastQuarantinedEnvelopes =
+      const <QuarantinedEnvelope>[];
+  Future<void>? _rotationTail;
+
+  /// Serializes epoch rotation and pending-rotation reconciliation (`AU-02`).
+  Future<T> _rotationSynchronized<T>(Future<T> Function() action) {
+    final Future<void>? previous = _rotationTail;
+    final Completer<T> completer = Completer<T>();
+    Future<void> run() async {
+      try {
+        completer.complete(await action());
+      } catch (error, stackTrace) {
+        completer.completeError(error, stackTrace);
+      }
+    }
+
+    late final Future<void> current;
+    current = (previous == null ? run() : previous.then((_) => run()))
+        .whenComplete(() {
+          if (identical(_rotationTail, current)) {
+            _rotationTail = null;
+          }
+        });
+    _rotationTail = current;
+    return completer.future;
+  }
+
+  /// Envelopes that failed decryption during the most recent sync (`AU-04`).
+  List<QuarantinedEnvelope> get lastQuarantinedEnvelopes =>
+      _lastQuarantinedEnvelopes;
 
   Future<LocalDeviceIdentity?> loadIdentity() async {
     final String? raw = await _keyStore.read(_identityStorageKey);
@@ -116,6 +178,7 @@ class PairingAndSyncRepository {
   Future<void> clearIdentity() async {
     await _localCache.clear();
     await clearPendingInvite();
+    await _keyStore.delete(_pendingRotationStorageKey);
     await _keyStore.delete(_identityStorageKey);
   }
 
@@ -209,9 +272,7 @@ class PairingAndSyncRepository {
       }
     }
     if (resolvedSas == null || resolvedSas.isEmpty) {
-      throw StateError(
-        'Missing out-of-band SAS secret for invite $inviteToken.',
-      );
+      throw StateError('Missing out-of-band SAS secret for invite.');
     }
     final Uint8List sasSecretBytes = DeepSkyCrypto.decodeSasSecretB64(
       resolvedSas,
@@ -538,77 +599,204 @@ class PairingAndSyncRepository {
 
   /// Downloads and locally decrypts all envelopes after `afterSeq`,
   /// syncing any new epoch rotation bundles first (`CA-02`, `AD-06`, `TC-07`).
+  ///
+  /// Undecryptable envelopes are quarantined per-envelope instead of aborting
+  /// the entire timeline (`AU-04`).
   Future<List<DecryptedEventRecord>> fetchAndDecryptEvents({
     int afterSeq = 0,
   }) async {
+    await reconcilePendingRotation();
     LocalDeviceIdentity identity = await _requireRootIdentity();
     final CoupleApiClient api = _clientFactory(identity.serverUrl);
     final pageRes = await api.listEnvelopesWithEpoch(
       identity: identity,
       afterSeq: afterSeq,
     );
+    bool syncedEpochThisCall = false;
     if (pageRes.coupleKeyEpoch > identity.currentKeyEpoch) {
       identity = await _syncEpochFromServer(api, identity);
+      syncedEpochThisCall = true;
     }
+
+    Future<
+      ({
+        List<DecryptedEventRecord> decrypted,
+        List<QuarantinedEnvelope> quarantined,
+        bool sawMissingEpoch,
+      })
+    >
+    decryptBatch(
+      LocalDeviceIdentity id,
+      List<EncryptedEnvelope> envelopes,
+    ) async {
+      final Uint8List activeRootKey = await _crypto.deriveCoupleRootKey(
+        id.recoverySeed!,
+      );
+      final Uint8List epoch1RootKey = id.epochSecrets[1] ?? activeRootKey;
+      final List<DecryptedEventRecord> ok = <DecryptedEventRecord>[];
+      final List<QuarantinedEnvelope> bad = <QuarantinedEnvelope>[];
+      bool missingEpoch = false;
+
+      for (final EncryptedEnvelope env in envelopes) {
+        try {
+          final DecryptedEnvelopePayload payload = await _crypto
+              .decryptEnvelope(
+                rootKey: epoch1RootKey,
+                epochSecrets: id.epochSecrets,
+                expectedCoupleId: id.coupleId,
+                envelope: env,
+              );
+          ok.add(DecryptedEventRecord(envelope: env, payload: payload));
+        } catch (error) {
+          if (env.keyEpoch >= 2 && !id.epochSecrets.containsKey(env.keyEpoch)) {
+            missingEpoch = true;
+          }
+          bad.add(
+            QuarantinedEnvelope(
+              envelopeId: env.envelopeId,
+              seq: env.seq,
+              keyEpoch: env.keyEpoch,
+              reason: error.runtimeType.toString(),
+            ),
+          );
+        }
+      }
+      return (decrypted: ok, quarantined: bad, sawMissingEpoch: missingEpoch);
+    }
+
+    var batch = await decryptBatch(identity, pageRes.envelopes);
+    if (batch.sawMissingEpoch && !syncedEpochThisCall) {
+      try {
+        identity = await _syncEpochFromServer(api, identity);
+        batch = await decryptBatch(identity, pageRes.envelopes);
+      } catch (_) {
+        // Keep partial decrypted items and quarantined list.
+      }
+    }
+
+    final List<DecryptedEventRecord> decrypted = batch.decrypted;
+    _lastQuarantinedEnvelopes = List<QuarantinedEnvelope>.unmodifiable(
+      batch.quarantined,
+    );
+
     final Uint8List activeRootKey = await _crypto.deriveCoupleRootKey(
       identity.recoverySeed!,
     );
-    final Uint8List epoch1RootKey = identity.epochSecrets[1] ?? activeRootKey;
-
-    final List<DecryptedEventRecord> decrypted = <DecryptedEventRecord>[];
+    int maxFetchedSeq = afterSeq;
     for (final EncryptedEnvelope env in pageRes.envelopes) {
-      final DecryptedEnvelopePayload payload = await _crypto.decryptEnvelope(
-        rootKey: epoch1RootKey,
-        epochSecrets: identity.epochSecrets,
-        expectedCoupleId: identity.coupleId,
-        envelope: env,
-      );
-      decrypted.add(DecryptedEventRecord(envelope: env, payload: payload));
+      if ((env.seq ?? 0) > maxFetchedSeq) {
+        maxFetchedSeq = env.seq!;
+      }
     }
-
+    // AU-04: never advance the persisted cursor past the lowest quarantined
+    // envelope, so it is retried (e.g. after an app restart or epoch arrival).
+    for (final QuarantinedEnvelope q in batch.quarantined) {
+      final int? qSeq = q.seq;
+      if (qSeq != null && qSeq - 1 < maxFetchedSeq) {
+        maxFetchedSeq = qSeq - 1 < afterSeq ? afterSeq : qSeq - 1;
+      }
+    }
     if (afterSeq == 0) {
       await _localCache.saveEvents(
         coupleRootKey: activeRootKey,
         coupleId: identity.coupleId,
         entries: decrypted.map(_toCacheEntry).toList(growable: false),
+        lastSeq: maxFetchedSeq,
+        lastEpoch: identity.currentKeyEpoch,
       );
-    } else if (decrypted.isNotEmpty) {
-      final List<CachedEventEntry> existing = await loadCachedEvents();
+    } else if (decrypted.isNotEmpty || maxFetchedSeq > afterSeq) {
+      final CachedEventsSnapshot existingSnap = await loadCachedSnapshot();
       final Map<String, CachedEventEntry> byId = <String, CachedEventEntry>{
-        for (final CachedEventEntry entry in existing) entry.envelopeId: entry,
+        for (final CachedEventEntry entry in existingSnap.events)
+          entry.envelopeId: entry,
       };
       for (final DecryptedEventRecord rec in decrypted) {
         byId[rec.envelope.envelopeId] = _toCacheEntry(rec);
       }
+      final int nextLastSeq = maxFetchedSeq > existingSnap.lastSeq
+          ? maxFetchedSeq
+          : existingSnap.lastSeq;
       await _localCache.saveEvents(
         coupleRootKey: activeRootKey,
         coupleId: identity.coupleId,
         entries: byId.values.toList(growable: false),
+        lastSeq: nextLastSeq,
+        lastEpoch: identity.currentKeyEpoch,
       );
     }
     return decrypted;
   }
 
-  /// Loads decrypted events from the encrypted local cache (`TC-07`).
-  Future<List<CachedEventEntry>> loadCachedEvents() async {
+  /// Loads decrypted events plus persisted sync cursor from the encrypted local cache (`TC-07`, `AU-05`).
+  Future<CachedEventsSnapshot> loadCachedSnapshot() async {
     final LocalDeviceIdentity identity = await _requireRootIdentity();
     final Uint8List rootKey = await _crypto.deriveCoupleRootKey(
       identity.recoverySeed!,
     );
-    return _localCache.loadEvents(
+    return _localCache.loadSnapshot(
       coupleRootKey: rootKey,
       coupleId: identity.coupleId,
     );
   }
 
-  /// Fetches live events from the server or falls back to the encrypted local
-  /// cache in read-only offline mode when network connectivity fails (`TC-07`).
-  Future<SyncEventsSnapshot> syncEventsWithOfflineFallback() async {
+  /// Loads decrypted events from the encrypted local cache (`TC-07`).
+  Future<List<CachedEventEntry>> loadCachedEvents() async {
+    final CachedEventsSnapshot snap = await loadCachedSnapshot();
+    return snap.events;
+  }
+
+  /// Fetches live events incrementally from the server (`afterSeq = lastSeq`, `AU-05`)
+  /// or falls back to the encrypted local cache in read-only offline mode (`TC-07`).
+  Future<SyncEventsSnapshot> syncEventsWithOfflineFallback({
+    bool fullResync = false,
+  }) async {
     try {
-      final List<DecryptedEventRecord> fresh = await fetchAndDecryptEvents();
+      await reconcilePendingRotation();
+      final LocalDeviceIdentity beforeSync = await _requireRootIdentity();
+      CachedEventsSnapshot? cached;
+      if (!fullResync) {
+        try {
+          cached = await loadCachedSnapshot();
+        } catch (_) {
+          // Corrupt/incompatible cache: recover cleanly via full resync.
+          cached = null;
+        }
+      }
+      final bool canIncremental =
+          cached != null &&
+          cached.lastSeq > 0 &&
+          cached.lastEpoch == beforeSync.currentKeyEpoch &&
+          _lastQuarantinedEnvelopes.isEmpty;
+      final int startAfterSeq = canIncremental ? cached.lastSeq : 0;
+
+      final List<DecryptedEventRecord> fresh = await fetchAndDecryptEvents(
+        afterSeq: startAfterSeq,
+      );
+      if (startAfterSeq > 0) {
+        final LocalDeviceIdentity afterSync = await _requireRootIdentity();
+        if (afterSync.currentKeyEpoch > beforeSync.currentKeyEpoch) {
+          // Epoch rotated during incremental sync: reload complete cache/history
+          // so any previously unreadable items can be decrypted cleanly.
+          final List<DecryptedEventRecord> full = await fetchAndDecryptEvents(
+            afterSeq: 0,
+          );
+          return SyncEventsSnapshot(
+            events: full.map(_toCacheEntry).toList(growable: false),
+            isOffline: false,
+            quarantinedEnvelopes: _lastQuarantinedEnvelopes,
+          );
+        }
+        final CachedEventsSnapshot merged = await loadCachedSnapshot();
+        return SyncEventsSnapshot(
+          events: merged.events,
+          isOffline: false,
+          quarantinedEnvelopes: _lastQuarantinedEnvelopes,
+        );
+      }
       return SyncEventsSnapshot(
         events: fresh.map(_toCacheEntry).toList(growable: false),
         isOffline: false,
+        quarantinedEnvelopes: _lastQuarantinedEnvelopes,
       );
     } on ClientUpgradeRequiredException {
       rethrow;
@@ -692,7 +880,45 @@ class PairingAndSyncRepository {
 
   /// Revokes a device and, when revoking a peer device, atomically rotates
   /// epoch keys, recovery seed, and recovery keyring (`CA-02`, `ADR-0012`).
-  Future<LocalDeviceIdentity> revokeDevice(String targetDeviceId) async {
+  Future<LocalDeviceIdentity> revokeDevice(String targetDeviceId) =>
+      _rotationSynchronized(() => _revokeDeviceLocked(targetDeviceId));
+
+  Future<LocalDeviceIdentity> _revokeDeviceLocked(String targetDeviceId) async {
+    // AU-02: resolve any earlier write-ahead rotation first (definitive answer
+    // required), and never overwrite an existing pending record with new keys.
+    final String? pendingBefore = await _keyStore.read(
+      _pendingRotationStorageKey,
+    );
+    String? pendingTarget;
+    if (pendingBefore != null && pendingBefore.isNotEmpty) {
+      try {
+        pendingTarget =
+            (jsonDecode(pendingBefore)
+                    as Map<String, Object?>)['targetDeviceId']
+                as String?;
+      } catch (_) {
+        pendingTarget = null;
+      }
+    }
+    final LocalDeviceIdentity? epochBefore = await loadIdentity();
+    final LocalDeviceIdentity? reconciledFirst = await _reconcileLocked(
+      suppressNetworkErrors: false,
+    );
+    final String? stillPending = await _keyStore.read(
+      _pendingRotationStorageKey,
+    );
+    if (stillPending != null && stillPending.isNotEmpty) {
+      throw const PendingRotationUnresolvedException();
+    }
+    if (reconciledFirst != null &&
+        epochBefore != null &&
+        reconciledFirst.currentKeyEpoch > epochBefore.currentKeyEpoch &&
+        pendingTarget != null &&
+        pendingTarget == targetDeviceId) {
+      // The earlier attempt for this same device was committed; nothing left to do.
+      return reconciledFirst;
+    }
+
     final LocalDeviceIdentity identity = await _requireRootIdentity();
     final CoupleApiClient api = _clientFactory(identity.serverUrl);
     if (targetDeviceId == identity.deviceId) {
@@ -779,18 +1005,15 @@ class PairingAndSyncRepository {
       });
     }
 
-    await api.revokeDevice(
-      identity: identity,
+    // AU-02: Write-ahead persistence before calling the server so a crash, OS kill,
+    // or lost network response after server commit never loses the new Recovery Key.
+    await _savePendingRotation(
+      coupleId: identity.coupleId,
+      deviceId: identity.deviceId,
       targetDeviceId: targetDeviceId,
-      rotationBody: <String, Object?>{
-        'targetEpoch': nextEpoch,
-        'newRecoveryAuthPublicKeyB64': base64UrlEncode(newRecoveryAuthPub),
-        'recoveryKeyringNonceB64': base64UrlEncode(keyring.nonce),
-        'recoveryKeyringCiphertextB64': base64UrlEncode(
-          keyring.ciphertextWithTag,
-        ),
-        'deliveries': deliveries,
-      },
+      targetEpoch: nextEpoch,
+      newRecoverySeed: newRecoverySeed,
+      epochSecrets: nextEpochs,
     );
 
     final LocalDeviceIdentity rotated = identity.copyWith(
@@ -799,12 +1022,172 @@ class PairingAndSyncRepository {
       epochSecrets: nextEpochs,
       recoverySavedConfirmed: false,
     );
+
+    try {
+      await api.revokeDevice(
+        identity: identity,
+        targetDeviceId: targetDeviceId,
+        rotationBody: <String, Object?>{
+          'targetEpoch': nextEpoch,
+          'newRecoveryAuthPublicKeyB64': base64UrlEncode(newRecoveryAuthPub),
+          'recoveryKeyringNonceB64': base64UrlEncode(keyring.nonce),
+          'recoveryKeyringCiphertextB64': base64UrlEncode(
+            keyring.ciphertextWithTag,
+          ),
+          'deliveries': deliveries,
+        },
+      );
+    } catch (_) {
+      // A transient network error keeps the pending record; only a definitive
+      // server answer may promote or discard it.
+      final LocalDeviceIdentity? reconciled = await _reconcileLocked(
+        suppressNetworkErrors: true,
+      );
+      if (reconciled != null && reconciled.currentKeyEpoch >= nextEpoch) {
+        return reconciled;
+      }
+      rethrow;
+    }
+
     await _reencryptLocalCacheBestEffort(
       oldRootKey: oldActiveRootKey,
       newIdentity: rotated,
     );
     await saveIdentity(rotated);
+    await _keyStore.delete(_pendingRotationStorageKey);
     return rotated;
+  }
+
+  /// Reconciles any write-ahead pending epoch rotation saved before a crash, kill,
+  /// or lost HTTP response (`AU-02`).
+  ///
+  /// Returns the updated [LocalDeviceIdentity] if the server committed our pending
+  /// rotation and we promoted it locally, otherwise returns the current identity (or null).
+  Future<LocalDeviceIdentity?> reconcilePendingRotation({
+    bool suppressNetworkErrors = true,
+  }) => _rotationSynchronized(
+    () => _reconcileLocked(suppressNetworkErrors: suppressNetworkErrors),
+  );
+
+  /// Non-locking body of [reconcilePendingRotation]; callers must already hold
+  /// the rotation lock.
+  Future<LocalDeviceIdentity?> _reconcileLocked({
+    required bool suppressNetworkErrors,
+  }) async {
+    final String? raw = await _keyStore.read(_pendingRotationStorageKey);
+    if (raw == null || raw.isEmpty) {
+      return loadIdentity();
+    }
+    final LocalDeviceIdentity? identity = await loadIdentity();
+    if (identity == null || !identity.hasCoupleRoot) {
+      await _keyStore.delete(_pendingRotationStorageKey);
+      return identity;
+    }
+
+    final Map<String, Object?> json;
+    try {
+      json = jsonDecode(raw) as Map<String, Object?>;
+    } catch (_) {
+      await _keyStore.delete(_pendingRotationStorageKey);
+      return identity;
+    }
+
+    final String pendingCoupleId = json['coupleId'] as String? ?? '';
+    final String pendingDeviceId = json['deviceId'] as String? ?? '';
+    final int targetEpoch = json['targetEpoch'] as int? ?? 0;
+    if (pendingCoupleId != identity.coupleId ||
+        pendingDeviceId != identity.deviceId ||
+        targetEpoch <= identity.currentKeyEpoch) {
+      await _keyStore.delete(_pendingRotationStorageKey);
+      return identity;
+    }
+
+    final CoupleApiClient api = _clientFactory(identity.serverUrl);
+    final EpochRotationStateResponse rot;
+    try {
+      rot = await api.fetchMyEpochRotation(identity: identity);
+    } on ClientUpgradeRequiredException {
+      rethrow;
+    } catch (_) {
+      if (suppressNetworkErrors) {
+        return identity;
+      }
+      rethrow;
+    }
+
+    // The server returns the latest EPOCH_ROTATION ever addressed to us, even if
+    // already delivered. Our own committed rotation leaves the couple at
+    // targetEpoch with no delivery at that epoch addressed to us; a rotation by
+    // another device at the same epoch would have left one with keyEpoch == target.
+    final WrappedKeyPackage? latestDelivery = rot.pendingDelivery;
+    if (rot.currentKeyEpoch == targetEpoch &&
+        (latestDelivery == null || latestDelivery.keyEpoch < targetEpoch)) {
+      // Promote the write-ahead keys immediately.
+      final Uint8List newRecoverySeed = _decodeB64Url(
+        json['recoverySeedB64']! as String,
+      );
+      final Map<String, Object?> rawEpochs =
+          json['epochSecretsB64']! as Map<String, Object?>;
+      final Map<int, Uint8List> epochSecrets = Map<int, Uint8List>.unmodifiable(
+        <int, Uint8List>{
+          for (final MapEntry<String, Object?> e in rawEpochs.entries)
+            int.parse(e.key): _decodeB64Url(e.value! as String),
+        },
+      );
+      final Uint8List oldActiveRootKey = await _crypto.deriveCoupleRootKey(
+        identity.recoverySeed!,
+      );
+      final LocalDeviceIdentity promoted = identity.copyWith(
+        recoverySeed: newRecoverySeed,
+        currentKeyEpoch: targetEpoch,
+        epochSecrets: epochSecrets,
+        recoverySavedConfirmed: false,
+      );
+      await _reencryptLocalCacheBestEffort(
+        oldRootKey: oldActiveRootKey,
+        newIdentity: promoted,
+      );
+      await saveIdentity(promoted);
+      await _keyStore.delete(_pendingRotationStorageKey);
+      return promoted;
+    }
+
+    // Either the server never committed our rotation (currentKeyEpoch < targetEpoch),
+    // or another device rotated (pendingDelivery != null or currentKeyEpoch > targetEpoch).
+    await _keyStore.delete(_pendingRotationStorageKey);
+    return identity;
+  }
+
+  Future<void> _savePendingRotation({
+    required String coupleId,
+    required String deviceId,
+    required String targetDeviceId,
+    required int targetEpoch,
+    required Uint8List newRecoverySeed,
+    required Map<int, Uint8List> epochSecrets,
+  }) async {
+    await _keyStore.write(
+      _pendingRotationStorageKey,
+      jsonEncode(<String, Object?>{
+        'coupleId': coupleId,
+        'deviceId': deviceId,
+        'targetDeviceId': targetDeviceId,
+        'targetEpoch': targetEpoch,
+        'recoverySeedB64': base64UrlEncode(newRecoverySeed),
+        'epochSecretsB64': <String, String>{
+          for (final MapEntry<int, Uint8List> e in epochSecrets.entries)
+            e.key.toString(): base64UrlEncode(e.value),
+        },
+      }),
+    );
+  }
+
+  static Uint8List _decodeB64Url(String value) {
+    final int rem = value.length % 4;
+    final String padded = rem == 0
+        ? value
+        : value.padRight(value.length + (4 - rem), '=');
+    return Uint8List.fromList(base64Url.decode(padded));
   }
 
   Future<LocalDeviceIdentity> _syncEpochFromServer(
@@ -871,18 +1254,23 @@ class PairingAndSyncRepository {
     required LocalDeviceIdentity newIdentity,
   }) async {
     try {
-      final List<CachedEventEntry> cached = await _localCache.loadEvents(
+      final CachedEventsSnapshot cached = await _localCache.loadSnapshot(
         coupleRootKey: oldRootKey,
         coupleId: newIdentity.coupleId,
       );
-      if (cached.isNotEmpty) {
+      if (cached.events.isNotEmpty) {
         final Uint8List newRootKey = await _crypto.deriveCoupleRootKey(
           newIdentity.recoverySeed!,
         );
+        // Preserve the persisted cursor (it may sit below a quarantined
+        // envelope, `AU-04`) and the old epoch marker so the next sync still
+        // performs its post-rotation full resync.
         await _localCache.saveEvents(
           coupleRootKey: newRootKey,
           coupleId: newIdentity.coupleId,
-          entries: cached,
+          entries: cached.events,
+          lastSeq: cached.lastSeq,
+          lastEpoch: cached.lastEpoch,
         );
       }
     } catch (_) {

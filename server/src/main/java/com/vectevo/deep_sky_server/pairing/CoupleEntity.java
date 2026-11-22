@@ -37,4 +37,7 @@ public class CoupleEntity {
 
 	@Column(name = "recovery_keyring_ciphertext")
 	private byte[] recoveryKeyringCiphertext;
+
+	@Column(name = "stored_bytes", nullable = false)
+	private long storedBytes = 0L;
 }

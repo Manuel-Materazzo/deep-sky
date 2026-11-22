@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,7 @@ public class PushService {
 
 	private static final Logger log = LoggerFactory.getLogger(PushService.class);
 	private static final long WAKEUP_WINDOW_MILLIS = 60_000L;
+	private static final int MAX_TRACKED_WAKEUP_DEVICES = 10_000;
 
 	public static final Set<String> CLIENT_TRIGGERABLE_KEYS = Set.of(
 			"wakeup.generic",
@@ -55,6 +57,7 @@ public class PushService {
 	private final PushProvider pushProvider;
 	private final Clock clock;
 	private final int clientWakeupMaxPerMinute;
+	private final ApplicationEventPublisher eventPublisher;
 	private final Map<UUID, Deque<Long>> clientWakeupWindows = new ConcurrentHashMap<>();
 
 	@Autowired
@@ -63,11 +66,13 @@ public class PushService {
 			PushRegistrationRepository repository,
 			PushProvider pushProvider,
 			Clock clock,
+			ApplicationEventPublisher eventPublisher,
 			@Value("${deepsky.push.client-wakeup-max-per-minute:5}") int clientWakeupMaxPerMinute) {
 		this.config = config;
 		this.repository = repository;
 		this.pushProvider = pushProvider;
 		this.clock = clock;
+		this.eventPublisher = eventPublisher;
 		this.clientWakeupMaxPerMinute = Math.max(1, clientWakeupMaxPerMinute);
 	}
 
@@ -75,8 +80,17 @@ public class PushService {
 			PushConfig config,
 			PushRegistrationRepository repository,
 			PushProvider pushProvider,
+			Clock clock,
+			int clientWakeupMaxPerMinute) {
+		this(config, repository, pushProvider, clock, null, clientWakeupMaxPerMinute);
+	}
+
+	public PushService(
+			PushConfig config,
+			PushRegistrationRepository repository,
+			PushProvider pushProvider,
 			Clock clock) {
-		this(config, repository, pushProvider, clock, 5);
+		this(config, repository, pushProvider, clock, null, 5);
 	}
 
 	public ClientConfig clientConfig() {
@@ -133,7 +147,7 @@ public class PushService {
 	}
 
 	@Async
-	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+	@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
 	public void onPartnerWakeupRequested(PartnerWakeupRequestedEvent event) {
 		try {
 			dispatchPartnerWakeup(event.coupleId(), event.senderDeviceId(), event.localizationKey());
@@ -142,7 +156,11 @@ public class PushService {
 		}
 	}
 
-	@Transactional
+	/**
+	 * Validates and rate-limits a client-triggered wakeup, then dispatches FCM I/O
+	 * asynchronously via {@link PartnerWakeupRequestedEvent} without holding a DB
+	 * transaction or request thread ({@code AU-12}).
+	 */
 	public WakeupOutcome dispatchClientWakeup(UUID coupleId, UUID senderDeviceId, String localizationKey) {
 		String key = (localizationKey == null || localizationKey.isBlank())
 				? "wakeup.generic"
@@ -151,6 +169,10 @@ public class PushService {
 			throw new IllegalArgumentException("Unsupported localizationKey: " + key);
 		}
 		consumeClientWakeupQuota(senderDeviceId);
+		if (eventPublisher != null) {
+			eventPublisher.publishEvent(new PartnerWakeupRequestedEvent(coupleId, senderDeviceId, key));
+			return new WakeupOutcome(key, 0, 0, 0);
+		}
 		return dispatchPartnerWakeup(coupleId, senderDeviceId, key);
 	}
 
@@ -161,6 +183,18 @@ public class PushService {
 	private void consumeClientWakeupQuota(UUID senderDeviceId) {
 		long now = clock.millis();
 		long cutoff = now - WAKEUP_WINDOW_MILLIS;
+		// AU-23: Prune stale device windows when map grows large so memory stays bounded.
+		if (clientWakeupWindows.size() >= MAX_TRACKED_WAKEUP_DEVICES) {
+			clientWakeupWindows.entrySet().removeIf(entry -> {
+				Deque<Long> q = entry.getValue();
+				synchronized (q) {
+					while (!q.isEmpty() && q.peekFirst() <= cutoff) {
+						q.pollFirst();
+					}
+					return q.isEmpty();
+				}
+			});
+		}
 		Deque<Long> timestamps = clientWakeupWindows.computeIfAbsent(senderDeviceId, k -> new ArrayDeque<>());
 		synchronized (timestamps) {
 			while (!timestamps.isEmpty() && timestamps.peekFirst() <= cutoff) {
@@ -178,7 +212,9 @@ public class PushService {
 		}
 	}
 
-	@Transactional
+	/**
+	 * Sends FCM wakeups to partner devices without wrapping network I/O in a DB transaction ({@code AU-12}).
+	 */
 	public WakeupOutcome dispatchPartnerWakeup(UUID coupleId, UUID senderDeviceId, String localizationKey) {
 		String key = (localizationKey == null || localizationKey.isBlank())
 				? "wakeup.generic"

@@ -108,6 +108,11 @@ public class SyncService {
 			if (keyEpoch < currentCoupleEpoch) {
 				throw new StaleKeyEpochException(currentCoupleEpoch);
 			}
+			// AU-21: Reject future keyEpochs that exceed the couple's active epoch.
+			if (keyEpoch > currentCoupleEpoch) {
+				throw new IllegalArgumentException(
+						"keyEpoch (" + keyEpoch + ") exceeds couple currentKeyEpoch (" + currentCoupleEpoch + ")");
+			}
 		}
 		byte[] nonce = Ed25519SignatureVerifier.decodeBase64Url(nonceB64, 24, "nonceB64");
 		byte[] ciphertext = Ed25519SignatureVerifier.decodeBase64UrlVariable(ciphertextB64, "ciphertextB64");
@@ -136,10 +141,12 @@ public class SyncService {
 					ciphertextB64,
 					Instant.now());
 		}
-		long usedBytes = envelopeRepository.sumStoredBytesByCoupleId(principal.coupleId());
-		if (usedBytes + payloadBytes > maxCoupleStorageBytes) {
-			throw new StorageQuotaExceededException(
-					"COUPLE_STORAGE_QUOTA_EXCEEDED", "Couple storage quota exceeded");
+		if (deviceAuthLookup == null) {
+			long usedBytes = envelopeRepository.sumStoredBytesByCoupleId(principal.coupleId());
+			if (usedBytes + payloadBytes > maxCoupleStorageBytes) {
+				throw new StorageQuotaExceededException(
+						"COUPLE_STORAGE_QUOTA_EXCEEDED", "Couple storage quota exceeded");
+			}
 		}
 
 		Instant now = Instant.now();
@@ -167,6 +174,12 @@ public class SyncService {
 					nonceB64,
 					ciphertextB64,
 					now);
+		}
+		if (deviceAuthLookup != null
+				&& !deviceAuthLookup.tryReserveStorageBytes(principal.coupleId(), payloadBytes, maxCoupleStorageBytes)) {
+			// Throwing rolls back the transaction (including the newly inserted envelope row) atomically (AU-21).
+			throw new StorageQuotaExceededException(
+					"COUPLE_STORAGE_QUOTA_EXCEEDED", "Couple storage quota exceeded");
 		}
 
 		// Reload to retrieve database-generated IDENTITY seq

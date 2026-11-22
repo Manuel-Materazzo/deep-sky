@@ -32,7 +32,8 @@ class DeepSkyPropertiesValidationTest {
 				"a-very-strong-production-secret-32chars",
 				new DeepSkyProperties.Protocol(1, 1),
 				new DeepSkyProperties.Quotas(10_485_760L, 1_073_741_824L),
-				new DeepSkyProperties.Firebase(true, "", "", "", "", "/nonexistent/sa.json"));
+				new DeepSkyProperties.Firebase(true, "", "", "", "", "/nonexistent/sa.json"),
+				null);
 
 		List<String> errors = DeepSkyPropertiesValidator.validate(props, true);
 		assertThat(errors)
@@ -50,7 +51,8 @@ class DeepSkyPropertiesValidationTest {
 				"a-very-strong-production-secret-32chars",
 				new DeepSkyProperties.Protocol(1, 1),
 				new DeepSkyProperties.Quotas(10_000_000L, 5_000_000L),
-				new DeepSkyProperties.Firebase(false, "", "", "", "", ""));
+				new DeepSkyProperties.Firebase(false, "", "", "", "", ""),
+				null);
 
 		List<String> errors = DeepSkyPropertiesValidator.validate(props, true);
 		assertThat(errors).singleElement().asString().contains("max-couple-storage-bytes");
@@ -62,6 +64,7 @@ class DeepSkyPropertiesValidationTest {
 				DeepSkyPropertiesValidator.DEV_DEFAULT_ADMIN_SECRET,
 				new DeepSkyProperties.Protocol(1, 1),
 				new DeepSkyProperties.Quotas(10_485_760L, 1_073_741_824L),
-				new DeepSkyProperties.Firebase(false, "", "", "", "", ""));
+				new DeepSkyProperties.Firebase(false, "", "", "", "", ""),
+				null);
 	}
 }

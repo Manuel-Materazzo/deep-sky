@@ -192,18 +192,21 @@ class Sp01PushIntegrationTest {
 						couple.devAId(), couple.devAKp(), pairingWakeup))
 				.andExpect(status().isBadRequest());
 
-		// When FCM reports UNREGISTERED, stale token is evicted from Postgres
+		// When FCM reports UNREGISTERED, stale token is evicted asynchronously from Postgres (AU-12)
 		doThrow(new PushTokenUnregisteredException("token-b-v2-rotated-9876", "gone"))
 				.when(pushProvider).sendWakeup("token-b-v2-rotated-9876", "wakeup.generic");
 		String genWakeup = "{\"localizationKey\":\"wakeup.generic\"}";
 		mockMvc.perform(signed(
 						post("/api/v1/push/wakeup").contentType(MediaType.APPLICATION_JSON).content(genWakeup),
 						couple.devAId(), couple.devAKp(), genWakeup))
-				.andExpect(status().isOk())
-				.andExpect(jsonPath("$.attempted").value(1))
-				.andExpect(jsonPath("$.delivered").value(0))
-				.andExpect(jsonPath("$.unregisteredRemoved").value(1));
+				.andExpect(status().isOk());
 
+		verify(pushProvider, timeout(2000)).sendWakeup("token-b-v2-rotated-9876", "wakeup.generic");
+		long deadline = System.currentTimeMillis() + 2000;
+		while (registrationRepository.findByDeviceId(couple.devBId()).isPresent()
+				&& System.currentTimeMillis() < deadline) {
+			Thread.sleep(25);
+		}
 		assertThat(registrationRepository.findByDeviceId(couple.devBId())).isEmpty();
 		mockMvc.perform(signed(get("/api/v1/push/register"), couple.devBId(), couple.devBKp(), ""))
 				.andExpect(status().isNotFound());
@@ -232,10 +235,10 @@ class Sp01PushIntegrationTest {
 				.andExpect(status().isOk());
 		verify(pushProvider, timeout(2000)).sendWakeup("token-a-initial-123456", "wakeup.pairing_request");
 
-		// Revoke B -> push token is removed cleanly
+		// Self-revoke B -> push token is removed cleanly (AU-10: revoking another approved device requires rotation)
 		mockMvc.perform(signed(
 						post("/api/v1/pairing/devices/" + couple.devBId() + "/revoke"),
-						couple.devAId(), couple.devAKp(), ""))
+						couple.devBId(), couple.devBKp(), ""))
 				.andExpect(status().isNoContent());
 		assertThat(registrationRepository.findByDeviceId(couple.devBId())).isEmpty();
 

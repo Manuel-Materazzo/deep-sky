@@ -1,13 +1,16 @@
 import 'dart:async';
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, SocketException;
 
+import 'package:cryptography/cryptography.dart';
 import 'package:deep_sky/data/apk_update_service.dart';
+import 'package:deep_sky/data/content_pack_service.dart';
 import 'package:deep_sky/data/couple_api_client.dart';
 import 'package:deep_sky/data/encrypted_local_cache.dart';
 import 'package:deep_sky/data/pairing_and_sync_repository.dart';
 import 'package:deep_sky/data/push_api_client.dart';
 import 'package:deep_sky/data/scene_manifest_parser.dart';
 import 'package:deep_sky/data/secure_key_store.dart';
+import 'package:deep_sky/domain/content/content_pack_models.dart';
 import 'package:deep_sky/domain/crypto/deep_sky_crypto.dart';
 import 'package:deep_sky/domain/crypto/e2ee_models.dart';
 import 'package:deep_sky/domain/pairing/invite_link_codec.dart';
@@ -17,9 +20,11 @@ import 'package:deep_sky/domain/update/apk_update_models.dart';
 import 'package:deep_sky/platform/native_bridge.dart';
 import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
 import 'package:deep_sky/scene/asset_override_registry.dart';
+import 'package:deep_sky/scene/local_scene_view_state.dart';
 import 'package:deep_sky/scene/scene_manifest.dart';
 import 'package:deep_sky/scene/scene_state_mapper.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/painting.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
@@ -34,39 +39,79 @@ class DeepSkyController extends ChangeNotifier {
     DeepSkyCrypto? crypto,
     http.Client? httpClient,
     NativeBridge? nativeBridge,
+    ContentPackService? contentPackService,
+    Map<String, SimplePublicKey>? trustedContentPublicKeys,
+    DateTime Function()? clockUtc,
+    DateTime Function()? clockLocal,
     this._manifestParser = const SceneManifestParser(),
     this._sceneStateMapper = const SceneStateMapper(),
     Future<String> Function(String path)? loadAssetString,
     Future<PlatformCapabilities> Function()? loadCapabilities,
-    this.clientVersionCode = 1,
+    int? clientVersionCode,
     this.protocolVersion = 1,
     this.defaultServerUrl = 'https://deepsky.vectevo.com',
     this.defaultUpdateSource = 'Manuel-Materazzo/deep-sky',
     this.trustedUpdatePublicKeyB64 =
         'MCowBQYDK2VwAyEAHDblTk6u65qfWgGXDDULNtIsR9JrXd1u4Pc6y7+Z+WM=',
     this.inviteAutoPollInterval = const Duration(seconds: 3),
+    this.enableSkyRefreshTimer = true,
+    this.thoughtSentBannerDuration = const Duration(seconds: 8),
   }) : _hasCustomNativeBridge = nativeBridge != null,
        _nativeBridge = nativeBridge ?? const NativeBridge(),
        _httpClient = httpClient ?? http.Client(),
        _loadAssetString = loadAssetString ?? rootBundle.loadString,
-       _loadCapabilitiesOverride = loadCapabilities {
+       _loadCapabilitiesOverride = loadCapabilities,
+       _clientVersionCodeOverride = clientVersionCode,
+       _clockUtc = clockUtc ?? (() => DateTime.now().toUtc()),
+       _clockLocal = clockLocal ?? DateTime.now {
     final SecureKeyStore resolvedKeyStore = keyStore ?? FlutterSecureKeyStore();
     _keyStore = resolvedKeyStore;
     _crypto = crypto ?? DeepSkyCrypto();
+    _localSceneStore = LocalSceneViewStateStore(resolvedKeyStore);
     _repository = PairingAndSyncRepository(
       keyStore: resolvedKeyStore,
       crypto: _crypto,
       clientFactory: _createApiClient,
+      localCache: EncryptedLocalCache(
+        keyStore: resolvedKeyStore,
+        resolveCacheRootDir: _canQueryNativeChannels
+            ? _nativeBridge.getOfflineCacheRootDir
+            : null,
+      ),
     );
     _updateService = ApkUpdateService(
       httpClient: _httpClient,
       nativeBridge: _nativeBridge,
     );
+    _contentPackService =
+        contentPackService ??
+        ContentPackService(
+          keyStore: resolvedKeyStore,
+          trustedPublicKeys:
+              trustedContentPublicKeys ??
+              <String, SimplePublicKey>{
+                'v1': ApkUpdateService.parseEd25519PublicKey(
+                  trustedUpdatePublicKeyB64,
+                ),
+              },
+          httpClient: _httpClient,
+          manifestParser: _manifestParser,
+          resolveStorageRootDir: _canQueryNativeChannels
+              ? _nativeBridge.getContentPackRootDir
+              : null,
+          isConnectionUnmetered: _canQueryNativeChannels
+              ? _nativeBridge.isConnectionUnmetered
+              : null,
+          appProtocolVersion: protocolVersion,
+          clientVersionCode: clientVersionCode ?? 1,
+        );
   }
 
   static const String _updateChannelStorageKey = 'deepsky.update.channel';
   static const String _pushPromptDismissedStorageKey =
       'deepsky.push.prompt_dismissed';
+  static const String homePackManifestPath = 'content/packs/v1/manifest.json';
+  static const String homePackAssetRoot = 'content/packs/v1';
   static const String pilotManifestPath =
       'content/packs/ds2_pilot/manifest.json';
   static const String pilotAssetRoot = 'content/packs/ds2_pilot';
@@ -81,7 +126,22 @@ class DeepSkyController extends ChangeNotifier {
   final SceneStateMapper _sceneStateMapper;
   final Future<String> Function(String path) _loadAssetString;
   final Future<PlatformCapabilities> Function()? _loadCapabilitiesOverride;
-  final int clientVersionCode;
+  final int? _clientVersionCodeOverride;
+  final DateTime Function() _clockUtc;
+
+  /// Current UTC instant from the injectable controller clock (deterministic in tests).
+  DateTime get nowUtc => _clockUtc();
+  final DateTime Function() _clockLocal;
+  final bool enableSkyRefreshTimer;
+  final Duration thoughtSentBannerDuration;
+
+  /// Effective Android `versionCode` sent in API compatibility headers.
+  ///
+  /// Uses the runtime value loaded from native [PlatformCapabilities] unless
+  /// explicitly overridden (for example in tests).
+  int get clientVersionCode =>
+      _clientVersionCodeOverride ?? capabilities.versionCode;
+
   final int protocolVersion;
   final String defaultServerUrl;
   final String defaultUpdateSource;
@@ -90,13 +150,30 @@ class DeepSkyController extends ChangeNotifier {
 
   late final SecureKeyStore _keyStore;
   late final DeepSkyCrypto _crypto;
+  late final LocalSceneViewStateStore _localSceneStore;
   late final PairingAndSyncRepository _repository;
   late final ApkUpdateService _updateService;
+  late final ContentPackService _contentPackService;
+
+  SceneManifest? _bundledManifest;
+  String activePackAssetRoot = homePackAssetRoot;
+  bool activePackIsFileSystem = false;
+  bool contentPackUpdating = false;
+  String? contentPackFeedback;
+  String? contentPackRolledBackFrom;
+  LocalSceneViewState localSceneViewState = const LocalSceneViewState();
+  bool showWelcomeBackBanner = false;
+  bool showThoughtSentBanner = false;
+  String? lastSentThoughtNote;
+  int thoughtSentBannerSequence = 0;
+
+  String get activePackVersion => sceneManifest?.packVersion ?? '1.1.0';
 
   AppBootPhase phase = AppBootPhase.loading;
   bool busy = false;
   bool isOffline = false;
   bool isDeviceRevoked = false;
+  int quarantinedEnvelopeCount = 0;
   bool isNight = true;
   bool reduceMotion = false;
   bool petOverrideActive = false;
@@ -161,11 +238,12 @@ class DeepSkyController extends ChangeNotifier {
     errorNotice = null;
     notifyListeners();
 
-    await _loadPilotScene();
+    await _loadHomeScene();
     await _loadCapabilities();
     await _loadClientPreferences();
     _nativeBridge.setDeepLinkListener(handleIncomingDeepLink);
-    identity = await _repository.loadIdentity();
+    _nativeBridge.setPushWakeupListener(handleForegroundPushWakeup);
+    identity = await _repository.reconcilePendingRotation();
     activeServerUrl = identity?.serverUrl ?? defaultServerUrl;
     if (identity != null && identity!.deviceLabel.trim().isNotEmpty) {
       deviceLabel = identity!.deviceLabel;
@@ -208,19 +286,77 @@ class DeepSkyController extends ChangeNotifier {
       return;
     }
 
+    await _resolveStartupContentPack();
+    await _recordLocalHomeOpen();
+
     phase = AppBootPhase.paired;
     await _refreshPairedState();
     await _syncPendingRotatedPushToken();
+    if (!isOffline && !isDeviceRevoked) {
+      unawaited(checkContentPackInBackground());
+    }
     notifyListeners();
   }
 
-  Future<void> _loadPilotScene() async {
+  Future<void> _loadHomeScene() async {
     try {
-      final String raw = await _loadAssetString(pilotManifestPath);
-      sceneManifest = _manifestParser.parseJson(raw);
+      final String raw = await _loadAssetString(homePackManifestPath);
+      final SceneManifest parsed = _manifestParser.parseJson(raw);
+      _bundledManifest = parsed;
+      sceneManifest = parsed;
+      activePackAssetRoot = parsed.packId == 'ds2-pilot-room'
+          ? pilotAssetRoot
+          : homePackAssetRoot;
+      activePackIsFileSystem = false;
     } catch (_) {
-      sceneManifest = null;
+      try {
+        final String raw = await _loadAssetString(pilotManifestPath);
+        final SceneManifest parsed = _manifestParser.parseJson(raw);
+        _bundledManifest = parsed;
+        sceneManifest = parsed;
+        activePackAssetRoot = pilotAssetRoot;
+        activePackIsFileSystem = false;
+      } catch (_) {
+        sceneManifest = null;
+      }
     }
+  }
+
+  Future<void> _resolveStartupContentPack() async {
+    final SceneManifest? bundled = _bundledManifest;
+    if (bundled == null) {
+      return;
+    }
+    try {
+      final SemanticVersion? serverMin = SemanticVersion.tryParse(
+        compatibilityPolicy?.minPackVersion,
+      );
+      final ResolvedContentPack resolved = await _contentPackService
+          .resolveStartupPack(
+            bundledManifest: bundled,
+            bundledAssetRoot: activePackAssetRoot,
+            serverMinPackVersion: serverMin,
+          );
+      sceneManifest = resolved.manifest;
+      activePackAssetRoot = resolved.assetRootPath;
+      activePackIsFileSystem = resolved.isFileSystem;
+      contentPackRolledBackFrom = resolved.rolledBackFromVersion;
+      if (resolved.rolledBackFromVersion != null) {
+        contentPackFeedback = DeepSkyStrings(languageCode)
+            .settingsGraphicsRolledBack(resolved.rolledBackFromVersion!);
+      }
+    } catch (_) {
+      // Fall back safely to bundled manifest.
+    }
+  }
+
+  Future<void> _recordLocalHomeOpen() async {
+    final DateTime nowUtc = _clockUtc();
+    showWelcomeBackBanner = localSceneViewState.shouldShowWelcomeBack(nowUtc);
+    localSceneViewState = localSceneViewState.copyWith(
+      lastOpenedAtLocal: nowUtc,
+    );
+    await _localSceneStore.save(localSceneViewState);
   }
 
   Future<void> _loadClientPreferences() async {
@@ -230,6 +366,7 @@ class DeepSkyController extends ChangeNotifier {
       );
       pushPromptDismissed =
           (await _keyStore.read(_pushPromptDismissedStorageKey)) == 'true';
+      localSceneViewState = await _localSceneStore.load();
     } catch (_) {
       // Fall back to safe defaults if preferences are unavailable.
     }
@@ -306,8 +443,13 @@ class DeepSkyController extends ChangeNotifier {
       identity = (await _repository.loadIdentity()) ?? identity;
       events = snap.events;
       isOffline = snap.isOffline;
+      quarantinedEnvelopeCount = snap.quarantinedEnvelopes.length;
       if (!isOffline) {
         isDeviceRevoked = false;
+      }
+      if (quarantinedEnvelopeCount > 0) {
+        errorNotice = DeepSkyStrings(languageCode)
+            .unreadableEnvelopesNotice(quarantinedEnvelopeCount);
       }
       _recomputeSceneState();
       if (!isOffline) {
@@ -335,10 +477,10 @@ class DeepSkyController extends ChangeNotifier {
         errorNotice = null;
         await _loadCachedEventsBestEffort();
       } else {
-        errorNotice = '$ex';
+        errorNotice = _friendlyErrorMessage(ex);
       }
     } catch (error) {
-      errorNotice = '$error';
+      errorNotice = _friendlyErrorMessage(error);
     }
   }
 
@@ -381,10 +523,269 @@ class DeepSkyController extends ChangeNotifier {
 
   void _recomputeSceneState() {
     final String deviceId = identity?.deviceId ?? '';
+    final String coupleId = identity?.coupleId ?? '';
     sceneState = _sceneStateMapper.derive(
       events: events,
       localDeviceId: deviceId,
+      coupleId: coupleId,
+      localViewState: localSceneViewState,
+      nowUtc: _clockUtc(),
+      nowLocal: _clockLocal(),
     );
+  }
+
+  /// Recomputes the local sky band across midnight or timezone changes (`S2-CTR-02`, `S2-APP-03`).
+  void refreshLocalSkyPeriod() {
+    final SkyPeriod prev = sceneState.skyPeriod;
+    _recomputeSceneState();
+    if (sceneState.skyPeriod != prev) {
+      notifyListeners();
+    }
+  }
+
+  Future<void> setSkyPreference(SkyTimePreference pref) async {
+    localSceneViewState = localSceneViewState.copyWith(skyPreference: pref);
+    await _localSceneStore.save(localSceneViewState);
+    if (pref == SkyTimePreference.day) {
+      isNight = false;
+    } else if (pref == SkyTimePreference.night) {
+      isNight = true;
+    }
+    _recomputeSceneState();
+    notifyListeners();
+  }
+
+  void dismissWelcomeBackBanner() {
+    if (!showWelcomeBackBanner) {
+      return;
+    }
+    showWelcomeBackBanner = false;
+    notifyListeners();
+  }
+
+  void dismissThoughtSentBanner() {
+    if (!showThoughtSentBanner) {
+      return;
+    }
+    showThoughtSentBanner = false;
+    lastSentThoughtNote = null;
+    notifyListeners();
+  }
+
+  /// Marks the latest partner thought as seen strictly on this device (`P-07`, `S-05`).
+  Future<void> markLatestPartnerThoughtSeen() async {
+    final CachedEventEntry? unseen = sceneState.unseenPartnerThought;
+    if (unseen == null) {
+      return;
+    }
+    await _markPartnerThoughtSeen(unseen);
+  }
+
+  Future<void> _markPartnerThoughtSeen(CachedEventEntry unseen) async {
+    final int nextSeq =
+        unseen.seq != null && unseen.seq! > localSceneViewState.lastSeenEventSeq
+        ? unseen.seq!
+        : localSceneViewState.lastSeenEventSeq;
+    localSceneViewState = localSceneViewState.copyWith(
+      lastSeenEventSeq: nextSeq,
+      lastSeenThoughtEnvelopeId: unseen.envelopeId,
+    );
+    await _localSceneStore.save(localSceneViewState);
+    _recomputeSceneState();
+    notifyListeners();
+  }
+
+  /// Sends a reciprocal "Ti penso" gesture (with optional short note) and marks
+  /// the incoming partner thought as seen locally (`F-03`, `S2-APP-03`).
+  Future<void> replyToPartnerThought({String? note}) async {
+    final CachedEventEntry? unseen = sceneState.unseenPartnerThought;
+    await sendThinkingOfYou(note: note);
+    if (errorNotice == null && unseen != null) {
+      await _markPartnerThoughtSeen(unseen);
+    }
+  }
+
+  /// Resets `packBootAttempts` once the first frame that exercises (or deliberately
+  /// bypasses) the scene has rendered: Home, or a paired pre-Home page such as space/recovery
+  /// setup that never draws the pack, so those boots are not counted as failures (`S2-APP-02`).
+  Future<void> markHomeBootSucceeded() =>
+      _contentPackService.markHomeBootSucceeded();
+
+  /// Silently checks for signed graphics updates on unmetered networks and stages
+  /// them for the next launch (`S2-APP-02`).
+  Future<void>? _bgPackCheckFuture;
+  DateTime? _lastSilentSyncUtc;
+  bool _silentSyncInFlight = false;
+  int _secureScreenRefCount = 0;
+
+  /// Reference-counted `FLAG_SECURE` acquisition (`AU-24`) so popping a nested
+  /// sensitive page never disables screen protection while another sensitive
+  /// page remains visible underneath.
+  Future<void> acquireSecureScreen() async {
+    _secureScreenRefCount++;
+    if (_secureScreenRefCount == 1) {
+      await _nativeBridge.setSecureScreen(true);
+    }
+  }
+
+  Future<void> releaseSecureScreen() async {
+    if (_secureScreenRefCount <= 0) {
+      _secureScreenRefCount = 0;
+      return;
+    }
+    _secureScreenRefCount--;
+    if (_secureScreenRefCount == 0) {
+      await _nativeBridge.setSecureScreen(false);
+    }
+  }
+
+  /// Throttled silent sync triggered on app resume or foreground push wakeup (`AU-18`).
+  Future<void> syncOnResumeSilently({bool force = false}) async {
+    if (phase != AppBootPhase.paired ||
+        identity == null ||
+        !identity!.hasCoupleRoot ||
+        busy ||
+        isDeviceRevoked ||
+        _silentSyncInFlight) {
+      return;
+    }
+    final DateTime now = _clockUtc();
+    if (!force &&
+        _lastSilentSyncUtc != null &&
+        now.difference(_lastSilentSyncUtc!) < const Duration(seconds: 10)) {
+      return;
+    }
+    _silentSyncInFlight = true;
+    _lastSilentSyncUtc = now;
+    try {
+      await _refreshPairedState();
+      notifyListeners();
+    } catch (_) {
+      // Silent resume sync never surfaces intrusive errors.
+    } finally {
+      _silentSyncInFlight = false;
+    }
+  }
+
+  /// Handles a foreground FCM data-only wakeup forwarded by Android (`AU-18`).
+  void handleForegroundPushWakeup(String l10nKey) {
+    unawaited(refreshPushStatus());
+    if (l10nKey == 'wakeup.pairing_request') {
+      unawaited(pollActiveInviteSilently());
+    } else {
+      unawaited(syncOnResumeSilently(force: true));
+    }
+  }
+
+  Future<void> checkContentPackInBackground() {
+    if (_bgPackCheckFuture != null) {
+      return _bgPackCheckFuture!;
+    }
+    final Future<void> run = _runBackgroundContentPackCheck();
+    _bgPackCheckFuture = run.whenComplete(() {
+      if (identical(_bgPackCheckFuture, run)) {
+        _bgPackCheckFuture = null;
+      }
+    });
+    return _bgPackCheckFuture!;
+  }
+
+  Future<void> _runBackgroundContentPackCheck() async {
+    final LocalDeviceIdentity? current = identity;
+    final SceneManifest? bundled = _bundledManifest;
+    final SceneManifest? active = sceneManifest;
+    if (current == null || bundled == null || active == null) {
+      return;
+    }
+    try {
+      final ContentPackUpdateResult res = await _contentPackService
+          .syncFromServer(
+            serverBaseUrl: current.serverUrl,
+            bundledPackVersion: SemanticVersion.parse(bundled.packVersion),
+            currentActivePackVersion: SemanticVersion.parse(active.packVersion),
+            serverMinPackVersion: SemanticVersion.tryParse(
+              compatibilityPolicy?.minPackVersion,
+            ),
+            manualForce: false,
+          );
+      if (res.status == ContentPackUpdateStatus.stagedForNextBoot &&
+          res.packVersion != null) {
+        contentPackFeedback = DeepSkyStrings(languageCode)
+            .settingsGraphicsStagedNextLaunch(res.packVersion!);
+        notifyListeners();
+      }
+    } catch (_) {
+      // Silent background sync never surfaces intrusive errors.
+    }
+  }
+
+  /// Forces an immediate file-by-file content pack download (even on metered networks),
+  /// evicts previous textures from `imageCache`, and hot-reloads the Home scene (`S2-D09`, `S2-APP-02`).
+  Future<void> forceUpdateContentPack() async {
+    final LocalDeviceIdentity? current = identity;
+    final SceneManifest? bundled = _bundledManifest;
+    final SceneManifest? active = sceneManifest;
+    if (current == null || bundled == null || active == null) {
+      return;
+    }
+    final DeepSkyStrings s = DeepSkyStrings(languageCode);
+    contentPackUpdating = true;
+    contentPackFeedback = null;
+    notifyListeners();
+    try {
+      // AU-07: Join any in-flight startup check before running a manual sync.
+      final Future<void>? inFlightBg = _bgPackCheckFuture;
+      if (inFlightBg != null) {
+        try {
+          await inFlightBg;
+        } catch (_) {}
+      }
+      final ContentPackUpdateResult res = await _contentPackService
+          .syncFromServer(
+            serverBaseUrl: current.serverUrl,
+            bundledPackVersion: SemanticVersion.parse(bundled.packVersion),
+            currentActivePackVersion: SemanticVersion.parse(active.packVersion),
+            serverMinPackVersion: SemanticVersion.tryParse(
+              compatibilityPolicy?.minPackVersion,
+            ),
+            manualForce: true,
+          );
+      switch (res.status) {
+        case ContentPackUpdateStatus.activatedHotReload:
+          final ResolvedContentPack? nextPack = res.resolvedPack;
+          if (nextPack != null) {
+            // Cached providers are wrapped in ResizeImage with size-dependent keys,
+            // so dropping the whole cache (and live images) is the reliable eviction.
+            PaintingBinding.instance.imageCache
+              ..clear()
+              ..clearLiveImages();
+            sceneManifest = nextPack.manifest;
+            activePackAssetRoot = nextPack.assetRootPath;
+            activePackIsFileSystem = nextPack.isFileSystem;
+            contentPackFeedback = s.settingsGraphicsUpdatedHotReload(
+              nextPack.packVersion,
+            );
+          }
+        case ContentPackUpdateStatus.upToDate:
+        case ContentPackUpdateStatus.notModified304:
+          contentPackFeedback = s.settingsGraphicsUpToDate;
+        case ContentPackUpdateStatus.unavailable:
+          contentPackFeedback = s.settingsGraphicsUnavailable;
+        case ContentPackUpdateStatus.stagedForNextBoot:
+          contentPackFeedback = s.settingsGraphicsStagedNextLaunch(
+            res.packVersion ?? activePackVersion,
+          );
+        case ContentPackUpdateStatus.skippedMeteredNetwork:
+          contentPackFeedback = s.settingsGraphicsUpToDate;
+      }
+    } on ContentPackException catch (ex) {
+      contentPackFeedback = ex.localizedMessage(languageCode);
+    } catch (error) {
+      contentPackFeedback = _friendlyErrorMessage(error);
+    } finally {
+      contentPackUpdating = false;
+      notifyListeners();
+    }
   }
 
   bool get isCustomServer =>
@@ -733,11 +1134,12 @@ class DeepSkyController extends ChangeNotifier {
 
   Future<void> confirmSasAndDeliverRootKey() => _runGuarded(() async {
     final InviteStatusResponse? status = activeInviteStatus;
+    final DeepSkyStrings s = DeepSkyStrings(languageCode);
     if (status == null ||
         !status.accepted ||
         status.acceptedDeviceId == null ||
         status.acceptedKemPublicKey == null) {
-      throw StateError('L\'altro telefono non ha ancora aperto l\'invito.');
+      throw _CalmUserException(s.inviteNotAcceptedYetError);
     }
     _lastKnownPeerLabel = status.acceptedLabel;
     await _repository.confirmSasAndDeliverRootKey(
@@ -751,9 +1153,7 @@ class DeepSkyController extends ChangeNotifier {
     activeSasCode = null;
     phase = AppBootPhase.paired;
     await _refreshPairedState();
-    statusNotice = languageCode == 'it'
-        ? 'Chiavi inviate in modo cifrato. Ora completa la ricezione sull\'altro telefono.'
-        : 'Keys delivered in encrypted form. Now finish receiving on the other phone.';
+    statusNotice = s.keysDeliveredNotice;
   });
 
   Future<void> acceptInvite({
@@ -812,25 +1212,20 @@ class DeepSkyController extends ChangeNotifier {
     if (session == null) {
       return;
     }
+    final DeepSkyStrings s = DeepSkyStrings(languageCode);
     try {
       identity = await _repository.completeKeyDelivery(session: session);
     } on ApiRequestException catch (ex) {
       if (ex.statusCode == 404) {
-        throw StateError(
-          languageCode == 'it'
-              ? 'L\'altro telefono non ha ancora confermato il codice SAS. Conferma prima sull\'altro telefono, poi riprova.'
-              : 'The other phone has not confirmed the SAS code yet. Confirm on the other device first, then try again.',
-        );
+        throw _CalmUserException(s.partnerNotConfirmedSasYetError);
       }
-      if (ex.isDeviceUnknownOrRevoked) {
-        await _repository.clearIdentity();
-        identity = null;
-        pendingJoin = null;
-        throw StateError(
-          languageCode == 'it'
-              ? 'Questo invito o dispositivo non è più valido. Chiedi un nuovo invito al partner.'
-              : 'This invite or device is no longer valid. Ask your partner for a new invite.',
-        );
+      if (ex.isClockSkew) {
+        throw _CalmUserException(s.clockSkewError);
+      }
+      // AU-16: Do not wipe joining identity on an ambiguous 401 (could be a
+      // proxy path rewrite or temporary auth mismatch); let the user retry or cancel.
+      if (ex.statusCode == 401) {
+        throw _CalmUserException(s.joinAuthCheckError);
       }
       rethrow;
     }
@@ -1030,9 +1425,13 @@ class DeepSkyController extends ChangeNotifier {
       // Push wakeup is best-effort; E2EE event is already stored.
     }
     await _refreshPairedState();
-    statusNotice = languageCode == 'it'
-        ? 'Pensiero inviato in modo cifrato.'
-        : 'Encrypted thought sent.';
+    lastSentThoughtNote = cleanNote.isEmpty ? null : cleanNote;
+    if (thoughtSentBannerDuration > Duration.zero) {
+      showThoughtSentBanner = true;
+      thoughtSentBannerSequence++;
+    } else {
+      showThoughtSentBanner = false;
+    }
   });
 
   Future<void> refreshSync() => _runGuarded(() async {
@@ -1111,6 +1510,8 @@ class DeepSkyController extends ChangeNotifier {
     pushStatus = null;
     pushFeedback = null;
     pushFeedbackIsError = false;
+    showThoughtSentBanner = false;
+    lastSentThoughtNote = null;
     isOffline = false;
     isDeviceRevoked = false;
     autoInviteAttempted = false;
@@ -1233,8 +1634,9 @@ class DeepSkyController extends ChangeNotifier {
   Future<bool> shareText({required String text, String? subject}) =>
       _nativeBridge.shareText(text: text, subject: subject);
 
+  /// Reference-counted `FLAG_SECURE` toggle (`CA-10`, `AU-24`).
   Future<void> setSecureScreen(bool enabled) =>
-      _nativeBridge.setSecureScreen(enabled);
+      enabled ? acquireSecureScreen() : releaseSecureScreen();
 
   Future<void> copySensitiveText(String text, {int clearAfterSeconds = 45}) =>
       _nativeBridge.copySensitiveText(
@@ -1378,6 +1780,15 @@ class DeepSkyController extends ChangeNotifier {
 
   void toggleNightMode() {
     isNight = !isNight;
+    if (localSceneViewState.skyPreference != SkyTimePreference.auto) {
+      localSceneViewState = localSceneViewState.copyWith(
+        skyPreference: isNight
+            ? SkyTimePreference.night
+            : SkyTimePreference.day,
+      );
+      unawaited(_localSceneStore.save(localSceneViewState));
+    }
+    _recomputeSceneState();
     notifyListeners();
   }
 
@@ -1449,14 +1860,55 @@ class DeepSkyController extends ChangeNotifier {
         errorNotice = null;
         await _loadCachedEventsBestEffort();
       } else {
-        errorNotice = ex.toString();
+        errorNotice = _friendlyErrorMessage(ex);
       }
     } catch (error) {
-      errorNotice = error.toString();
+      errorNotice = _friendlyErrorMessage(error);
     } finally {
       busy = false;
       notifyListeners();
     }
+  }
+
+  /// Maps raw exceptions to calm localized user-facing copy (`AU-16`, `AU-17`).
+  String _friendlyErrorMessage(Object error) {
+    final DeepSkyStrings s = DeepSkyStrings(languageCode);
+    if (error is _CalmUserException) {
+      return error.message;
+    }
+    if (error is ContentPackException) {
+      return error.localizedMessage(languageCode);
+    }
+    if (error is ApkUpdateException) {
+      return error.localizedMessage(languageCode);
+    }
+    if (error is SocketException ||
+        error is TimeoutException ||
+        error is http.ClientException) {
+      return s.networkErrorGeneric;
+    }
+    if (error is ApiRequestException) {
+      if (error.isClockSkew) {
+        return s.clockSkewError;
+      }
+      if (error.statusCode == 429) {
+        return s.rateLimitedError;
+      }
+      if (error.statusCode == 413) {
+        return s.payloadTooLargeError;
+      }
+      if (error.statusCode == 409) {
+        return s.conflictErrorGeneric;
+      }
+      if (error.statusCode >= 500) {
+        return s.serverErrorGeneric;
+      }
+      if (error.statusCode == 401) {
+        return s.joinAuthCheckError;
+      }
+      return s.unexpectedErrorGeneric;
+    }
+    return s.unexpectedErrorGeneric;
   }
 
   Uint8List? get recoverySeed => identity?.recoverySeed;

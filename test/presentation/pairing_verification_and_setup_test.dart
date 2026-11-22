@@ -283,8 +283,8 @@ void main() {
       expect(ctrlA.deviceLabel, 'Marco');
       expect(server.deviceLabels[ctrlA.identity!.deviceId], 'Marco');
 
-      // Update name again from Settings tab and check server + Devices tab stay in sync.
-      await tapVisible(tester, find.text('Impostazioni'));
+      // Update name again from Settings screen and check server + Noi tab stay in sync.
+      await tapVisible(tester, find.byKey(const Key('open-settings-button')));
       await tester.enterText(
         find.byKey(const Key('settings-device-label-field')),
         'Marco P.',
@@ -296,7 +296,8 @@ void main() {
       expect(ctrlA.deviceLabel, 'Marco P.');
       expect(server.deviceLabels[ctrlA.identity!.deviceId], 'Marco P.');
 
-      await tapVisible(tester, find.text('Dispositivi'));
+      await tapVisible(tester, find.byKey(const Key('settings-back-button')));
+      await tapVisible(tester, find.text('Noi'));
       expect(find.text('Marco P.'), findsWidgets);
     },
   );
@@ -462,8 +463,8 @@ void main() {
       );
       expect(find.byKey(const Key('home-shell-page')), findsOneWidget);
 
-      // Switch to Devices tab and create an enrollment invite.
-      await tapVisible(tester, find.text('Dispositivi'));
+      // Switch to Noi tab and create an enrollment invite.
+      await tapVisible(tester, find.text('Noi'));
       await tapVisible(
         tester,
         find.byKey(const Key('create-enrollment-invite-button')),

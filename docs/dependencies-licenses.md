@@ -1,6 +1,6 @@
 # Dependency Licenses Inventory
 
-Reference IDs: `SEC-02`, `PD-13`, [Piano di sviluppo](development-plan.md) section 3.1.
+Reference IDs: `SEC-02`, `PD-13`, [Development Plan](development-plan.md) section 3.1.
 
 Generated via `python scripts/check-licenses.py --write-doc docs/dependencies-licenses.md`.
 

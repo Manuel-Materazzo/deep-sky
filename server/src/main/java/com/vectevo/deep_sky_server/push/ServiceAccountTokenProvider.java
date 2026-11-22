@@ -15,6 +15,9 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -37,8 +40,10 @@ public class ServiceAccountTokenProvider {
 	private final ObjectMapper objectMapper;
 	private final Clock clock;
 
-	private String cachedAccessToken;
-	private Instant cachedExpiresAt = Instant.EPOCH;
+	private record CachedToken(String accessToken, Instant expiresAt) {}
+
+	private final AtomicReference<CachedToken> cachedToken = new AtomicReference<>();
+	private final AtomicReference<CompletableFuture<String>> inFlightRefresh = new AtomicReference<>();
 
 	public ServiceAccountTokenProvider(
 			Path serviceAccountPath,
@@ -69,11 +74,50 @@ public class ServiceAccountTokenProvider {
 		}
 	}
 
-	public synchronized String getAccessToken() {
+	public String getAccessToken() {
 		Instant now = clock.instant();
-		if (cachedAccessToken != null && now.isBefore(cachedExpiresAt.minusSeconds(60))) {
-			return cachedAccessToken;
+		CachedToken current = cachedToken.get();
+		if (current != null && now.isBefore(current.expiresAt().minusSeconds(60))) {
+			return current.accessToken();
 		}
+
+		// AU-12: Single-flight OAuth2 token refresh outside any monitor lock so stalled
+		// calls never deadlock unrelated push threads.
+		CompletableFuture<String> created = new CompletableFuture<>();
+		if (inFlightRefresh.compareAndSet(null, created)) {
+			try {
+				String token = fetchFreshToken(now);
+				created.complete(token);
+				return token;
+			} catch (Throwable ex) {
+				created.completeExceptionally(ex);
+				throw ex;
+			} finally {
+				inFlightRefresh.compareAndSet(created, null);
+			}
+		}
+
+		CompletableFuture<String> existing = inFlightRefresh.get();
+		if (existing != null) {
+			try {
+				return existing.join();
+			} catch (CompletionException ex) {
+				if (ex.getCause() instanceof RuntimeException re) {
+					throw re;
+				}
+				throw new IllegalStateException("OAuth2 token refresh failed", ex.getCause());
+			}
+		}
+
+		// Refresh completed between CAS and get(); re-check cache or fetch directly.
+		CachedToken refreshed = cachedToken.get();
+		if (refreshed != null && clock.instant().isBefore(refreshed.expiresAt().minusSeconds(60))) {
+			return refreshed.accessToken();
+		}
+		return fetchFreshToken(clock.instant());
+	}
+
+	private String fetchFreshToken(Instant now) {
 		String assertion = createJwtAssertion(now);
 		MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
 		form.add("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer");
@@ -89,8 +133,7 @@ public class ServiceAccountTokenProvider {
 			JsonNode json = objectMapper.readTree(responseBody);
 			String accessToken = requireText(json, "access_token");
 			long expiresIn = json.has("expires_in") ? json.get("expires_in").asLong(3600L) : 3600L;
-			this.cachedAccessToken = accessToken;
-			this.cachedExpiresAt = now.plusSeconds(Math.max(expiresIn, 120L));
+			cachedToken.set(new CachedToken(accessToken, now.plusSeconds(Math.max(expiresIn, 120L))));
 			return accessToken;
 		} catch (Exception ex) {
 			throw new IllegalStateException("Failed to parse OAuth2 token response", ex);

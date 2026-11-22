@@ -1,219 +1,219 @@
 # Design Brief: Deep Sky
 
-**Versione:** 0.2 (bozza per revisione) · **Data:** 12 novembre 2026 · **Dipende da:** Project Brief v0.2
+**Version:** 0.2 (draft for review) · **Date:** November 12, 2026 · **Depends on:** Project Brief v0.2
 
-**Destinatario:** agente designer. Non conosce nulla del progetto: questo documento, insieme al Project Brief, è tutto ciò che gli serve.
+**Audience:** designer agent. Knows nothing about the project: this document, together with the Project Brief, is everything they need.
 
-**Convenzioni.** Gli stati **\[Deciso\]**, **\[Ipotesi\]**, **\[Aperto\]** hanno lo stesso significato del Project Brief. Gli ID di questo documento sono **V-xx** (requisiti visivi e di esperienza), **A-xx** (requisiti sugli asset), **DD-xx** (decisioni aperte di design). Gli ID P-xx, F-xx, S-xx, N-xx rimandano al Project Brief e vanno citati nei deliverable.
+**Conventions.** The statuses **\[Decided\]**, **\[Assumption\]**, **\[Open\]** have the same meaning as in the Project Brief. The IDs in this document are **V-xx** (visual and experience requirements), **A-xx** (asset requirements), **DD-xx** (open design decisions). The IDs P-xx, F-xx, S-xx, N-xx refer back to the Project Brief and must be cited in deliverables.
 
-**Novità della v0.2 (12 novembre 2026), per chi ha già iniziato a lavorare:** (1) piattaforma Android per prima; (2) nuove schermate da progettare: aggiornamento dell’app, chiave di recupero e nuovo dispositivo, modalità offline in sola lettura (capitolo 7); (3) animazione: si parte dal livello 1, con più livelli sovrapposti per slot, e si lascia aperta la strada verso l’animazione scheletrica o a parti (capitolo 11, DD-11). Il resto del documento è invariato.
+**What's new in v0.2 (November 12, 2026), for those who have already started working:** (1) Android platform first; (2) new screens to design: app update, recovery key and new device, read-only offline mode (Chapter 7); (3) animation: starting from level 1, with multiple stacked layers per slot, leaving the path open toward skeletal or part-based animation (Chapter 11, DD-11). The rest of the document is unchanged.
 
 ---
 
-## 1. Missione
+## 1. Mission
 
-Il designer definisce **identità, linguaggio visivo, sistema di asset e design system** di un’app mobile per coppie. Non decide stack tecnologico, architettura o modello dei dati: se un vincolo tecnico limita il design, lo segnala come domanda al promotore.
+The designer defines **identity, visual language, asset system, and design system** for a mobile app for couples. They do not decide the tech stack, architecture, or data model: if a technical constraint limits the design, they flag it as a question to the sponsor.
 
-## 2. Il prodotto in breve
+## 2. The Product in Brief
 
-È una **casa digitale privata per due persone**, anche a distanza. Non è una chat né un gestionale: è uno spazio dove ogni piccolo gesto (un “ti penso”, un disegno a turni, un umore, un countdown, una time capsule, una foto del giorno) lascia una traccia visibile nella stanza condivisa. Un pet condiviso, che non muore mai, reagisce a ciò che la coppia fa. Mobile-first, senza pubblicità, senza streak, senza monete, open source.
+It is a **private digital home for two people**, even long-distance. It is not a chat or a task manager: it is a space where every small gesture (a "thinking of you," a turn-based drawing, a mood, a countdown, a time capsule, a photo of the day) leaves a visible trace in the shared room. A shared pet, which never dies, reacts to what the couple does. Mobile-first, no ads, no streaks, no coins, open source.
 
-Principi che il design deve incarnare: **P-01** piccoli gesti, **P-02** affetto senza obbligo, **P-03** engagement volontario e non punitivo, **P-04** casa-first, **P-05** mobile-first, **P-09** semplicità per chi non è tecnico.
+Principles the design must embody: **P-01** small gestures, **P-02** affection without obligation, **P-03** voluntary and non-punitive engagement, **P-04** home-first, **P-05** mobile-first, **P-09** simplicity for non-technical users.
 
-## 3. Intento emotivo
+## 3. Emotional Intent
 
-| Chi apre la casa deve sentire | Non deve mai sentire |
+| Whoever opens the home must feel | Must never feel |
 | :-- | :-- |
-| Tenerezza, calma, intimità | Dovere, colpa, pressione di “dimostrare” qualcosa |
-| Che l’altra persona c’è, anche a distanza | Controllo o sorveglianza reciproca |
-| Curiosità di scoprire cosa è stato lasciato | Ansia da notifica, da “non letto”, da urgenza |
-| Che un’assenza di giorni sia normale | Che la casa “si spenga” o punisca l’inattività |
-| Gioco affettuoso | Un’app per bambini o un gioco a punti |
+| Tenderness, calm, intimacy | Duty, guilt, pressure to "prove" something |
+| That the other person is there, even at a distance | Mutual control or surveillance |
+| Curiosity to discover what has been left | Notification anxiety, "unread" anxiety, urgency |
+| That an absence of days is normal | That the home "turns off" or punishes inactivity |
+| Affectionate play | A kids' app or a points-based game |
 
-## 4. Identità
+## 4. Identity
 
-### 4.1 Nome
+### 4.1 Name
 
-**\[Deciso\] DD-01.** Il nome definitivo del prodotto è **Deep Sky** (D-01). La direzione emotiva resta “la luce lasciata accesa”: il gesto di far sapere che ci sei senza scrivere. Resta aperto il naming dei concetti interni dell’interfaccia.
+**\[Decided\] DD-01.** The final product name is **Deep Sky** (D-01). The emotional direction remains "the light left on": the gesture of letting someone know you're there without writing. Naming of internal interface concepts remains open.
 
-### 4.2 Concetto: la luce
+### 4.2 Concept: The Light
 
-**\[Ipotesi\]** La luce è il motivo ricorrente dell’identità e del linguaggio dell’interfaccia: quando l’altra persona lascia un gesto, nella casa si accende qualcosa (una finestra, una lampada, una piccola luce). Regola ferrea (P-02, P-03): **la casa non si spegne e non diventa buia per inattività**. La luce premia l’arrivo di un gesto, non punisce la sua assenza.
+**\[Assumption\]** Light is the recurring motif of the identity and interface language: when the other person leaves a gesture, something lights up in the home (a window, a lamp, a small light). Iron rule (P-02, P-03): **the home never turns off and never goes dark due to inactivity**. Light rewards the arrival of a gesture, never punishes its absence.
 
-Logo e icona: semplici, riconoscibili a 48 px, efficaci in monocromia, leggibili sia su sfondo chiaro sia scuro. Nessun testo nell’icona.
+Logo and icon: simple, recognizable at 48 px, effective in monochrome, legible on both light and dark backgrounds. No text in the icon.
 
-## 5. Direzione visiva
+## 5. Visual Direction
 
-- **V-01** Calda, non infantile: un mondo tenero per adulti che si amano, non un gioco per bambini.
-- **V-02** Mobile-first: progettata per una mano e il pollice. Il desktop non è un target.
-- **V-03** Casa-first: la home è la casa, non un menu di funzioni.
-- **V-04** Un solo stile illustrativo coerente per pet, avatar, oggetti e sfondi.
-- **V-05** Stile **producibile con l’AI**: va scelto perché riproducibile in modo coerente da generatori di immagini. Evitare stili che richiedono precisione tecnica (prospettive complesse, mani dettagliate, testo nelle immagini).
-- **V-06** Tema chiaro e scuro. La sera è un momento centrale d’uso e il tema scuro è un cittadino di prima classe, non un’inversione di colori.
-- **V-07** Accessibilità: contrasto AA, aree di tocco adeguate, testo ridimensionabile, significato mai affidato al solo colore, rispetto di “riduci movimento”.
-- **V-08** Nessun dark pattern visivo: niente badge rossi d’urgenza, contatori ansiogeni, indicatori di “non letto” aggressivi. Le novità si segnalano con delicatezza.
-- **V-09** La casa deve funzionare anche **spoglia**: nella prima fase (nucleo) non ci sono pet né corkboard, e deve poi crescere senza ricostruire la composizione.
+- **V-01** Warm, not childish: a tender world for adults who love each other, not a game for children.
+- **V-02** Mobile-first: designed for one hand and a thumb. Desktop is not a target.
+- **V-03** Home-first: the home screen is the house/room, not a feature menu.
+- **V-04** One single consistent illustrative style for pet, avatars, objects, and backgrounds.
+- **V-05** Style **producible with AI**: must be chosen so it can be reproduced consistently by image generators. Avoid styles that require technical precision (complex perspectives, detailed hands, text in images).
+- **V-06** Light and dark theme. Evening is a prime usage time, and dark theme is a first-class citizen, not a color inversion.
+- **V-07** Accessibility: AA contrast, adequate touch targets, scalable text, meaning never conveyed by color alone, respect for "reduce motion."
+- **V-08** No visual dark patterns: no urgent red badges, anxiety-inducing counters, or aggressive "unread" indicators. New items are signaled gently.
+- **V-09** The home must work even when **sparse**: in the first phase (core) there are no pet or corkboard, and it must later grow without rebuilding the composition.
 
-**Anti-riferimenti.** Estetica desktop-first e ambient del progetto Kehai (grafica non apprezzata dal promotore); linguaggio visivo a monete, ricompense e streak di Togetherly. Non copiare grafiche di progetti esistenti.
+**Anti-references.** Desktop-first and ambient aesthetic of the Kehai project (visuals not liked by the sponsor); coin, reward, and streak visual language of Togetherly. Do not copy visuals from existing projects.
 
-**Riferimenti positivi.** **\[Aperto\] DD-02**: vanno definiti insieme al promotore tramite moodboard (vedi fasi, capitolo 11).
+**Positive references.** **\[Open\] DD-02**: to be defined together with the sponsor via moodboard (see phases, Chapter 11).
 
-## 6. La casa
+## 6. The Home
 
-### 6.1 Composizione
+### 6.1 Composition
 
-**\[Ipotesi\]** Una scena illustrata 2D in sezione, vista frontale, composta da **oggetti in slot fissi** sopra uno sfondo. Ogni oggetto corrisponde a una funzione e tappandolo la si apre:
+**\[Assumption\]** A 2D illustrated cutaway scene, front view, composed of **objects in fixed slots** over a background. Each object corresponds to a feature and tapping it opens it:
 
-- finestra: la luce, l’ora del giorno, i gesti ricevuti (F-03);
-- calendario o lavagna a parete: countdown (F-06);
-- scatola o mensola sigillata: time capsule (F-07);
-- corkboard: disegni e immagini appesi (F-08);
-- cornice o album: foto del giorno e timeline (F-10, F-11);
-- libro o diario: domande e “gioco del giorno” (F-14);
-- il pet (F-09) e i due personaggi dei partner.
+- window: the light, time of day, received gestures (F-03);
+- wall calendar or board: countdown (F-06);
+- sealed box or shelf: time capsule (F-07);
+- corkboard: pinned drawings and images (F-08);
+- frame or album: photo of the day and timeline (F-10, F-11);
+- book or journal: questions and "game of the day" (F-14);
+- the pet (F-09) and the two partner characters.
 
-La scena non può essere l’unica forma di navigazione: serve un accesso minimo e accessibile alle funzioni (**DD-04**).
+The scene cannot be the only form of navigation: minimal, accessible navigation to features is needed (**DD-04**).
 
-### 6.2 Regole degli artefatti
+### 6.2 Artifact Rules
 
-- Ogni attività lascia un artefatto visibile nella casa (P-04).
-- La casa non diventa mai satura: quando uno spazio (es. la corkboard) si riempie, gli elementi più vecchi passano alla timeline senza essere persi.
-- Gli oggetti si sbloccano come conseguenza naturale delle attività, mai come valuta o ricompensa (P-03).
+- Every activity leaves a visible artifact in the home (P-04).
+- The home never becomes saturated: when a space (e.g., the corkboard) fills up, older items move to the timeline without being lost.
+- Items unlock as a natural consequence of activities, never as currency or reward (P-03).
 
-## 7. Inventario delle schermate e dei momenti
+## 7. Screen and Moment Inventory
 
-| Schermata o momento | Funzioni | Note di design |
+| Screen or moment | Features | Design notes |
 | :-- | :-- | :-- |
-| Onboarding e abbinamento | F-01 | Invito da link o QR; comprensibile per chi non è tecnico; nessun gergo da server |
-| Home / casa | F-02 | Racconta in un colpo d’occhio: prossimo incontro, umore recente, ultimo disegno |
-| Invia un gesto “ti penso” | F-03 | Pochi secondi, frase facoltativa |
-| Mood del giorno | F-04 | Sempre facoltativo; “oggi avrei bisogno di…” |
-| Disegno a turni | F-05 | Canvas, strumenti semplici, disegno ricevuto, sovra-disegno, messaggio; pensato anche per chi non sa disegnare |
-| Countdown | F-06 | Lista e dettaglio con descrizione, todo, immagini, commenti |
-| Time capsule | F-07 | Creazione, sigillo, attesa, **cerimonia di apertura** |
-| Corkboard | F-08 | Disposizione libera di immagini e disegni |
-| Pet e stanza | F-09 | Pose, reazioni, storia delle attività |
-| Album, timeline, giorni insieme | F-10, F-11, F-12 | I giorni insieme non sono mai una misura d’impegno |
-| Gioco del giorno | F-14 | Un unico modulo coerente, non un pacco di mini-giochi |
-| Notifiche e widget | F-13, F-16 | Contenuto generico di default sulla schermata bloccata (S-02) |
-| Impostazioni e privacy | F-17, S-03, S-04 | Esportazione, cancellazione definitiva, interruzione dell’abbinamento ed eventuale riattivazione consensuale della coppia con tono dignitoso e non colpevolizzante |
-| Personalizzazione | F-18 | Vedi capitolo 8 |
-| Stati vuoti, errori, offline, caricamento | tutte | Tono affettuoso, mai allarmante |
-| Aggiornamento dell’app | F-19 | Controllo, conferma e avanzamento; il permesso “Installa app sconosciute” va spiegato in modo semplice; schermata di “aggiornamento richiesto” quando il server impone una versione minima, con tono non allarmante |
-| Chiave di recupero e nuovo dispositivo | F-20, S-06 | Generazione della chiave all’abbinamento con conferma di avvenuto salvataggio; ripristino su un nuovo telefono; tono rassicurante, mai colpevolizzante |
-| Modalità offline | N-03 | Sola lettura: scena e ricordi visibili, azioni di scrittura disattivate con un messaggio gentile (P-02) |
+| Onboarding and pairing | F-01 | Invite via link or QR; understandable by non-technical users; no server jargon |
+| Home / house | F-02 | Conveys at a glance: next meetup, recent mood, latest drawing |
+| Send a "thinking of you" gesture | F-03 | A few seconds, optional phrase |
+| Mood of the day | F-04 | Always optional; "today I could use..." |
+| Turn-based drawing | F-05 | Canvas, simple tools, received drawing, over-drawing, message; designed also for people who can't draw |
+| Countdown | F-06 | List and detail with description, todo, images, comments |
+| Time capsule | F-07 | Creation, sealing, waiting, **opening ceremony** |
+| Corkboard | F-08 | Free-form arrangement of images and drawings |
+| Pet and room | F-09 | Poses, reactions, activity history |
+| Album, timeline, days together | F-10, F-11, F-12 | Days together are never a measure of commitment |
+| Game of the day | F-14 | One coherent module, not a bundle of mini-games |
+| Notifications and widget | F-13, F-16 | Generic content by default on the lock screen (S-02) |
+| Settings and privacy | F-17, S-03, S-04 | Export, permanent deletion, breaking pairing, and optional consensual couple reactivation with dignified, non-blaming tone |
+| Customization | F-18 | See Chapter 8 |
+| Empty states, errors, offline, loading | all | Affectionate tone, never alarming |
+| App update | F-19 | Check, confirmation, and progress; the "Install unknown apps" permission must be explained simply; "update required" screen when the server enforces a minimum version, with non-alarming tone |
+| Recovery key and new device | F-20, S-06 | Key generation at pairing with confirmation that it was saved; restore on a new phone; reassuring tone, never blaming |
+| Offline mode | N-03 | Read-only: scene and memories visible, write actions disabled with a gentle message (P-02) |
 
-**Momenti da progettare con cura:** primo gesto ricevuto; ritorno dopo giorni di assenza (accoglienza, mai rimprovero); apertura di una time capsule; arrivo del pet nella casa.
+**Moments to design with care:** first gesture received; returning after days of absence (welcoming, never scolding); opening a time capsule; arrival of the pet in the home.
 
-## 8. Personaggi e personalizzazione
+## 8. Characters and Customization
 
-### 8.1 Il pet
+### 8.1 The Pet
 
-**\[Ipotesi\]** Pet di default: un **cane**, sostituibile dalla coppia con un altro animale. Non muore, non si degrada, non ha bisogni da soddisfare. Reagisce a ciò che la coppia fa (un cuscino nuovo dopo una time capsule, una foto appesa dopo una foto del giorno).
+**\[Assumption\]** Default pet: a **dog**, replaceable by the couple with another animal. Does not die, does not degrade, has no needs to satisfy. Reacts to what the couple does (a new cushion after a time capsule, a hung photo after a photo of the day).
 
-Il pet si esprime con un **set finito di pose**. **\[Ipotesi\]** Un primo set da circa 8 pose: a riposo, attento, contento, curioso, che dorme, che accoglie, che partecipa a un’attività, che festeggia. **Nessuna posa di tristezza, noia o fame legata all’assenza.** Il numero di pose determina il costo per chi vuole sostituire il personaggio, quindi va tenuto basso (vedi A-05).
+The pet expresses itself with a **finite set of poses**. **\[Assumption\]** An initial set of about 8 poses: resting, attentive, happy, curious, sleeping, welcoming, participating in an activity, celebrating. **No poses of sadness, boredom, or hunger tied to absence.** The number of poses determines the cost for anyone wanting to replace the character, so it must be kept low (see A-05).
 
-### 8.2 I due partner
+### 8.2 The Two Partners
 
-Ogni partner ha un personaggio personalizzabile, senza assunzioni su genere o composizione della coppia. L’aspetto di default è neutro e gradevole.
+Each partner has a customizable character, with no assumptions about gender or couple composition. Default appearance is neutral and pleasant.
 
-### 8.3 Personalizzazione (proposta F-18)
+### 8.3 Customization (F-18 Proposal)
 
-**\[Ipotesi\]** La coppia può sostituire gli asset della casa con immagini proprie, create con un assistente AI scelto da loro. Esempi: aggiungere un dettaglio al cane, cambiare animale, ridisegnare i personaggi dei partner. **L’app non offre né integra alcun servizio AI** (N-06): fornisce un kit, riceve un’immagine.
+**\[Assumption\]** The couple can replace home assets with their own images, created with an AI assistant of their choice. Examples: adding a detail to the dog, changing the animal, redesigning the partner characters. **The app neither offers nor integrates any AI service** (N-06): it provides a kit, receives an image.
 
-Flusso in quattro passi, da progettare come esperienza guidata e comprensibile per chi non è tecnico:
+Four-step flow, to be designed as a guided experience understandable by non-technical users:
 
-1. **Scarica il kit** dello slot scelto: immagine attuale, scheda tecnica, prompt suggeriti, riferimenti di stile.
-2. **Usa il tuo assistente AI** con il kit e i tuoi dettagli (i prompt hanno segnaposto da completare).
-3. **Carica** l’immagine risultante.
-4. **Anteprima nella casa** e conferma; è sempre possibile ripristinare l’originale.
+1. **Download the kit** for the chosen slot: current image, spec sheet, suggested prompts, style references.
+2. **Use your AI assistant** with the kit and your details (prompts have placeholders to fill in).
+3. **Upload** the resulting image.
+4. **Preview in the home** and confirm; restoring the original is always possible.
 
-L’app verifica che l’immagine rispetti formato, dimensioni e trasparenza, con messaggi in linguaggio semplice. Il designer progetta anche cosa succede se l’immagine non è conforme (**DD-08**).
+The app verifies that the image complies with format, dimensions, and transparency, with plain-language messages. The designer also designs what happens if the image is non-compliant (**DD-08**).
 
-## 9. Sistema di asset generati con l’AI
+## 9. AI-Generated Asset System
 
-Tutti gli asset visivi (pet, avatar, oggetti, sfondi) saranno **generati con strumenti AI**, non disegnati a mano né in vettoriale. Il designer non consegna file sorgente di un programma di grafica: consegna **immagini PNG/JPG e le istruzioni per riprodurle**.
+All visual assets (pet, avatars, objects, backgrounds) will be **generated with AI tools**, not hand-drawn or vector. The designer does not deliver source files from a graphics program: they deliver **PNG/JPG images and instructions to reproduce them**.
 
-- **A-01 Formati.** PNG con trasparenza per oggetti, personaggi e accessori. JPG ammesso solo per sfondi e fotografie opache.
-- **A-02 Master e derivati.** Il designer consegna immagini master ad alta risoluzione e le specifiche di ridimensionamento. I derivati per le varie densità di schermo sono prodotti dagli sviluppatori tramite pipeline (**DD-10** per risoluzioni e budget di peso).
-- **A-03 Style Bible.** Documento che rende riproducibile lo stile: immagini di riferimento, palette, tratto, illuminazione, prompt base, prompt negativi, e quale strumento ha prodotto i master. Indipendente da un modello specifico.
-- **A-04 Trasparenza pulita.** Bordi senza aloni, ritaglio con margine definito, verifica su sfondo chiaro e scuro. Se lo strumento non produce trasparenza reale, il flusso prevede sfondo uniforme e rimozione dello sfondo, e il criterio di accettazione resta lo stesso.
-- **A-05 Coerenza.** Le varianti di uno stesso personaggio (le pose del pet) devono sembrare lo stesso soggetto. Serve un *character sheet* di riferimento e un test affiancato in accettazione.
-- **A-06 Niente testo né marchi.** Nessun testo incorporato, logo, marchio o personaggio protetto negli asset (il testo è localizzato dall’app).
-- **A-07 Catalogo.** Ogni asset ha: ID, nome, tipo, slot, dimensioni master, formato, prompt completo, riferimenti usati, versione, stato di approvazione.
-- **A-08 Licenza.** I termini d’uso dello strumento di generazione devono consentire la redistribuzione degli asset in un progetto open source. Il designer registra strumento e termini; **\[Aperto\] DD-06**.
-- **A-09 Slot.** Ogni oggetto sostituibile occupa uno *slot*. Il designer consegna la **tabella degli slot** con: ID slot, descrizione, ancoraggio nella scena, dimensione, trasparenza richiesta, ordine di sovrapposizione, se è sostituibile.
+- **A-01 Formats.** PNG with transparency for objects, characters, and accessories. JPG allowed only for backgrounds and opaque photographs.
+- **A-02 Masters and derivatives.** The designer delivers high-resolution master images and resizing specifications. Derivatives for different screen densities are produced by developers via a pipeline (**DD-10** for resolutions and file size budgets).
+- **A-03 Style Bible.** Document that makes the style reproducible: reference images, palette, linework, lighting, base prompts, negative prompts, and which tool produced the masters. Independent of a specific model.
+- **A-04 Clean transparency.** Edges without halos, crop with defined margin, verified on light and dark backgrounds. If the tool does not produce true transparency, the workflow uses a uniform background and background removal, and the acceptance criterion remains the same.
+- **A-05 Consistency.** Variants of the same character (pet poses) must look like the same subject. Requires a reference *character sheet* and a side-by-side acceptance test.
+- **A-06 No text or trademarks.** No embedded text, logos, trademarks, or copyrighted characters in assets (text is localized by the app).
+- **A-07 Catalog.** Each asset has: ID, name, type, slot, master dimensions, format, full prompt, references used, version, approval status.
+- **A-08 License.** The generation tool's terms of use must allow redistribution of assets in an open source project. The designer records tool and terms; **\[Open\] DD-06**.
+- **A-09 Slots.** Every replaceable object occupies a *slot*. The designer delivers the **slot table** with: slot ID, description, anchor in the scene, dimensions, required transparency, layering order, whether it is replaceable.
 
-## 10. Voce e microcopy
+## 10. Voice and Microcopy
 
-- **V-10** Prima persona plurale (“la nostra casa”), tono affettuoso, breve, mai pressante.
-- **V-11** Mai senso di dovere: “puoi lasciare qualcosa”, mai “devi dimostrare qualcosa” (P-02).
-- **V-12** Italiano e inglese pensati ciascuno per sé, non tradotti meccanicamente; le stringhe devono reggere lunghezze diverse.
+- **V-10** First person plural ("our home"), affectionate tone, brief, never pressuring.
+- **V-11** Never a sense of duty: "you can leave something," never "you must prove something" (P-02).
+- **V-12** Italian and English each crafted on their own merits, not mechanically translated; strings must accommodate different lengths.
 
-| Sì | No |
+| Yes | No |
 | :-- | :-- |
-| “Ti ho lasciato un disegno.” | “Non rispondi da due giorni!” |
-| “Hai un pensiero in arrivo.” (notifica generica) | Contenuti intimi sulla schermata bloccata |
-| “Bentornato, la casa ti aspettava.” | “Hai perso la tua serie di giorni.” |
-| “Se ti va, racconta com’è andata.” | “Spiega perché ti senti così.” |
+| "I left you a drawing." | "You haven't replied in two days!" |
+| "You have a thought arriving." (generic notification) | Intimate content on the lock screen |
+| "So good to see you again, the home was waiting for you." | "You lost your streak of days." |
+| "If you feel like it, share how it went." | "Explain why you feel this way." |
 
-## 11. Movimento, suono, aptica
+## 11. Motion, Sound, Haptics
 
-**\[Ipotesi\]** Movimenti brevi e delicati; la luce che si accende come gesto ricorrente; aptica leggera; suoni disattivati di default (**DD-09**). Nessuna animazione che insista per richiamare l’attenzione. Rispetto di “riduci movimento”.
+**\[Assumption\]** Brief, gentle movements; light turning on as a recurring gesture; light haptics; sounds off by default (**DD-09**). No animation that insists on grabbing attention. Respect for "reduce motion."
 
-**Animazione.** **\[Deciso\]** Si parte dal **livello 1**: trasformazioni, opacità e dissolvenze su livelli di immagine, anche con più livelli sovrapposti per slot (ad esempio ombre, riflessi di luce, particelle, accessori). Il manifest della scena descrive le animazioni per slot (tipo, durata, curva, ripetizione). Gli asset che il designer prevede di animare vanno consegnati in **parti separate** quando serve (ad esempio testa e coda). **Obiettivo finale: livello 3**, animazione scheletrica o a parti 2D, con strumento e formato ancora da scegliere (**DD-11**). Il design non deve rendere difficile il passaggio dal livello 1 al livello 3.
+**Animation.** **\[Decided\]** Starting at **level 1**: transforms, opacity, and fades on image layers, including multiple stacked layers per slot (e.g., shadows, light reflections, particles, accessories). The scene manifest describes per-slot animations (type, duration, curve, loop). Assets the designer plans to animate must be delivered in **separate parts** when needed (e.g., head and tail). **Final goal: level 3**, 2D skeletal or part-based animation, with tool and format yet to be chosen (**DD-11**). The design must not make the transition from level 1 to level 3 difficult.
 
-## 12. Vincoli
+## 12. Constraints
 
-- Deliverable **indipendenti dallo stack** (D-06 non è deciso): token di design in JSON, immagini PNG/JPG, documenti testuali.
-- Android e iOS entrambi cittadini di prima classe; tema chiaro e scuro; widget in formati piccoli (F-13).
-- **Font con licenza aperta** (es. OFL) e inclusi nell’app: nessuna dipendenza da servizi esterni per font o immagini (N-06).
-- Nessuno spazio per pubblicità o elementi di tracciamento (S-07).
-- Notifiche con contenuto generico di default (S-02).
-- Le immagini caricate dagli utenti sono contenuti privati e vanno trattate come tali (S-01).
+- **Stack-independent** deliverables (D-06 is not decided): design tokens in JSON, PNG/JPG images, text documents.
+- Android and iOS both first-class citizens; light and dark theme; widgets in small sizes (F-13).
+- **Open-licensed fonts** (e.g., OFL) bundled in the app: no dependency on external services for fonts or images (N-06).
+- No space for ads or tracking elements (S-07).
+- Notifications with generic content by default (S-02).
+- User-uploaded images are private content and must be treated as such (S-01).
 
-## 13. Fasi e deliverable
+## 13. Phases and Deliverables
 
-Ogni fase termina con un’approvazione del promotore prima di procedere.
+Each phase ends with sponsor approval before proceeding.
 
-| Fase | Deliverable | Gate |
+| Phase | Deliverables | Gate |
 | :-- | :-- | :-- |
-| **DS-1 Discovery visiva** | Analisi degli anti-riferimenti, **3 direzioni** di moodboard, proposte di logo e identità visiva | Il promotore sceglie una direzione |
-| **DS-2 Pilota** | Style Bible, **kit pilota** (alcune pose del pet, due oggetti, un avatar) e prova completa di **sostituzione con un assistente AI esterno** | Il pilota dimostra coerenza stilistica e fattibilità del flusso di personalizzazione |
-| **DS-3 Design system** | Token (colori chiaro/scuro, tipografia, spaziature, raggi, ombre, movimento), iconografia, componenti, linee guida di microcopy | Approvazione del sistema |
-| **DS-4 Schermate** | Schermate e stati chiave: prima il nucleo (F-01 – F-07), poi il resto | Approvazione per gruppi di funzioni |
-| **DS-5 Catalogo asset** | Catalogo completo, tabella slot, guida di personalizzazione | Approvazione del catalogo |
-| **DS-6 Handoff** | Documentazione per gli sviluppatori, checklist di QA visivo | Consegna |
+| **DS-1 Visual discovery** | Analysis of anti-references, **3 moodboard directions**, logo and visual identity proposals | Sponsor chooses a direction |
+| **DS-2 Pilot** | Style Bible, **pilot kit** (a few pet poses, two objects, one avatar) and full test of **replacement with an external AI assistant** | Pilot demonstrates stylistic consistency and feasibility of the customization flow |
+| **DS-3 Design system** | Tokens (light/dark colors, typography, spacing, radii, shadows, motion), iconography, components, microcopy guidelines | System approval |
+| **DS-4 Screens** | Key screens and states: first the core (F-01 – F-07), then the rest | Approval by feature groups |
+| **DS-5 Asset catalog** | Complete catalog, slot table, customization guide | Catalog approval |
+| **DS-6 Handoff** | Developer documentation, visual QA checklist | Delivery |
 
-**Regola:** non si producono tutti gli asset prima del gate DS-2.
+**Rule:** do not produce all assets before gate DS-2.
 
-## 14. Criteri di accettazione
+## 14. Acceptance Criteria
 
-- Ogni scelta di design cita i principi o le funzioni da cui discende.
-- Nessun elemento viola P-02, P-03 o V-08.
-- Gli asset di una famiglia superano il test di coerenza (A-05) e il test di trasparenza su sfondo chiaro e scuro (A-04).
-- Un asset può essere **rigenerato e sostituito** da un’altra persona seguendo solo la Style Bible e il catalogo.
-- Un partner non tecnico completa l’abbinamento e invia un “ti penso” senza istruzioni.
-- Le schermate funzionano in tema chiaro e scuro, in italiano e in inglese, con testo ingrandito.
+- Every design choice cites the principles or features from which it derives.
+- No element violates P-02, P-03, or V-08.
+- Assets in a family pass the consistency test (A-05) and the transparency test on light and dark backgrounds (A-04).
+- An asset can be **regenerated and replaced** by another person following only the Style Bible and the catalog.
+- A non-technical partner completes pairing and sends a "thinking of you" without instructions.
+- Screens work in light and dark themes, in Italian and English, with enlarged text.
 
-## 15. Decisioni aperte
+## 15. Open Decisions
 
-Il designer non le risolve: le segnala, proponendo alternative con pro e contro.
+The designer does not resolve them: they flag them, proposing alternatives with pros and cons.
 
-| ID | Questione |
+| ID | Issue |
 | :-- | :-- |
-| **DD-01** | Naming dei concetti interni (nome definitivo deciso: **Deep Sky**) |
-| **DD-02** | Stile illustrativo e moodboard di riferimento |
-| **DD-03** | Specie di default del pet e set definitivo di pose |
-| **DD-04** | Casa come scena unica o più stanze; navigazione accessibile oltre la scena |
-| **DD-05** | Granularità della personalizzazione: sostituire l’intero set di pose o aggiungere accessori come livelli sovrapposti con punti di ancoraggio |
-| **DD-06** | Strumento di generazione e termini di licenza per asset in un progetto open source |
-| **DD-07** | Le personalizzazioni sono visibili a entrambi i partner o solo a chi le crea? |
-| **DD-08** | Gestione di un’immagine caricata non conforme: rifiuto con spiegazione, adattamento automatico, altro |
-| **DD-09** | Presenza e ruolo di suoni |
-| **DD-10** | Risoluzioni master e budget di peso per asset e per app |
-| DD-11 | Strumento e formato per l’animazione di livello 3 (scheletrica o a parti 2D): deve poter essere prodotto da agenti, non solo da un editor manuale, e restare compatibile con asset generati con l’AI |
+| **DD-01** | Naming of internal concepts (final name decided: **Deep Sky**) |
+| **DD-02** | Illustrative style and reference moodboard |
+| **DD-03** | Default pet species and final pose set |
+| **DD-04** | Home as a single scene or multiple rooms; accessible navigation beyond the scene |
+| **DD-05** | Customization granularity: replace the entire pose set or add accessories as overlaid layers with anchor points |
+| **DD-06** | Generation tool and license terms for assets in an open source project |
+| **DD-07** | Are customizations visible to both partners or only to the creator? |
+| **DD-08** | Handling a non-compliant uploaded image: rejection with explanation, automatic adaptation, other |
+| **DD-09** | Presence and role of sounds |
+| **DD-10** | Master resolutions and file size budgets per asset and per app |
+| DD-11 | Tool and format for level 3 animation (2D skeletal or part-based): must be producible by agents, not only by a manual editor, and remain compatible with AI-generated assets |
 
-## 16. Tracciabilità
+## 16. Traceability
 
-Ogni deliverable del designer cita gli ID di questo brief (V-xx, A-xx, DD-xx) e del Project Brief (P-xx, F-xx, S-xx, N-xx) da cui discende. In caso di conflitto con un principio P-xx, vince il principio e il conflitto viene segnalato al promotore.
+Every designer deliverable cites the IDs from this brief (V-xx, A-xx, DD-xx) and from the Project Brief (P-xx, F-xx, S-xx, N-xx) from which it derives. In case of conflict with a P-xx principle, the principle wins and the conflict is flagged to the sponsor.

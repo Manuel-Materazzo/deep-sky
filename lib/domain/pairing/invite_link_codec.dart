@@ -188,7 +188,16 @@ class InviteLinkCodec {
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       withScheme = trimmed;
     } else {
-      final String hostPart = trimmed.split('/').first.split(':').first;
+      final String authority = trimmed.split('/').first;
+      final String hostPart;
+      if (authority.startsWith('[')) {
+        final int closeIdx = authority.indexOf(']');
+        hostPart = closeIdx > 0
+            ? authority.substring(0, closeIdx + 1)
+            : authority;
+      } else {
+        hostPart = authority.split(':').first;
+      }
       final String scheme = _isLocalOrPrivateHost(hostPart) ? 'http' : 'https';
       withScheme = '$scheme://$trimmed';
     }
@@ -278,18 +287,49 @@ class InviteLinkCodec {
   }
 
   static bool _isLocalOrPrivateHost(String host) {
-    final String lower = host.toLowerCase();
-    if (lower == 'localhost' ||
-        lower == '127.0.0.1' ||
-        lower == '10.0.2.2' ||
-        lower == '::1' ||
-        lower == '[::1]') {
+    final String lower = host.trim().toLowerCase();
+    if (lower == 'localhost') {
       return true;
     }
-    if (lower.startsWith('192.168.') || lower.startsWith('10.')) {
-      return true;
+    // Strip optional brackets around literal IPv6 addresses (e.g. `[::1]`).
+    final String candidate =
+        (lower.startsWith('[') && lower.endsWith(']') && lower.length > 2)
+        ? lower.substring(1, lower.length - 1)
+        : lower;
+
+    // Never allow plain HTTP for DNS names (AU-09): only strict IPv4/IPv6
+    // literals in loopback, RFC 1918 / ULA, or link-local ranges.
+    try {
+      final List<int> ipv4 = Uri.parseIPv4Address(candidate);
+      final int a = ipv4[0];
+      final int b = ipv4[1];
+      if (a == 127) return true; // 127.0.0.0/8 loopback
+      if (a == 10) return true; // 10.0.0.0/8 RFC 1918 (incl. 10.0.2.2)
+      if (a == 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12 RFC 1918
+      if (a == 192 && b == 168) return true; // 192.168.0.0/16 RFC 1918
+      if (a == 169 && b == 254) return true; // 169.254.0.0/16 link-local
+      return false;
+    } on FormatException {
+      // Not an IPv4 literal; try IPv6 literal next.
     }
-    final RegExp rfc172 = RegExp(r'^172\.(1[6-9]|2\d|3[0-1])\.');
-    return rfc172.hasMatch(lower);
+
+    try {
+      final List<int> ipv6 = Uri.parseIPv6Address(candidate);
+      bool isLoopback = true;
+      for (int i = 0; i < 15; i++) {
+        if (ipv6[i] != 0) {
+          isLoopback = false;
+          break;
+        }
+      }
+      if (isLoopback && ipv6[15] == 1) return true; // ::1
+      if ((ipv6[0] & 0xfe) == 0xfc) return true; // fc00::/7 ULA
+      if (ipv6[0] == 0xfe && (ipv6[1] & 0xc0) == 0x80) {
+        return true; // fe80::/10 link-local
+      }
+      return false;
+    } on FormatException {
+      return false;
+    }
   }
 }

@@ -2,17 +2,20 @@
 
 This directory contains the project documentation, operational plans, technical reference guides, and Architecture Decision Records (`docs/adr/`).
 
+> **Looking for guides to install, configure, or use the app and server without developing?**
+> Go to the **[User & Server Operator Wiki (`docs/wiki/`)](wiki/README.md)** (includes **Getting Started**, content pack publishing, backup, and recovery).
+
 ## Core Project Documents
 
 | Document | Version | ID Prefixes | Description |
 | :-- | :-- | :-- | :-- |
 | [Project Brief](project-brief.md) | 0.2 | `P-xx`, `F-xx`, `S-xx`, `N-xx`, `D-xx` | Product vision, principles, features, security and non-functional requirements |
 | [Design Brief](design-brief.md) | 0.2 | `V-xx`, `A-xx`, `DD-xx` | Emotional intent, visual direction, house metaphor, AI asset system, design phases |
-| [Considerazioni tecniche](technical-considerations.md) | 0.1 | `TC-xx`, `SP-xx`, `AD-xx` | Stack decisions, push proposal, scene architecture, E2EE model, updates, open architecture questions |
-| [Documento architetturale](architecture.md) | 0.2 | `AR-01`..`AR-11`, `AD-01`..`AD-10`, `G5-01`..`G5-09` | Exported post-M1 architecture v0.2 (`REP-05`), `AR-xx` outcomes, component boundaries, and `G-5` security review points |
-| [Piano di sviluppo](development-plan.md) | 0.1 | `PD-xx`, `M-x`, `SL-xx`, `G-x` | Roles, engagement rules, milestones M0–M8, vertical slice model, gates |
-| [Piano operativo M0 e M1](m0-m1-operative-plan.md) | 0.1 | `REP-xx`, `SEC-xx`, `INF-xx`, `SRV-xx`, `APP-xx`, `CNT-xx`, `CI-xx`, `NAME-xx`, `SPxx-xx` | Detailed checklists for M0 Foundations and M1 Verification Prototypes (`G-1` closed) |
-| [Piano operativo M2](m2-operative-plan.md) | 0.1 | `PR-M2-xx`, `F-01`, `F-03`, `F-19`, `F-20`, `G-2` | Detailed M2 execution plan, carry-over hardware checks from M1, and prototype-to-PR promotion inventory |
+| [Technical Considerations](technical-considerations.md) | 0.1 | `TC-xx`, `SP-xx`, `AD-xx` | Stack decisions, push proposal, scene architecture, E2EE model, updates, open architecture questions |
+| [Architecture Document](architecture.md) | 0.2 | `AR-01`..`AR-11`, `AD-01`..`AD-10`, `G5-01`..`G5-09` | Exported post-M1 architecture v0.2 (`REP-05`), `AR-xx` outcomes, component boundaries, and `G-5` security review points |
+| [Development Plan](development-plan.md) | 0.1 | `PD-xx`, `M-x`, `SL-xx`, `G-x` | Roles, engagement rules, milestones M0–M8, vertical slice model, gates |
+| [M0 and M1 Operative Plan](m0-m1-operative-plan.md) | 0.1 | `REP-xx`, `SEC-xx`, `INF-xx`, `SRV-xx`, `APP-xx`, `CNT-xx`, `CI-xx`, `NAME-xx`, `SPxx-xx` | Detailed checklists for M0 Foundations and M1 Verification Prototypes (`G-1` closed) |
+| [M2 Operative Plan](m2-operative-plan.md) | 0.1 | `PR-M2-xx`, `F-01`, `F-03`, `F-19`, `F-20`, `G-2` | Detailed M2 execution plan, carry-over hardware checks from M1, and prototype-to-PR promotion inventory |
 
 ## Technical & Operational Guides
 

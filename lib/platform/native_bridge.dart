@@ -9,6 +9,10 @@ class NativeBridge {
   const NativeBridge([this._channel = const MethodChannel(channelName)]);
 
   static const String channelName = 'com.vectevo.deep_sky/platform';
+  static final Map<MethodChannel, void Function(String uri)>
+  _deepLinkListeners = <MethodChannel, void Function(String uri)>{};
+  static final Map<MethodChannel, void Function(String l10nKey)>
+  _pushWakeupListeners = <MethodChannel, void Function(String l10nKey)>{};
 
   final MethodChannel _channel;
 
@@ -197,14 +201,42 @@ class NativeBridge {
   /// Registers a listener for deep-link invite URIs arriving while the app is open (`S1-APP-01`).
   void setDeepLinkListener(void Function(String uri)? listener) {
     if (listener == null) {
+      _deepLinkListeners.remove(_channel);
+    } else {
+      _deepLinkListeners[_channel] = listener;
+    }
+    _syncChannelHandler();
+  }
+
+  /// Registers a listener for foreground FCM wakeups forwarded from native Android (`AU-18`).
+  void setPushWakeupListener(void Function(String l10nKey)? listener) {
+    if (listener == null) {
+      _pushWakeupListeners.remove(_channel);
+    } else {
+      _pushWakeupListeners[_channel] = listener;
+    }
+    _syncChannelHandler();
+  }
+
+  void _syncChannelHandler() {
+    final bool hasDeepLink = _deepLinkListeners.containsKey(_channel);
+    final bool hasWakeup = _pushWakeupListeners.containsKey(_channel);
+    if (!hasDeepLink && !hasWakeup) {
       _channel.setMethodCallHandler(null);
       return;
     }
     _channel.setMethodCallHandler((MethodCall call) async {
       if (call.method == 'onDeepLink') {
         final String? uri = call.arguments as String?;
-        if (uri != null && uri.trim().isNotEmpty) {
-          listener(uri.trim());
+        final void Function(String)? cb = _deepLinkListeners[_channel];
+        if (cb != null && uri != null && uri.trim().isNotEmpty) {
+          cb(uri.trim());
+        }
+      } else if (call.method == 'onPushWakeup') {
+        final String? key = call.arguments as String?;
+        final void Function(String)? cb = _pushWakeupListeners[_channel];
+        if (cb != null && key != null && key.trim().isNotEmpty) {
+          cb(key.trim());
         }
       }
     });
@@ -260,5 +292,55 @@ class NativeBridge {
       // Fall back to standard Clipboard if native helper fails.
     }
     await Clipboard.setData(ClipboardData(text: text));
+  }
+
+  /// Returns `true` when the active Android network is unmetered (e.g. Wi-Fi) (`S2-APP-02`).
+  ///
+  /// Defaults to `true` on desktop/headless hosts without Android platform channels.
+  Future<bool> isConnectionUnmetered() async {
+    try {
+      final bool? unmetered = await _channel.invokeMethod<bool>(
+        'isConnectionUnmetered',
+      );
+      return unmetered ?? true;
+    } on MissingPluginException {
+      return true;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// Returns the app-private directory used for verified content packs (`S2-APP-02`, `AD-06`).
+  Future<String?> getContentPackRootDir() async {
+    try {
+      final String? path = await _channel.invokeMethod<String>(
+        'getContentPackRootDir',
+      );
+      if (path == null || path.trim().isEmpty) {
+        return null;
+      }
+      return path.trim();
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  /// Returns the app-private directory used for the encrypted offline event cache (`AU-05`).
+  Future<String?> getOfflineCacheRootDir() async {
+    try {
+      final String? path = await _channel.invokeMethod<String>(
+        'getOfflineCacheRootDir',
+      );
+      if (path == null || path.trim().isEmpty) {
+        return null;
+      }
+      return path.trim();
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
   }
 }

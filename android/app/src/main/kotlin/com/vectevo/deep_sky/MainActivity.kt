@@ -15,6 +15,20 @@ class MainActivity : FlutterActivity() {
         platformBridge.handleIntent(intent)
     }
 
+    override fun onDestroy() {
+        if (::platformBridge.isInitialized) {
+            platformBridge.detach()
+        }
+        super.onDestroy()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::platformBridge.isInitialized) {
+            platformBridge.onResume()
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)

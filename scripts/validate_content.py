@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 Validates Deep Sky scene pack manifests against content/schemas/scene-manifest.schema.json
-and enforces semantic invariants (CNT-01, TC-08, TC-09).
+and enforces semantic, path-safety, asset-existence, and DD-10 size-budget invariants
+(CNT-01, TC-08, TC-09, DD-10, S2-CNT-01).
 Uses Python standard library only so it runs offline in any environment.
 """
 
@@ -10,7 +11,7 @@ from __future__ import annotations
 import json
 import re
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 PACK_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,63}$")
 LAYER_ID_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
@@ -21,6 +22,14 @@ ALLOWED_ANIM_TYPES = {"fade", "translateY", "translateX", "scale", "rotate"}
 ALLOWED_CURVES = {"linear", "easeInOut", "easeIn", "easeOut"}
 ALLOWED_REPEATS = {"none", "loop", "reverse"}
 
+# DD-10 runtime budgets (applied to packs shipping real assets/).
+# "KB"/"MB" in m3-operative-plan.md section 6.3 are interpreted as KiB/MiB (1024 bytes), identical
+# to scripts/build_content_pack.py.
+KIB = 1024
+MAX_FLOOR_ASSET_BYTES = 400 * KIB
+MAX_OBJECT_ASSET_BYTES = 250 * KIB
+MAX_PACK_TOTAL_BYTES = int(1.8 * 1024 * KIB)
+
 
 def _is_int(v: object) -> bool:
     return isinstance(v, int) and not isinstance(v, bool)
@@ -28,6 +37,23 @@ def _is_int(v: object) -> bool:
 
 def _is_num(v: object) -> bool:
     return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def is_safe_relative_asset_path(raw: str) -> bool:
+    """Rejects absolute paths, backslashes, drive letters, control chars, or '..' segments."""
+    if not raw or raw != raw.strip():
+        return False
+    if "\\" in raw or ":" in raw or "\x00" in raw:
+        return False
+    if raw.startswith("/"):
+        return False
+    parts = PurePosixPath(raw).parts
+    if not parts:
+        return False
+    for part in parts:
+        if part in ("", ".", ".."):
+            return False
+    return True
 
 
 def _check_keys(obj: dict, required: set[str], optional: set[str], ctx: str, errors: list[str]) -> None:
@@ -64,8 +90,9 @@ def _check_rect(obj: object, ctx: str, errors: list[str]) -> None:
             errors.append(f"{ctx}.{dim}: must be in (0.0, 1.0]")
 
 
-def validate_manifest(manifest_path: Path) -> list[str]:
+def validate_manifest(manifest_path: Path, *, require_assets: bool | None = None) -> list[str]:
     errors: list[str] = []
+    pack_dir = manifest_path.parent
     try:
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
     except Exception as exc:
@@ -99,6 +126,8 @@ def validate_manifest(manifest_path: Path) -> list[str]:
 
     _check_localized(data.get("name"), f"{ctx}.name", errors)
 
+    referenced_assets: set[str] = set()
+
     scene = data.get("scene")
     if not isinstance(scene, dict):
         errors.append(f"{ctx}.scene: must be an object")
@@ -125,8 +154,13 @@ def validate_manifest(manifest_path: Path) -> list[str]:
             _check_keys(bg, {"dayAsset", "nightAsset"}, set(), f"{ctx}.scene.background", errors)
             for key in ("dayAsset", "nightAsset"):
                 v = bg.get(key)
-                if v is not None and (not isinstance(v, str) or len(v.strip()) == 0):
-                    errors.append(f"{ctx}.scene.background.{key}: must be non-empty string or null")
+                if v is not None:
+                    if not isinstance(v, str) or len(v.strip()) == 0:
+                        errors.append(f"{ctx}.scene.background.{key}: must be non-empty string or null")
+                    elif not is_safe_relative_asset_path(v):
+                        errors.append(f"{ctx}.scene.background.{key}: unsafe relative path '{v}'")
+                    else:
+                        referenced_assets.add(v)
 
     slots = data.get("slots")
     if not isinstance(slots, list):
@@ -218,8 +252,13 @@ def validate_manifest(manifest_path: Path) -> list[str]:
                         errors.append(f"{l_ctx}.id: invalid layer id '{lid}'")
                     else:
                         all_layer_ids.add(lid)
-                    if not isinstance(layer.get("asset"), str) or len(layer["asset"].strip()) == 0:
+                    asset_val = layer.get("asset")
+                    if not isinstance(asset_val, str) or len(asset_val.strip()) == 0:
                         errors.append(f"{l_ctx}.asset: must be non-empty string")
+                    elif not is_safe_relative_asset_path(asset_val):
+                        errors.append(f"{l_ctx}.asset: unsafe relative path '{asset_val}'")
+                    else:
+                        referenced_assets.add(asset_val)
                     if not _is_int(layer.get("zOffset")) or layer["zOffset"] < 0:
                         errors.append(f"{l_ctx}.zOffset: must be integer >= 0")
                     if "opacity" in layer:
@@ -256,6 +295,34 @@ def validate_manifest(manifest_path: Path) -> list[str]:
                     errors.append(f"{a_ctx}.repeat: invalid repeat '{anim.get('repeat')}'")
                 if not _is_num(anim.get("from")) or not _is_num(anim.get("to")):
                     errors.append(f"{a_ctx}: 'from' and 'to' must be numbers")
+
+    # Asset existence & DD-10 weight budget checks for real packs (those with an assets/ folder
+    # or explicitly requested via require_assets=True; example/base schema-only fixtures are skipped).
+    should_check_files = require_assets if require_assets is not None else (pack_dir / "assets").is_dir()
+    if should_check_files and referenced_assets:
+        pack_root_resolved = pack_dir.resolve()
+        total_asset_bytes = 0
+        for rel_asset in sorted(referenced_assets):
+            resolved = (pack_dir / rel_asset).resolve()
+            try:
+                resolved.relative_to(pack_root_resolved)
+            except ValueError:
+                errors.append(f"{ctx}: asset '{rel_asset}' escapes pack directory")
+                continue
+            if not resolved.is_file():
+                errors.append(f"{ctx}: referenced asset file does not exist: '{rel_asset}'")
+                continue
+            size = resolved.stat().st_size
+            total_asset_bytes += size
+            limit = MAX_FLOOR_ASSET_BYTES if resolved.name == "floor.png" else MAX_OBJECT_ASSET_BYTES
+            if size > limit:
+                errors.append(
+                    f"{ctx}: asset '{rel_asset}' size {size} bytes exceeds DD-10 limit ({limit} bytes)"
+                )
+        if total_asset_bytes > MAX_PACK_TOTAL_BYTES:
+            errors.append(
+                f"{ctx}: total referenced assets size {total_asset_bytes} bytes exceeds DD-10 limit ({MAX_PACK_TOTAL_BYTES} bytes)"
+            )
 
     return errors
 

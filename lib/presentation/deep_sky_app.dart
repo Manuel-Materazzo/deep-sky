@@ -40,7 +40,9 @@ class _DeepSkyAppState extends State<DeepSkyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _controller.refreshPushStatus();
+      _controller.refreshLocalSkyPeriod();
       unawaited(_controller.pollActiveInviteSilently());
+      unawaited(_controller.syncOnResumeSilently());
     }
   }
 
@@ -79,6 +81,16 @@ class _DeepSkyAppState extends State<DeepSkyApp> with WidgetsBindingObserver {
     );
   }
 
+  /// Paired boots that land on a page not drawing the content pack must not count
+  /// towards the "last known good pack" rollback guard (`S2-APP-02`).
+  void _resetBootCounterAfterFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(_controller.markHomeBootSucceeded());
+      }
+    });
+  }
+
   Widget _buildPhaseScreen() {
     switch (_controller.phase) {
       case AppBootPhase.loading:
@@ -96,9 +108,11 @@ class _DeepSkyAppState extends State<DeepSkyApp> with WidgetsBindingObserver {
         return OnboardingPage(controller: _controller);
       case AppBootPhase.paired:
         if (_controller.needsSpaceSetup) {
+          _resetBootCounterAfterFrame();
           return SpaceSetupPage(controller: _controller);
         }
         if (_controller.needsRecoveryKeySetup) {
+          _resetBootCounterAfterFrame();
           return RecoveryKeySetupPage(controller: _controller);
         }
         return HomeShellPage(controller: _controller);

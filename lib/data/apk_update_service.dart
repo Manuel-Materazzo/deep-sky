@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -16,16 +17,22 @@ class ApkUpdateService {
     http.Client? httpClient,
     this.nativeBridge = const NativeBridge(),
     Duration Function(int attempt)? retryDelay,
+    this.requestTimeout = defaultRequestTimeout,
+    this.chunkIdleTimeout = defaultChunkIdleTimeout,
   }) : _http = httpClient ?? http.Client(),
        _retryDelay = retryDelay ?? _defaultRetryDelay;
 
   static const int storageSafetyMarginBytes = 20 * 1024 * 1024;
   static const Duration defaultReleaseCheckCooldown = Duration(hours: 6);
+  static const Duration defaultRequestTimeout = Duration(seconds: 15);
+  static const Duration defaultChunkIdleTimeout = Duration(seconds: 30);
   static final Ed25519 _ed25519 = Ed25519();
 
   final http.Client _http;
   final NativeBridge nativeBridge;
   final Duration Function(int attempt) _retryDelay;
+  final Duration requestTimeout;
+  final Duration chunkIdleTimeout;
 
   static Duration _defaultRetryDelay(int attempt) =>
       Duration(milliseconds: 250 * (1 << (attempt - 1).clamp(0, 4)));
@@ -67,10 +74,9 @@ class ApkUpdateService {
 
     final http.Response manifestResp;
     try {
-      manifestResp = await _http.get(
-        Uri.parse('$sourceBaseUri/manifest.json'),
-        headers: headers,
-      );
+      manifestResp = await _http
+          .get(Uri.parse('$sourceBaseUri/manifest.json'), headers: headers)
+          .timeout(requestTimeout);
     } catch (error) {
       throw ApkUpdateException(ApkUpdateErrorCode.networkError, '$error');
     }
@@ -95,7 +101,9 @@ class ApkUpdateService {
 
     final http.Response sigResp;
     try {
-      sigResp = await _http.get(Uri.parse('$sourceBaseUri/manifest.json.sig'));
+      sigResp = await _http
+          .get(Uri.parse('$sourceBaseUri/manifest.json.sig'))
+          .timeout(requestTimeout);
     } catch (error) {
       throw ApkUpdateException(ApkUpdateErrorCode.networkError, '$error');
     }
@@ -175,12 +183,14 @@ class ApkUpdateService {
     );
     final http.Response resp;
     try {
-      resp = await _http.get(
-        apiUri,
-        headers: const <String, String>{
-          'Accept': 'application/vnd.github+json',
-        },
-      );
+      resp = await _http
+          .get(
+            apiUri,
+            headers: const <String, String>{
+              'Accept': 'application/vnd.github+json',
+            },
+          )
+          .timeout(requestTimeout);
     } catch (error) {
       throw ApkUpdateException(ApkUpdateErrorCode.networkError, '$error');
     }
@@ -234,8 +244,12 @@ class ApkUpdateService {
     final http.Response manifestResp;
     final http.Response sigResp;
     try {
-      manifestResp = await _http.get(Uri.parse('$sourceBaseUri/manifest.json'));
-      sigResp = await _http.get(Uri.parse('$sourceBaseUri/manifest.json.sig'));
+      manifestResp = await _http
+          .get(Uri.parse('$sourceBaseUri/manifest.json'))
+          .timeout(requestTimeout);
+      sigResp = await _http
+          .get(Uri.parse('$sourceBaseUri/manifest.json.sig'))
+          .timeout(requestTimeout);
     } catch (error) {
       throw ApkUpdateException(ApkUpdateErrorCode.networkError, '$error');
     }
@@ -354,7 +368,9 @@ class ApkUpdateService {
         if (existingLen > 0) {
           req.headers['Range'] = 'bytes=$existingLen-';
         }
-        final http.StreamedResponse streamed = await _http.send(req);
+        final http.StreamedResponse streamed = await _http
+            .send(req)
+            .timeout(requestTimeout);
         if (streamed.statusCode != 200 && streamed.statusCode != 206) {
           throw ApkUpdateException(
             ApkUpdateErrorCode.downloadInterrupted,
@@ -370,7 +386,9 @@ class ApkUpdateService {
         onProgress?.call(received, manifest.apkSizeBytes);
         final IOSink sink = partFile.openWrite(mode: mode);
         try {
-          await for (final List<int> chunk in streamed.stream) {
+          await for (final List<int> chunk in streamed.stream.timeout(
+            chunkIdleTimeout,
+          )) {
             sink.add(chunk);
             received += chunk.length;
             onProgress?.call(
