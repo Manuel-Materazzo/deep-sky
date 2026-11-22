@@ -473,7 +473,8 @@ class Sp02PairingAndSyncIntegrationTest {
 		int purged = cleanupService.purgeExpiredNonces(Instant.now());
 		assertThat(purged).isGreaterThanOrEqualTo(1);
 
-		// 5. Public recovery rate-limit enforces both per-couple (5/15m) and per-IP (10/60s, ignoring X-Forwarded-For)
+		// 5. Public recovery rate-limit enforces both per-couple (5/15m on failed completion, AU-23)
+		// and per-IP (10/60s, ignoring X-Forwarded-For)
 		String challengePayloadA = objectMapper.writeValueAsString(new ChallengeBody(rawEd25519B64(recAKp)));
 		String challengePayloadB = objectMapper.writeValueAsString(new ChallengeBody(rawEd25519B64(recBKp)));
 		for (int i = 0; i < 5; i++) {
@@ -487,14 +488,46 @@ class Sp02PairingAndSyncIntegrationTest {
 							.content(challengePayloadA))
 					.andExpect(status().isOk());
 		}
-		// 6th call for Couple A fails with 429 even from a different IP (per-couple throttle)
-		mockMvc.perform(post("/api/v1/recovery/challenges")
+		// 6th challenge call for Couple A from a different IP still succeeds (AU-23: challenge creation
+		// does not consume the per-couple bucket)
+		MvcResult extraChallengeRes = mockMvc.perform(post("/api/v1/recovery/challenges")
 						.with(r -> {
 							r.setRemoteAddr("198.51.100.88");
 							return r;
 						})
 						.contentType(MediaType.APPLICATION_JSON)
 						.content(challengePayloadA))
+				.andExpect(status().isOk())
+				.andReturn();
+		String extraChallengeId = objectMapper.readTree(extraChallengeRes.getResponse().getContentAsString())
+				.get("challengeId").asText();
+
+		// 5 failed completeRecovery attempts consume Couple A's per-couple bucket; 6th fails with 429
+		// even from a different IP
+		String badRecoverySig = b64(new byte[64]);
+		String badCompleteBody = objectMapper.writeValueAsString(new CompleteRecoveryBody(
+				extraChallengeId,
+				"Attacker Phone",
+				rawEd25519B64(generateEd25519()),
+				b64(randomBytes32()),
+				badRecoverySig));
+		for (int i = 0; i < 5; i++) {
+			mockMvc.perform(post("/api/v1/recovery/complete")
+							.with(r -> {
+								r.setRemoteAddr("198.51.100.88");
+								return r;
+							})
+							.contentType(MediaType.APPLICATION_JSON)
+							.content(badCompleteBody))
+					.andExpect(status().isUnauthorized());
+		}
+		mockMvc.perform(post("/api/v1/recovery/complete")
+						.with(r -> {
+							r.setRemoteAddr("198.51.100.89");
+							return r;
+						})
+						.contentType(MediaType.APPLICATION_JSON)
+						.content(badCompleteBody))
 				.andExpect(status().isTooManyRequests())
 				.andExpect(jsonPath("$.code").value("RATE_LIMITED"));
 
