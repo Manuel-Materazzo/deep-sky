@@ -24,7 +24,7 @@ jobs:
       image: ${{ steps.meta.outputs.image }}
       digest: ${{ steps.push.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Validate workflow inputs (AU-25)
         env:
@@ -66,7 +66,7 @@ jobs:
           echo "image=ghcr.io/${OWNER_LC}/deep-sky-server" >> "$GITHUB_OUTPUT"
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -74,7 +74,7 @@ jobs:
 
       - name: Build and push multi-arch server image
         id: push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ./server
           file: ./server/Dockerfile
@@ -96,7 +96,7 @@ jobs:
     outputs:
       unsigned_sha256: ${{ steps.bundle.outputs.unsigned_sha256 }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Java for Android Gradle
         uses: actions/setup-java@v5
