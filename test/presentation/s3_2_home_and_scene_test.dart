@@ -898,4 +898,178 @@ void main() {
       expect(find.byKey(const Key('scene-slot-pet_sleeping')), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'Thinking of you card omits old sub-header and opens ThoughtHistorySheet (empty & populated, IT/EN, 200% text scale)',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final DateTime nowLocal = DateTime(2026, 11, 22, 14, 30);
+      final DateTime nowUtc = nowLocal.toUtc();
+
+      final InMemorySecureKeyStore emptyStore = await buildPairedStore();
+      final DeepSkyController emptyCtrl = DeepSkyController(
+        keyStore: emptyStore,
+        httpClient: buildMockServer(offline: false),
+        loadAssetString: (_) async => v1ManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+        enableSkyRefreshTimer: false,
+        clockUtc: () => nowUtc,
+        clockLocal: () => nowLocal,
+      );
+      emptyCtrl.reduceMotion = true;
+
+      await tester.pumpWidget(DeepSkyApp(controller: emptyCtrl));
+      await tester.pumpAndSettle();
+
+      // Old sub-header must be gone
+      expect(
+        find.text('Accende una luce gentile nella vostra casa.'),
+        findsNothing,
+      );
+      expect(
+        find.text('Lights a gentle glow in your shared home.'),
+        findsNothing,
+      );
+
+      // Small history button is present and opens the empty history sheet
+      final Finder historyBtn = find.byKey(
+        const Key('open-thought-history-button'),
+      );
+      expect(historyBtn, findsOneWidget);
+      await tester.tap(historyBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('thought-history-sheet')), findsOneWidget);
+      expect(find.textContaining('0 pensieri'), findsOneWidget);
+      expect(find.byKey(const Key('thought-history-empty')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('close-thought-history-button')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('thought-history-sheet')), findsNothing);
+
+      // Populated history with today, yesterday, older, and silent tap (offline cache + 200% text scale)
+      final List<CachedEventEntry> sampleEvents = <CachedEventEntry>[
+        CachedEventEntry(
+          envelopeId: 'env-1',
+          coupleId: 'couple-s32',
+          senderDeviceId: 'dev-partner',
+          channel: EnvelopeChannel.event,
+          keyEpoch: 1,
+          seq: 1,
+          createdAtServer: nowLocal
+              .subtract(const Duration(days: 3))
+              .toUtc(),
+          payload: DecryptedEnvelopePayload(
+            schemaVersion: 1,
+            eventType: 'thinking_of_you',
+            createdAtClient: DateTime(2026, 11, 19, 10, 15).toUtc(),
+            authorDeviceId: 'dev-partner',
+            body: const <String, Object?>{'note': 'Buongiorno'},
+          ),
+        ),
+        CachedEventEntry(
+          envelopeId: 'env-2',
+          coupleId: 'couple-s32',
+          senderDeviceId: 'dev-me',
+          channel: EnvelopeChannel.event,
+          keyEpoch: 1,
+          seq: 2,
+          createdAtServer: DateTime(2026, 11, 21, 14, 5).toUtc(),
+          payload: DecryptedEnvelopePayload(
+            schemaVersion: 1,
+            eventType: 'thinking_of_you',
+            createdAtClient: DateTime(2026, 11, 21, 14, 5).toUtc(),
+            authorDeviceId: 'dev-me',
+            body: const <String, Object?>{},
+          ),
+        ),
+        CachedEventEntry(
+          envelopeId: 'env-3',
+          coupleId: 'couple-s32',
+          senderDeviceId: 'dev-partner',
+          channel: EnvelopeChannel.event,
+          keyEpoch: 1,
+          seq: 3,
+          createdAtServer: DateTime(2026, 11, 22, 12, 40).toUtc(),
+          payload: DecryptedEnvelopePayload(
+            schemaVersion: 1,
+            eventType: 'thinking_of_you',
+            createdAtClient: DateTime(2026, 11, 22, 12, 40).toUtc(),
+            authorDeviceId: 'dev-partner',
+            body: const <String, Object?>{'note': 'Un bacio tra una lezione'},
+          ),
+        ),
+      ];
+
+      final InMemorySecureKeyStore populatedStore = await buildPairedStore(
+        cachedEvents: sampleEvents,
+      );
+      final DeepSkyController populatedCtrl = DeepSkyController(
+        keyStore: populatedStore,
+        httpClient: buildMockServer(offline: true),
+        loadAssetString: (_) async => v1ManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+        enableSkyRefreshTimer: false,
+        clockUtc: () => nowUtc,
+        clockLocal: () => nowLocal,
+      );
+      populatedCtrl.reduceMotion = true;
+
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await tester.pumpWidget(
+        DeepSkyApp(
+          key: const ValueKey<String>('populated-app'),
+          controller: populatedCtrl,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(populatedCtrl.events.length, 3);
+
+      // Also visible in received-thought state
+      expect(find.byKey(const Key('open-thought-history-button')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('open-thought-history-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('thought-history-sheet')), findsOneWidget);
+      expect(find.textContaining('3 pensieri'), findsOneWidget);
+      expect(find.text('OGGI'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('thought-history-sheet')),
+          matching: find.textContaining('Un bacio tra una lezione'),
+        ),
+        findsOneWidget,
+      );
+
+      final Finder historyScroll = find
+          .descendant(
+            of: find.byKey(const Key('thought-history-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.text('IERI'),
+        150,
+        scrollable: historyScroll,
+      );
+      expect(find.text('IERI'), findsOneWidget);
+      expect(find.text('Pensiero silenzioso'), findsOneWidget);
+      expect(find.textContaining('Tu (Luca)'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.text('19 nov'),
+        150,
+        scrollable: historyScroll,
+      );
+      expect(find.text('19 nov'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 }

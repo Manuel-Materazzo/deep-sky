@@ -9,6 +9,7 @@ import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
 import 'package:deep_sky/presentation/screens/settings_page.dart';
 import 'package:deep_sky/presentation/theme/deep_sky_theme.dart';
 import 'package:deep_sky/presentation/widgets/invite_verification_section.dart';
+import 'package:deep_sky/presentation/widgets/thought_history_sheet.dart';
 import 'package:deep_sky/scene/hybrid_scene_canvas.dart';
 import 'package:deep_sky/scene/scene_manifest.dart';
 import 'package:flutter/semantics.dart';
@@ -122,6 +123,38 @@ class _HomeShellPageState extends State<HomeShellPage> {
       MaterialPageRoute<void>(
         builder: (_) => SettingsPage(controller: widget.controller),
       ),
+    );
+  }
+
+  Future<void> _openThoughtHistory(
+    BuildContext context,
+    DeepSkyController c,
+    DeepSkyStrings s,
+  ) {
+    return showThoughtHistorySheet(
+      context: context,
+      events: c.events,
+      myDeviceId: c.identity?.deviceId,
+      myDisplayName: c.identity?.deviceLabel,
+      partnerDisplayName: c.partnerDisplayLabel,
+      nowLocal: c.nowLocal,
+      strings: s,
+    );
+  }
+
+  Widget _buildThoughtHistoryButton(
+    BuildContext context,
+    DeepSkyController c,
+    DeepSkyStrings s,
+    DeepSkyTokens tokens,
+  ) {
+    return IconButton(
+      key: const Key('open-thought-history-button'),
+      tooltip: s.thoughtHistoryButtonTooltip,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+      onPressed: () => _openThoughtHistory(context, c, s),
+      icon: Icon(Icons.history_rounded, size: 20, color: tokens.mutedInk),
     );
   }
 
@@ -585,6 +618,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
                       ],
                     ),
                   ),
+                  _buildThoughtHistoryButton(context, c, s, tokens),
                 ],
               ),
               if (note != null) ...<Widget>[
@@ -743,21 +777,12 @@ class _HomeShellPageState extends State<HomeShellPage> {
                   Icon(Icons.favorite_border_rounded, color: tokens.blushPetal),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          s.quickThoughtTitle,
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                        Text(
-                          s.quickThoughtSubtitle,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: tokens.mutedInk),
-                        ),
-                      ],
+                    child: Text(
+                      s.quickThoughtTitle,
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
                   ),
+                  _buildThoughtHistoryButton(context, c, s, tokens),
                 ],
               ),
               const SizedBox(height: 10),

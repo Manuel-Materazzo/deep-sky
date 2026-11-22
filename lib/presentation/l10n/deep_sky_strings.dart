@@ -516,9 +516,89 @@ class DeepSkyStrings {
   String get quickThoughtTitle =>
       isIt ? 'Lascia un pensiero' : 'Leave a quiet thought';
 
-  String get quickThoughtSubtitle => isIt
-      ? 'Accende una luce gentile nella vostra casa.'
-      : 'Lights a gentle glow in your shared home.';
+  String get thoughtHistoryButtonTooltip =>
+      isIt ? 'Storico pensieri' : 'Thought history';
+
+  String get thoughtHistorySheetTitle => isIt ? 'Ti Penso' : 'Thinking of you';
+
+  String get thoughtHistoryCloseTooltip => isIt ? 'Chiudi' : 'Close';
+
+  String get thoughtHistoryEyebrow =>
+      isIt ? 'I NOSTRI PENSIERI CONDIVISI' : 'OUR SHARED THOUGHTS';
+
+  String thoughtHistoryCount(int count) {
+    if (isIt) {
+      return count == 1 ? '1 pensiero' : '$count pensieri';
+    }
+    return count == 1 ? '1 thought' : '$count thoughts';
+  }
+
+  String get thoughtHistoryCountSuffix => isIt ? 'insieme' : 'together';
+
+  String get thoughtHistorySubtitle => isIt
+      ? 'Ogni luce è un pensiero lasciato senza fretta.'
+      : 'Every light is a thought left without rush.';
+
+  String get thoughtHistoryToday => isIt ? 'OGGI' : 'TODAY';
+
+  String get thoughtHistoryYesterday => isIt ? 'IERI' : 'YESTERDAY';
+
+  String thoughtHistorySelfLabel(String myName) =>
+      isIt ? 'Tu ($myName)' : 'You ($myName)';
+
+  String get thoughtHistorySelfFallbackName => isIt ? 'Io' : 'Me';
+
+  String get thoughtHistorySilentBadge =>
+      isIt ? 'Pensiero silenzioso' : 'Silent thought';
+
+  String get thoughtHistorySilentCaption => isIt
+      ? 'Nessun testo, un tocco rapido sulla lampada accanto al divano.'
+      : 'No text, a quick tap on the lamp by the couch.';
+
+  String get thoughtHistoryEmptyTitle =>
+      isIt ? 'Nessun pensiero ancora' : 'No thoughts yet';
+
+  String get thoughtHistoryEmptyBody => isIt
+      ? 'Quando lascerete una luce nella casa, apparirà qui.'
+      : 'Whenever you leave a gentle light in your home, it will appear here.';
+
+  String thoughtHistoryDateLabel(DateTime localDate, DateTime nowLocal) {
+    const List<String> monthsIt = <String>[
+      'gen',
+      'feb',
+      'mar',
+      'apr',
+      'mag',
+      'giu',
+      'lug',
+      'ago',
+      'set',
+      'ott',
+      'nov',
+      'dic',
+    ];
+    const List<String> monthsEn = <String>[
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    final String month = isIt
+        ? monthsIt[localDate.month - 1]
+        : monthsEn[localDate.month - 1];
+    final String base = isIt
+        ? '${localDate.day} $month'
+        : '$month ${localDate.day}';
+    return localDate.year == nowLocal.year ? base : '$base ${localDate.year}';
+  }
 
   String get welcomeBackTitle => isIt
       ? 'Che bello rivederti, la casa ti aspettava.'

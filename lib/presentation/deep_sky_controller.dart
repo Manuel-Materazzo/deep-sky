@@ -132,6 +132,7 @@ class DeepSkyController extends ChangeNotifier {
   /// Current UTC instant from the injectable controller clock (deterministic in tests).
   DateTime get nowUtc => _clockUtc();
   final DateTime Function() _clockLocal;
+  DateTime get nowLocal => _clockLocal();
   final bool enableSkyRefreshTimer;
   final Duration thoughtSentBannerDuration;
 
