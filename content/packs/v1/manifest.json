@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "packId": "deep-sky-home-v1",
-  "packVersion": "1.1.0",
+  "packVersion": "1.2.0",
   "minAppProtocol": 1,
   "name": {
-    "it": "La nostra casa · v1.1",
-    "en": "Our Home · v1.1"
+    "it": "La nostra casa · v1.2",
+    "en": "Our Home · v1.2"
   },
   "scene": {
     "aspectRatio": "4:3",
@@ -144,6 +144,50 @@
         "lit": {
           "layers": [
             { "id": "lamp", "asset": "assets/floor_lamp_lit.png", "zOffset": 0, "opacity": 1.0 }
+          ]
+        }
+      },
+      "animations": []
+    },
+    {
+      "id": "couple_on_couch",
+      "description": "The two partners sitting embraced on the couch under a shared blanket",
+      "zIndex": 40,
+      "replaceable": true,
+      "anchor": { "x": 0.48, "y": 0.58 },
+      "bounds": { "x": 0.28, "y": 0.45, "width": 0.40, "height": 0.34 },
+      "touchArea": { "x": 0.29, "y": 0.42, "width": 0.38, "height": 0.32 },
+      "accessibilityLabel": {
+        "it": "Voi due abbracciati sul divano",
+        "en": "You two embraced on the couch"
+      },
+      "defaultState": "resting",
+      "states": {
+        "resting": {
+          "layers": [
+            { "id": "couple_base", "asset": "assets/couple_on_couch.png", "zOffset": 0, "opacity": 1.0 }
+          ]
+        }
+      },
+      "animations": []
+    },
+    {
+      "id": "pet_sleeping",
+      "description": "Shared bunny resting on the rug as a calm presence in the home",
+      "zIndex": 45,
+      "replaceable": true,
+      "anchor": { "x": 0.62, "y": 0.78 },
+      "bounds": { "x": 0.52, "y": 0.68, "width": 0.20, "height": 0.16 },
+      "touchArea": { "x": 0.53, "y": 0.69, "width": 0.18, "height": 0.14 },
+      "accessibilityLabel": {
+        "it": "Il vostro coniglietto che riposa sul tappeto",
+        "en": "Your bunny resting on the rug"
+      },
+      "defaultState": "sleeping",
+      "states": {
+        "sleeping": {
+          "layers": [
+            { "id": "pet_base", "asset": "assets/pet_sleeping.png", "zOffset": 0, "opacity": 1.0 }
           ]
         }
       },
