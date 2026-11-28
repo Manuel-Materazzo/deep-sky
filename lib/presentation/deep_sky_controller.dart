@@ -132,6 +132,7 @@ class DeepSkyController extends ChangeNotifier {
   /// Current UTC instant from the injectable controller clock (deterministic in tests).
   DateTime get nowUtc => _clockUtc();
   final DateTime Function() _clockLocal;
+  DateTime get nowLocal => _clockLocal();
   final bool enableSkyRefreshTimer;
   final Duration thoughtSentBannerDuration;
 
@@ -703,6 +704,7 @@ class DeepSkyController extends ChangeNotifier {
             serverBaseUrl: current.serverUrl,
             bundledPackVersion: SemanticVersion.parse(bundled.packVersion),
             currentActivePackVersion: SemanticVersion.parse(active.packVersion),
+            expectedPackId: bundled.packId, // IR-01
             serverMinPackVersion: SemanticVersion.tryParse(
               compatibilityPolicy?.minPackVersion,
             ),
@@ -745,6 +747,7 @@ class DeepSkyController extends ChangeNotifier {
             serverBaseUrl: current.serverUrl,
             bundledPackVersion: SemanticVersion.parse(bundled.packVersion),
             currentActivePackVersion: SemanticVersion.parse(active.packVersion),
+            expectedPackId: bundled.packId, // IR-01
             serverMinPackVersion: SemanticVersion.tryParse(
               compatibilityPolicy?.minPackVersion,
             ),

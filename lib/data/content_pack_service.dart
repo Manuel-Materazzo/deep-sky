@@ -40,6 +40,10 @@ class ContentPackService {
   static const Duration defaultChunkIdleTimeout = Duration(seconds: 20);
   static final Ed25519 _ed25519 = Ed25519();
   static final RegExp _keyIdPattern = RegExp(r'^[a-z0-9][a-z0-9_-]{0,31}$');
+
+  /// Signing context of `pack-checksums.json` (`IR-06`, `PD-19` transitional: optional until
+  /// every published pack is re-signed, but must match when present).
+  static const String checksumsType = 'deep-sky/pack-checksums';
   static final RegExp _sha256Pattern = RegExp(r'^[0-9a-f]{64}$');
 
   final SecureKeyStore _keyStore;
@@ -95,9 +99,14 @@ class ContentPackService {
     }
     if (rawPath.startsWith('/') ||
         rawPath.contains(r'\') ||
-        rawPath.contains(':') ||
-        rawPath.contains('\u0000')) {
+        rawPath.contains(':')) {
       return false;
+    }
+    // IR-N2: reject every control character (U+0000-U+001F, U+007F).
+    for (final int unit in rawPath.codeUnits) {
+      if (unit <= 0x1F || unit == 0x7F) {
+        return false;
+      }
     }
     for (final String seg in rawPath.split('/')) {
       if (seg.isEmpty || seg == '.' || seg == '..') {
@@ -163,6 +172,15 @@ class ContentPackService {
       throw const ContentPackException(
         ContentPackErrorCode.checksumsInvalid,
         'pack-checksums.json root must be a JSON object.',
+      );
+    }
+
+    // IR-06 (PD-19 transitional): `type` is optional for already-published packs; if present
+    // it must be the pack-checksums signing context.
+    if (decoded.containsKey('type') && decoded['type'] != checksumsType) {
+      throw const ContentPackException(
+        ContentPackErrorCode.checksumsInvalid,
+        'pack-checksums.json type must be "deep-sky/pack-checksums".',
       );
     }
 
@@ -266,7 +284,8 @@ class ContentPackService {
 
   /// Resolves which pack to render on startup, promoting any verified `staged/` pack
   /// and automatically rolling back to `previous/` or `bundled` if `packBootAttempts >= 2`
-  /// (`S2-CTR-01`, `S2-APP-02`).
+  /// (`S2-CTR-01`, `S2-APP-02`). Staged/active/previous packs whose manifest `packId` differs
+  /// from [bundledManifest] are treated as invalid (`IR-01`).
   Future<ResolvedContentPack> resolveStartupPack({
     required SceneManifest bundledManifest,
     required String bundledAssetRoot,
@@ -284,6 +303,7 @@ class ContentPackService {
     required String bundledAssetRoot,
     SemanticVersion? serverMinPackVersion,
   }) async {
+    final String expectedPackId = bundledManifest.packId;
     final String? rootPath = await _getStorageRootPath();
     if (rootPath == null) {
       return ResolvedContentPack(
@@ -316,7 +336,11 @@ class ContentPackService {
           'staged',
           meta.stagedVersion!,
         );
-        if (_loadVerifiedManifestFromDir(stagedDir) != null) {
+        if (_loadVerifiedManifestFromDir(
+              stagedDir,
+              expectedPackId: expectedPackId,
+            ) !=
+            null) {
           final String? prevActive = meta.activeVersion;
           if (prevActive != null && prevActive != meta.stagedVersion) {
             await _moveDirReplacing(
@@ -346,11 +370,13 @@ class ContentPackService {
           await _pruneUnusedPackDirs(rootPath, meta);
           await _collectBlobGarbage(rootPath);
         } else {
-          meta = meta.copyWith(clearStagedVersion: true);
+          // IR-05: the stored ETag belongs to the discarded pack; drop it so the next silent
+          // check refetches instead of stalling on 304.
+          meta = meta.copyWith(clearStagedVersion: true, clearEtag: true);
           await _saveMeta(meta);
         }
       } else {
-        meta = meta.copyWith(clearStagedVersion: true);
+        meta = meta.copyWith(clearStagedVersion: true, clearEtag: true);
         await _saveMeta(meta);
       }
     }
@@ -375,6 +401,7 @@ class ContentPackService {
           final Directory prevDir = _packDir(rootPath, 'previous', prevVerStr);
           final SceneManifest? prevManifest = _loadVerifiedManifestFromDir(
             prevDir,
+            expectedPackId: expectedPackId,
           );
           final SemanticVersion? prevVer = SemanticVersion.tryParse(prevVerStr);
           if (prevManifest != null &&
@@ -386,6 +413,7 @@ class ContentPackService {
             );
             meta = meta.copyWith(
               activeVersion: prevVerStr,
+              clearEtag: true, // IR-05
               clearPreviousVersion: true,
               blockedVersion: exceededBootFailures
                   ? activeVerStr
@@ -405,6 +433,7 @@ class ContentPackService {
         // Fall back cleanly to APK-bundled pack.
         meta = meta.copyWith(
           clearActiveVersion: true,
+          clearEtag: true, // IR-05
           clearPreviousVersion: true,
           blockedVersion: exceededBootFailures
               ? activeVerStr
@@ -423,6 +452,7 @@ class ContentPackService {
       final Directory activeDir = _packDir(rootPath, 'active', activeVerStr);
       final SceneManifest? activeManifest = _loadVerifiedManifestFromDir(
         activeDir,
+        expectedPackId: expectedPackId,
       );
       if (activeManifest != null) {
         meta = meta.copyWith(packBootAttempts: meta.packBootAttempts + 1);
@@ -433,6 +463,10 @@ class ContentPackService {
           isFileSystem: true,
         );
       }
+      // IR-01/IR-05: the active pack is unusable (missing/invalid/foreign packId): drop it and
+      // its ETag so the next check refetches, and fall back to the bundled pack.
+      meta = meta.copyWith(clearActiveVersion: true, clearEtag: true);
+      await _saveMeta(meta);
     }
 
     return ResolvedContentPack(
@@ -461,10 +495,12 @@ class ContentPackService {
     required String serverBaseUrl,
     required SemanticVersion bundledPackVersion,
     required SemanticVersion currentActivePackVersion,
+    required String expectedPackId,
     SemanticVersion? serverMinPackVersion,
     bool manualForce = false,
   }) => _synchronized(
     () => _syncFromServerLocked(
+      expectedPackId: expectedPackId,
       serverBaseUrl: serverBaseUrl,
       bundledPackVersion: bundledPackVersion,
       currentActivePackVersion: currentActivePackVersion,
@@ -474,6 +510,7 @@ class ContentPackService {
   );
 
   Future<ContentPackUpdateResult> _syncFromServerLocked({
+    required String expectedPackId,
     required String serverBaseUrl,
     required SemanticVersion bundledPackVersion,
     required SemanticVersion currentActivePackVersion,
@@ -561,6 +598,15 @@ class ContentPackService {
       rawSignatureBytes: Uint8List.fromList(sigResp.bodyBytes),
     );
 
+    // IR-01: pin the pack identity BEFORE the downgrade check so a foreign (even validly
+    // signed) pack can never touch the shared maxSeenVersion floor.
+    if (checksums.packId != expectedPackId) {
+      throw ContentPackException(
+        ContentPackErrorCode.packIdMismatch,
+        'Remote packId "${checksums.packId}" != expected "$expectedPackId".',
+      );
+    }
+
     // Anti-downgrade guard: max(bundled, localMaxSeen, serverMin)
     final SemanticVersion minAllowed = computeMinAcceptableVersion(
       bundledPackVersion: bundledPackVersion,
@@ -579,6 +625,21 @@ class ContentPackService {
       return ContentPackUpdateResult(
         status: ContentPackUpdateStatus.upToDate,
         packVersion: currentActivePackVersion.toString(),
+      );
+    }
+
+    // IR-N3: manual refresh of the version already active with intact files is a no-op; never
+    // rebuild and move over the live `active/<version>` directory while it is on screen.
+    if (manualForce &&
+        meta.activeVersion == checksums.packVersion.toString() &&
+        _loadVerifiedManifestFromDir(
+              _packDir(rootPath, 'active', meta.activeVersion!),
+              expectedPackId: expectedPackId,
+            ) !=
+            null) {
+      return ContentPackUpdateResult(
+        status: ContentPackUpdateStatus.upToDate,
+        packVersion: checksums.packVersion.toString(),
       );
     }
 
@@ -708,6 +769,7 @@ class ContentPackService {
       // Validate manifest & every referenced asset before staging/promotion.
       final SceneManifest? parsedManifest = _loadVerifiedManifestFromDir(
         stagingTarget,
+        expectedPackId: expectedPackId,
       );
       if (parsedManifest == null ||
           parsedManifest.packId != checksums.packId ||
@@ -871,7 +933,10 @@ class ContentPackService {
     } catch (_) {}
   }
 
-  SceneManifest? _loadVerifiedManifestFromDir(Directory packDir) {
+  SceneManifest? _loadVerifiedManifestFromDir(
+    Directory packDir, {
+    required String expectedPackId,
+  }) {
     if (!packDir.existsSync()) {
       return null;
     }
@@ -883,6 +948,9 @@ class ContentPackService {
       final SceneManifest manifest = _manifestParser.parseJson(
         manifestFile.readAsStringSync(),
       );
+      if (manifest.packId != expectedPackId) {
+        return null; // IR-01
+      }
       if (manifest.minAppProtocol > appProtocolVersion) {
         return null;
       }
@@ -1003,20 +1071,17 @@ class ContentPackService {
   static ({String keyId, Uint8List sigBytes}) _parseSigEnvelope(
     Uint8List rawSigBytes,
   ) {
-    if (rawSigBytes.length == 64) {
-      return (keyId: 'v1', sigBytes: rawSigBytes);
-    }
     final String text = utf8.decode(rawSigBytes, allowMalformed: true).trim();
     final int colon = text.indexOf(':');
-    final String keyId;
-    final String sigB64;
-    if (colon > 0) {
-      keyId = text.substring(0, colon).trim();
-      sigB64 = text.substring(colon + 1).trim();
-    } else {
-      keyId = 'v1';
-      sigB64 = text;
+    // IR-N1: the `keyId:base64` envelope is mandatory (no raw-64-byte / unprefixed fallback).
+    if (colon <= 0) {
+      throw const ContentPackException(
+        ContentPackErrorCode.signatureInvalid,
+        'Signature envelope must be "keyId:base64".',
+      );
     }
+    final String keyId = text.substring(0, colon).trim();
+    final String sigB64 = text.substring(colon + 1).trim();
     if (!_keyIdPattern.hasMatch(keyId)) {
       throw const ContentPackException(
         ContentPackErrorCode.unknownKeyId,
@@ -1079,6 +1144,7 @@ class _PackMeta {
     bool clearBlockedVersion = false,
     String? maxSeenVersion,
     String? etag,
+    bool clearEtag = false,
     int? packBootAttempts,
   }) {
     return _PackMeta(
@@ -1095,7 +1161,7 @@ class _PackMeta {
           ? null
           : (blockedVersion ?? this.blockedVersion),
       maxSeenVersion: maxSeenVersion ?? this.maxSeenVersion,
-      etag: etag ?? this.etag,
+      etag: clearEtag ? null : (etag ?? this.etag),
       packBootAttempts: packBootAttempts ?? this.packBootAttempts,
     );
   }

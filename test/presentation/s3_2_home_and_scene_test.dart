@@ -321,9 +321,9 @@ void main() {
         } catch (_) {}
       });
 
-      // Active external pack v1.2.0 (copy of the bundled v1 assets) with one failed boot recorded.
+      // Active external pack v1.3.0 (copy of the bundled v1 assets) with one failed boot recorded.
       final Directory activeDir = Directory(
-        '${tempPackRoot.path}/active/1.2.0/assets',
+        '${tempPackRoot.path}/active/1.3.0/assets',
       )..createSync(recursive: true);
       for (final FileSystemEntity f in Directory(
         'content/packs/v1/assets',
@@ -332,10 +332,10 @@ void main() {
           f.copySync('${activeDir.path}/${f.uri.pathSegments.last}');
         }
       }
-      File('${tempPackRoot.path}/active/1.2.0/manifest.json').writeAsStringSync(
+      File('${tempPackRoot.path}/active/1.3.0/manifest.json').writeAsStringSync(
         v1ManifestRaw.replaceFirst(
-          '"packVersion": "1.1.0"',
           '"packVersion": "1.2.0"',
+          '"packVersion": "1.3.0"',
         ),
       );
 
@@ -346,8 +346,8 @@ void main() {
       await store.write(
         metaKey,
         jsonEncode(<String, Object?>{
-          'activeVersion': '1.2.0',
-          'maxSeenVersion': '1.2.0',
+          'activeVersion': '1.3.0',
+          'maxSeenVersion': '1.3.0',
           'packBootAttempts': 1,
         }),
       );
@@ -382,12 +382,116 @@ void main() {
       await tester.pump();
 
       expect(find.byKey(const Key('space-setup-page')), findsOneWidget);
-      expect(controller.activePackVersion, '1.2.0');
+      expect(controller.activePackVersion, '1.3.0');
       final Map<String, Object?> meta =
           jsonDecode((await store.read(metaKey))!) as Map<String, Object?>;
       expect(meta['packBootAttempts'], 0);
     },
   );
+
+  // IR-03: the rollback guard must reset only after the active pack layers actually decoded.
+  for (final ({String label, bool corrupt}) scenario
+      in <({String label, bool corrupt})>[
+        (
+          label: 'valid file-system pack resets packBootAttempts once layers decoded',
+          corrupt: false,
+        ),
+        (
+          label: 'undecodable PNG layer in a file-system pack does NOT reset packBootAttempts',
+          corrupt: true,
+        ),
+      ]) {
+    testWidgets('IR-03: ${scenario.label}', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final Directory tempPackRoot = Directory.systemTemp.createTempSync(
+        'deepsky_ir03_',
+      );
+      addTearDown(() {
+        PaintingBinding.instance.imageCache.clear();
+        try {
+          tempPackRoot.deleteSync(recursive: true);
+        } catch (_) {}
+      });
+
+      final Directory activeAssets = Directory(
+        '${tempPackRoot.path}/active/1.3.0/assets',
+      )..createSync(recursive: true);
+      for (final FileSystemEntity f in Directory(
+        'content/packs/v1/assets',
+      ).listSync()) {
+        if (f is File) {
+          f.copySync('${activeAssets.path}/${f.uri.pathSegments.last}');
+        }
+      }
+      if (scenario.corrupt) {
+        // Same path/size class as a real asset, but not a decodable image.
+        File('${activeAssets.path}/floor.png')
+            .writeAsBytesSync(List<int>.filled(64, 7));
+      }
+      File('${tempPackRoot.path}/active/1.3.0/manifest.json').writeAsStringSync(
+        v1ManifestRaw.replaceFirst(
+          '"packVersion": "1.2.0"',
+          '"packVersion": "1.3.0"',
+        ),
+      );
+
+      final InMemorySecureKeyStore store = await buildPairedStore();
+      const String metaKey = 'deepsky.content_pack.meta.v1';
+      await store.write(
+        metaKey,
+        jsonEncode(<String, Object?>{
+          'activeVersion': '1.3.0',
+          'maxSeenVersion': '1.3.0',
+          'packBootAttempts': 1,
+        }),
+      );
+
+      final MockClient httpClient = buildMockServer();
+      final ContentPackService packService = ContentPackService(
+        keyStore: store,
+        trustedPublicKeys: const <String, SimplePublicKey>{},
+        httpClient: httpClient,
+        resolveStorageRootDir: () async => tempPackRoot.path,
+        isConnectionUnmetered: () async => false,
+      );
+      final DeepSkyController controller = DeepSkyController(
+        keyStore: store,
+        httpClient: httpClient,
+        contentPackService: packService,
+        loadAssetString: (_) async => v1ManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+        enableSkyRefreshTimer: false,
+      );
+      controller.reduceMotion = true;
+
+      await tester.pumpWidget(
+        DeepSkyApp(controller: controller, autoInitialize: false),
+      );
+      await tester.runAsync(controller.initialize);
+      for (int i = 0; i < 20; i++) {
+        await tester.pump();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 50)),
+        );
+      }
+      await tester.pump();
+
+      expect(controller.activePackIsFileSystem, isTrue);
+      expect(find.byKey(const Key('ds2-scene-canvas')), findsOneWidget);
+      if (scenario.corrupt) {
+        // Decode failures are reported through FlutterError (expected here).
+        while (tester.takeException() != null) {}
+      }
+      final Map<String, Object?> meta =
+          jsonDecode((await store.read(metaKey))!) as Map<String, Object?>;
+      // Startup incremented 1 -> 2; a decode failure must leave it pending (not reset to 0).
+      expect(meta['packBootAttempts'], scenario.corrupt ? 2 : 0);
+    });
+  }
 
   testWidgets(
     'Dual-state "Ti penso" card shows "<Partner> ti ha pensato" + Ricambia for unseen <6h thought and switches to quick-send after reply',
@@ -639,7 +743,7 @@ void main() {
   );
 
   testWidgets(
-    'Settings "Aggiorna grafiche" hot-reloads signed v1.2.0 pack live without restarting app',
+    'Settings "Aggiorna grafiche" hot-reloads signed v1.3.0 pack live without restarting app',
     (WidgetTester tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1.0;
@@ -664,12 +768,12 @@ void main() {
       final Uint8List rugBytes = File('content/packs/v1/assets/rug.png')
           .readAsBytesSync();
 
-      final String v12Manifest = jsonEncode(<String, Object?>{
+      final String v13Manifest = jsonEncode(<String, Object?>{
         'schemaVersion': 1,
         'packId': 'deep-sky-home-v1',
-        'packVersion': '1.2.0',
+        'packVersion': '1.3.0',
         'minAppProtocol': 1,
-        'name': <String, String>{'it': 'Casa v1.2', 'en': 'Home v1.2'},
+        'name': <String, String>{'it': 'Casa v1.3', 'en': 'Home v1.3'},
         'scene': <String, Object?>{
           'aspectRatio': '4:3',
           'bleed': <String, double>{
@@ -757,7 +861,7 @@ void main() {
       });
 
       final Map<String, List<int>> files = <String, List<int>>{
-        'manifest.json': utf8.encode(v12Manifest),
+        'manifest.json': utf8.encode(v13Manifest),
         'assets/floor.png': floorBytes,
         'assets/rug.png': rugBytes,
       };
@@ -777,7 +881,7 @@ void main() {
             'schemaVersion': 1,
             'keyId': 'v1',
             'packId': 'deep-sky-home-v1',
-            'packVersion': '1.2.0',
+            'packVersion': '1.3.0',
             'minAppProtocol': 1,
             'files': fileMeta,
           }),
@@ -853,13 +957,13 @@ void main() {
       await tester.pumpWidget(DeepSkyApp(controller: controller));
       await tester.pumpAndSettle();
 
-      expect(controller.activePackVersion, '1.1.0');
+      expect(controller.activePackVersion, '1.2.0');
 
       // Open Settings via single top-right button
       await tester.tap(find.byKey(const Key('open-settings-button')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('settings-page')), findsOneWidget);
-      expect(find.textContaining('v1.1.0'), findsOneWidget);
+      expect(find.textContaining('v1.2.0'), findsOneWidget);
 
       // Tap explicit "Aggiorna grafiche" button
       final Finder updateBtn = find.byKey(
@@ -888,14 +992,189 @@ void main() {
       }
       await tester.pumpAndSettle();
 
-      expect(controller.activePackVersion, '1.2.0');
+      expect(controller.activePackVersion, '1.3.0');
       expect(controller.activePackIsFileSystem, isTrue);
-      expect(find.textContaining('v1.2.0'), findsWidgets);
+      expect(find.textContaining('v1.3.0'), findsWidgets);
 
-      // Pop back to Home and verify the new v1.2.0 pet_sleeping slot is live!
+      // Pop back to Home and verify the updated v1.3.0 pet_sleeping slot is live!
       await tester.tap(find.byKey(const Key('settings-back-button')));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('scene-slot-pet_sleeping')), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'Thinking of you card omits old sub-header and opens ThoughtHistorySheet (empty & populated, IT/EN, 200% text scale)',
+    (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      final DateTime nowLocal = DateTime(2026, 11, 22, 14, 30);
+      final DateTime nowUtc = nowLocal.toUtc();
+
+      final InMemorySecureKeyStore emptyStore = await buildPairedStore();
+      final DeepSkyController emptyCtrl = DeepSkyController(
+        keyStore: emptyStore,
+        httpClient: buildMockServer(offline: false),
+        loadAssetString: (_) async => v1ManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+        enableSkyRefreshTimer: false,
+        clockUtc: () => nowUtc,
+        clockLocal: () => nowLocal,
+      );
+      emptyCtrl.reduceMotion = true;
+
+      await tester.pumpWidget(DeepSkyApp(controller: emptyCtrl));
+      await tester.pumpAndSettle();
+
+      // Old sub-header must be gone
+      expect(
+        find.text('Accende una luce gentile nella vostra casa.'),
+        findsNothing,
+      );
+      expect(
+        find.text('Lights a gentle glow in your shared home.'),
+        findsNothing,
+      );
+
+      // Small history button is present and opens the empty history sheet
+      final Finder historyBtn = find.byKey(
+        const Key('open-thought-history-button'),
+      );
+      expect(historyBtn, findsOneWidget);
+      await tester.tap(historyBtn);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('thought-history-sheet')), findsOneWidget);
+      expect(find.textContaining('0 pensieri'), findsOneWidget);
+      expect(find.byKey(const Key('thought-history-empty')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('close-thought-history-button')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('thought-history-sheet')), findsNothing);
+
+      // Populated history with today, yesterday, older, and silent tap (offline cache + 200% text scale)
+      final List<CachedEventEntry> sampleEvents = <CachedEventEntry>[
+        CachedEventEntry(
+          envelopeId: 'env-1',
+          coupleId: 'couple-s32',
+          senderDeviceId: 'dev-partner',
+          channel: EnvelopeChannel.event,
+          keyEpoch: 1,
+          seq: 1,
+          createdAtServer: nowLocal.subtract(const Duration(days: 3)).toUtc(),
+          payload: DecryptedEnvelopePayload(
+            schemaVersion: 1,
+            eventType: 'thinking_of_you',
+            createdAtClient: DateTime(2026, 11, 19, 10, 15).toUtc(),
+            authorDeviceId: 'dev-partner',
+            body: const <String, Object?>{'note': 'Buongiorno'},
+          ),
+        ),
+        CachedEventEntry(
+          envelopeId: 'env-2',
+          coupleId: 'couple-s32',
+          senderDeviceId: 'dev-me',
+          channel: EnvelopeChannel.event,
+          keyEpoch: 1,
+          seq: 2,
+          createdAtServer: DateTime(2026, 11, 21, 14, 5).toUtc(),
+          payload: DecryptedEnvelopePayload(
+            schemaVersion: 1,
+            eventType: 'thinking_of_you',
+            createdAtClient: DateTime(2026, 11, 21, 14, 5).toUtc(),
+            authorDeviceId: 'dev-me',
+            body: const <String, Object?>{},
+          ),
+        ),
+        CachedEventEntry(
+          envelopeId: 'env-3',
+          coupleId: 'couple-s32',
+          senderDeviceId: 'dev-partner',
+          channel: EnvelopeChannel.event,
+          keyEpoch: 1,
+          seq: 3,
+          createdAtServer: DateTime(2026, 11, 22, 12, 40).toUtc(),
+          payload: DecryptedEnvelopePayload(
+            schemaVersion: 1,
+            eventType: 'thinking_of_you',
+            createdAtClient: DateTime(2026, 11, 22, 12, 40).toUtc(),
+            authorDeviceId: 'dev-partner',
+            body: const <String, Object?>{'note': 'Un bacio tra una lezione'},
+          ),
+        ),
+      ];
+
+      final InMemorySecureKeyStore populatedStore = await buildPairedStore(
+        cachedEvents: sampleEvents,
+      );
+      final DeepSkyController populatedCtrl = DeepSkyController(
+        keyStore: populatedStore,
+        httpClient: buildMockServer(offline: true),
+        loadAssetString: (_) async => v1ManifestRaw,
+        loadCapabilities: () async => testCaps,
+        defaultServerUrl: 'https://couple.example.test',
+        enableSkyRefreshTimer: false,
+        clockUtc: () => nowUtc,
+        clockLocal: () => nowLocal,
+      );
+      populatedCtrl.reduceMotion = true;
+
+      tester.platformDispatcher.textScaleFactorTestValue = 2.0;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      await tester.pumpWidget(
+        DeepSkyApp(
+          key: const ValueKey<String>('populated-app'),
+          controller: populatedCtrl,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(populatedCtrl.events.length, 3);
+
+      // Also visible in received-thought state
+      expect(
+        find.byKey(const Key('open-thought-history-button')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('open-thought-history-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('thought-history-sheet')), findsOneWidget);
+      expect(find.textContaining('3 pensieri'), findsOneWidget);
+      expect(find.text('OGGI'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('thought-history-sheet')),
+          matching: find.textContaining('Un bacio tra una lezione'),
+        ),
+        findsOneWidget,
+      );
+
+      final Finder historyScroll = find
+          .descendant(
+            of: find.byKey(const Key('thought-history-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        find.text('IERI'),
+        150,
+        scrollable: historyScroll,
+      );
+      expect(find.text('IERI'), findsOneWidget);
+      expect(find.text('Pensiero silenzioso'), findsOneWidget);
+      expect(find.textContaining('Tu (Luca)'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.text('19 nov'),
+        150,
+        scrollable: historyScroll,
+      );
+      expect(find.text('19 nov'), findsOneWidget);
+      expect(tester.takeException(), isNull);
     },
   );
 }

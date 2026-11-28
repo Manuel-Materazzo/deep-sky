@@ -9,6 +9,7 @@ import 'package:deep_sky/presentation/l10n/deep_sky_strings.dart';
 import 'package:deep_sky/presentation/screens/settings_page.dart';
 import 'package:deep_sky/presentation/theme/deep_sky_theme.dart';
 import 'package:deep_sky/presentation/widgets/invite_verification_section.dart';
+import 'package:deep_sky/presentation/widgets/thought_history_sheet.dart';
 import 'package:deep_sky/scene/hybrid_scene_canvas.dart';
 import 'package:deep_sky/scene/scene_manifest.dart';
 import 'package:flutter/semantics.dart';
@@ -55,7 +56,11 @@ class _HomeShellPageState extends State<HomeShellPage> {
       if (!mounted) {
         return;
       }
-      widget.controller.markHomeBootSucceeded();
+      // IR-03: a file-system pack only counts as booted once its active layers decoded
+      // (see `_onActiveLayersResolved`); bundled assets cannot be a bad downloaded pack.
+      if (!widget.controller.activePackIsFileSystem) {
+        widget.controller.markHomeBootSucceeded();
+      }
       _centerPanoramicSceneIfNeeded();
     });
   }
@@ -69,6 +74,15 @@ class _HomeShellPageState extends State<HomeShellPage> {
       _handledThoughtSentSequence = 0;
       _syncThoughtSentTimer();
     }
+  }
+
+  /// `IR-03`: reset `packBootAttempts` only when every active layer of a file-system pack
+  /// resolved; a decode failure leaves the counter so the rollback guard can trigger.
+  void _onActiveLayersResolved(bool allOk) {
+    if (!mounted || !allOk) {
+      return;
+    }
+    widget.controller.markHomeBootSucceeded();
   }
 
   void _syncThoughtSentTimer() {
@@ -122,6 +136,38 @@ class _HomeShellPageState extends State<HomeShellPage> {
       MaterialPageRoute<void>(
         builder: (_) => SettingsPage(controller: widget.controller),
       ),
+    );
+  }
+
+  Future<void> _openThoughtHistory(
+    BuildContext context,
+    DeepSkyController c,
+    DeepSkyStrings s,
+  ) {
+    return showThoughtHistorySheet(
+      context: context,
+      events: c.events,
+      myDeviceId: c.identity?.deviceId,
+      myDisplayName: c.identity?.deviceLabel,
+      partnerDisplayName: c.partnerDisplayLabel,
+      nowLocal: c.nowLocal,
+      strings: s,
+    );
+  }
+
+  Widget _buildThoughtHistoryButton(
+    BuildContext context,
+    DeepSkyController c,
+    DeepSkyStrings s,
+    DeepSkyTokens tokens,
+  ) {
+    return IconButton(
+      key: const Key('open-thought-history-button'),
+      tooltip: s.thoughtHistoryButtonTooltip,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+      onPressed: () => _openThoughtHistory(context, c, s),
+      icon: Icon(Icons.history_rounded, size: 20, color: tokens.mutedInk),
     );
   }
 
@@ -396,6 +442,9 @@ class _HomeShellPageState extends State<HomeShellPage> {
                               slotStates: c.sceneState.slotStates,
                               overrides: c.assetOverrides,
                               languageCode: c.languageCode,
+                              onActiveLayersResolved: c.activePackIsFileSystem
+                                  ? _onActiveLayersResolved
+                                  : null,
                               expandFloorDownward: true,
                               extraFloorHeight: extraFloorH,
                               floorBaseColor: tokens.floorParquetBase,
@@ -420,6 +469,9 @@ class _HomeShellPageState extends State<HomeShellPage> {
                             slotStates: c.sceneState.slotStates,
                             overrides: c.assetOverrides,
                             languageCode: c.languageCode,
+                            onActiveLayersResolved: c.activePackIsFileSystem
+                                ? _onActiveLayersResolved
+                                : null,
                             onSlotTapped: (SceneSlot slot) =>
                                 _handleSceneSlotTap(slot, c, canWrite),
                           ),
@@ -585,6 +637,7 @@ class _HomeShellPageState extends State<HomeShellPage> {
                       ],
                     ),
                   ),
+                  _buildThoughtHistoryButton(context, c, s, tokens),
                 ],
               ),
               if (note != null) ...<Widget>[
@@ -743,21 +796,12 @@ class _HomeShellPageState extends State<HomeShellPage> {
                   Icon(Icons.favorite_border_rounded, color: tokens.blushPetal),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          s.quickThoughtTitle,
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                        Text(
-                          s.quickThoughtSubtitle,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: tokens.mutedInk),
-                        ),
-                      ],
+                    child: Text(
+                      s.quickThoughtTitle,
+                      style: Theme.of(context).textTheme.titleSmall,
                     ),
                   ),
+                  _buildThoughtHistoryButton(context, c, s, tokens),
                 ],
               ),
               const SizedBox(height: 10),
