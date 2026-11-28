@@ -56,7 +56,9 @@ class ThoughtHistorySheet extends StatelessWidget {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     final List<CachedEventEntry> thoughts =
         events
-            .where((CachedEventEntry e) => e.payload.eventType == 'thinking_of_you')
+            .where(
+              (CachedEventEntry e) => e.payload.eventType == 'thinking_of_you',
+            )
             .toList()
           ..sort((CachedEventEntry a, CachedEventEntry b) {
             final int timeCmp = b.payload.createdAtClient.compareTo(
@@ -109,7 +111,9 @@ class ThoughtHistorySheet extends StatelessWidget {
                       color: scheme.primaryContainer,
                       boxShadow: <BoxShadow>[
                         BoxShadow(
-                          color: scheme.primaryContainer.withValues(alpha: 0.45),
+                          color: scheme.primaryContainer.withValues(
+                            alpha: 0.45,
+                          ),
                           blurRadius: 10,
                           spreadRadius: 2,
                         ),
@@ -184,14 +188,9 @@ class ThoughtHistorySheet extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: <Color>[
-            tokens.cardSurface,
-            tokens.surfaceLow,
-          ],
+          colors: <Color>[tokens.cardSurface, tokens.surfaceLow],
         ),
-        border: Border.all(
-          color: tokens.cardBorder.withValues(alpha: 0.35),
-        ),
+        border: Border.all(color: tokens.cardBorder.withValues(alpha: 0.35)),
       ),
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -219,9 +218,8 @@ class ThoughtHistorySheet extends StatelessWidget {
               children: <InlineSpan>[
                 TextSpan(
                   text: strings.thoughtHistoryCount(totalCount),
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: Theme.of(context).textTheme.headlineMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
                 const TextSpan(text: '  '),
                 TextSpan(
@@ -236,9 +234,8 @@ class ThoughtHistorySheet extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             strings.thoughtHistorySubtitle,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: tokens.mutedInk,
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: tokens.mutedInk),
           ),
         ],
       ),
@@ -256,11 +253,7 @@ class ThoughtHistorySheet extends StatelessWidget {
       ),
       child: Column(
         children: <Widget>[
-          Icon(
-            Icons.nights_stay_outlined,
-            size: 28,
-            color: tokens.blushPetal,
-          ),
+          Icon(Icons.nights_stay_outlined, size: 28, color: tokens.blushPetal),
           const SizedBox(height: 10),
           Text(
             strings.thoughtHistoryEmptyTitle,
@@ -270,9 +263,8 @@ class ThoughtHistorySheet extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             strings.thoughtHistoryEmptyBody,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: tokens.mutedInk,
-            ),
+            style: Theme.of(context).textTheme.bodySmall
+                ?.copyWith(color: tokens.mutedInk),
             textAlign: TextAlign.center,
           ),
         ],
@@ -360,9 +352,7 @@ class ThoughtHistorySheet extends StatelessWidget {
       decoration: BoxDecoration(
         color: isMe ? tokens.surfaceLow : tokens.cardSurface,
         borderRadius: BorderRadius.circular(DeepSkyTheme.radiusXl),
-        border: Border.all(
-          color: tokens.cardBorder.withValues(alpha: 0.28),
-        ),
+        border: Border.all(color: tokens.cardBorder.withValues(alpha: 0.28)),
       ),
       padding: const EdgeInsets.all(14),
       child: Row(
@@ -463,9 +453,8 @@ class ThoughtHistorySheet extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       timeLabel,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: tokens.mutedInk,
-                      ),
+                      style: Theme.of(context).textTheme.labelSmall
+                          ?.copyWith(color: tokens.mutedInk),
                     ),
                   ],
                 ),
@@ -473,9 +462,8 @@ class ThoughtHistorySheet extends StatelessWidget {
                 if (note != null)
                   Text(
                     '“$note”',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: isMe ? tokens.mutedInk : null,
-                    ),
+                    style: Theme.of(context).textTheme.bodyMedium
+                        ?.copyWith(color: isMe ? tokens.mutedInk : null),
                   )
                 else
                   Text(
@@ -494,7 +482,11 @@ class ThoughtHistorySheet extends StatelessWidget {
   }
 
   List<_DateGroup> _groupByLocalDate(List<CachedEventEntry> sorted) {
-    final DateTime today = DateTime(nowLocal.year, nowLocal.month, nowLocal.day);
+    final DateTime today = DateTime(
+      nowLocal.year,
+      nowLocal.month,
+      nowLocal.day,
+    );
     final DateTime yesterday = today.subtract(const Duration(days: 1));
     final Map<DateTime, List<CachedEventEntry>> buckets =
         <DateTime, List<CachedEventEntry>>{};
@@ -518,7 +510,9 @@ class ThoughtHistorySheet extends StatelessWidget {
       } else {
         label = strings.thoughtHistoryDateLabel(day, nowLocal);
       }
-      groups.add(_DateGroup(label: label, isToday: isToday, entries: bucket.value));
+      groups.add(
+        _DateGroup(label: label, isToday: isToday, entries: bucket.value),
+      );
     }
     return groups;
   }
